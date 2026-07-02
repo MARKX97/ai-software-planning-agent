@@ -5,7 +5,11 @@
   "type": "object",
   "properties": {
     "topic": { "type": "string", "description": "冲突主题" },
-    "positions": { "type": "object", "additionalProperties": { "type": "string" }, "description": "各模型立场，key为模型名称，value为立场描述" },
+    "positions": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "各模型立场，key为模型名称，value为立场描述"
+    },
     "resolution": { "type": "string", "description": "消解方案（融合阶段填充）" }
   },
   "required": ["topic", "positions"]

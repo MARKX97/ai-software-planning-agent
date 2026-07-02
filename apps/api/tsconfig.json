@@ -1,5 +1,4 @@
 {
-{
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "module": "CommonJS",
@@ -25,4 +24,3 @@
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "test"]
 }
-

@@ -22,14 +22,14 @@ triggers:
 
 ## 1. 环境对比
 
-| 维度 | 本地开发 | 测试环境 | 生产环境 |
-|------|----------|----------|----------|
-| 部署方式 | `pnpm dev` | Docker Compose | Docker Compose |
-| 数据库 | 本地 PostgreSQL | Docker PostgreSQL | Docker PostgreSQL |
-| 日志级别 | DEBUG | INFO | WARN |
-| 认证 | 可选 | 必选 | 必选 |
-| 监控 | 无 | 基础 | 完整 |
-| 备份 | 无 | 手动 | 自动 |
+| 维度     | 本地开发        | 测试环境          | 生产环境          |
+| -------- | --------------- | ----------------- | ----------------- |
+| 部署方式 | `pnpm dev`      | Docker Compose    | Docker Compose    |
+| 数据库   | 本地 PostgreSQL | Docker PostgreSQL | Docker PostgreSQL |
+| 日志级别 | DEBUG           | INFO              | WARN              |
+| 认证     | 可选            | 必选              | 必选              |
+| 监控     | 无              | 基础              | 完整              |
+| 备份     | 无              | 手动              | 自动              |
 
 ## 2. 本地开发
 
@@ -63,28 +63,28 @@ docker/
 
 ### 卷
 
-| 卷名 | 用途 | 持久化 |
-|------|------|--------|
-| `pgdata` | PostgreSQL 数据 | 是 |
-| `artifacts` | 产物文件 | 是 |
+| 卷名        | 用途            | 持久化 |
+| ----------- | --------------- | ------ |
+| `pgdata`    | PostgreSQL 数据 | 是     |
+| `artifacts` | 产物文件        | 是     |
 
 ### 健康检查
 
-| 服务 | 检查 | 间隔 | 超时 | 重试 |
-|------|------|------|------|------|
-| web | `curl localhost:3000` | 30s | 10s | 3 |
-| api | `curl localhost:3001/api/v1/health` | 30s | 10s | 3 |
-| postgres | `pg_isready` | 10s | 5s | 5 |
+| 服务     | 检查                                | 间隔 | 超时 | 重试 |
+| -------- | ----------------------------------- | ---- | ---- | ---- |
+| web      | `curl localhost:3000`               | 30s  | 10s  | 3    |
+| api      | `curl localhost:3001/api/v1/health` | 30s  | 10s  | 3    |
+| postgres | `pg_isready`                        | 10s  | 5s   | 5    |
 
 ## 5. 环境变量
 
-| 分类 | 变量 | 必须 |
-|------|------|------|
-| 数据库 | `DATABASE_URL` | 是 |
-| LLM API | `BAISHAN_BASE_URL`, `BAISHAN_API_KEY` | 是 |
-| LLM API | `BAISHAN_MODEL_DEEPSEEK/GLM/MINIMAX` | 否 |
-| 应用 | `API_PORT`, `WEB_PORT`, `API_KEY`, `DATA_DIR`, `LOG_LEVEL` | 否 |
-| 成本 | `COST_MAX_TOKENS_PER_PROJECT`, `COST_MAX_COST_PER_PROJECT` | 否 |
+| 分类    | 变量                                                       | 必须 |
+| ------- | ---------------------------------------------------------- | ---- |
+| 数据库  | `DATABASE_URL`                                             | 是   |
+| LLM API | `BAISHAN_BASE_URL`, `BAISHAN_API_KEY`                      | 是   |
+| LLM API | `BAISHAN_MODEL_DEEPSEEK/GLM/MINIMAX`                       | 否   |
+| 应用    | `API_PORT`, `WEB_PORT`, `API_KEY`, `DATA_DIR`, `LOG_LEVEL` | 否   |
+| 成本    | `COST_MAX_TOKENS_PER_PROJECT`, `COST_MAX_COST_PER_PROJECT` | 否   |
 
 安全: .env 加入 .gitignore、生产 API Key 90 天轮换、不记录 API Key 到日志、数据库密码 > 16 位、生产端口仅绑定 127.0.0.1
 
@@ -97,6 +97,7 @@ docker/
 ```
 
 规范:
+
 - ✅ 迁移文件提交 Git、新增字段设 DEFAULT 或 NULL、生产迁移前备份
 - ❌ 禁止手动修改已提交迁移、禁止生产执行 `prisma migrate dev`、禁止删除字段（标记 `@deprecated` 等 MAJOR）
 
@@ -106,52 +107,52 @@ docker/
 Push/PR → Lint & Type Check → Test → Build → Deploy
 ```
 
-| 事件 | 目标 | 触发 |
-|------|------|------|
+| 事件            | 目标     | 触发 |
+| --------------- | -------- | ---- |
 | Push to develop | 测试环境 | 自动 |
-| Merge to main | 生产 | 手动 |
-| Tag v* | 生产 | 手动 |
+| Merge to main   | 生产     | 手动 |
+| Tag v*          | 生产     | 手动 |
 
 ## 8. 日志与监控
 
 - 框架: pino（结构化 JSON）
 - 存储: stdout → Docker logs → 日志文件，每天轮转，保留 30 天
 
-| 级别 | 场景 |
-|------|------|
-| ERROR | 需立即关注 |
-| WARN | 潜在问题 |
-| INFO | 关键业务事件 |
-| DEBUG | 调试信息 |
+| 级别  | 场景         |
+| ----- | ------------ |
+| ERROR | 需立即关注   |
+| WARN  | 潜在问题     |
+| INFO  | 关键业务事件 |
+| DEBUG | 调试信息     |
 
 告警阈值: API 连续 3 次失败、数据库不可用、3 个 Provider 全部 unhealthy、单项目成本 > ¥5.00、磁盘 > 80%
 
 ## 9. 备份策略
 
-| 备份项 | 方式 | 频率 | 保留 |
-|--------|------|------|------|
-| PostgreSQL | `pg_dump` | 每天 03:00 | 7 天 |
-| 产物文件 | 文件同步 | 每天 04:00 | 7 天 |
-| 环境变量 | 手动备份 | 变更时 | 永久 |
-| Docker 配置 | Git | 每次变更 | 永久 |
+| 备份项      | 方式      | 频率       | 保留 |
+| ----------- | --------- | ---------- | ---- |
+| PostgreSQL  | `pg_dump` | 每天 03:00 | 7 天 |
+| 产物文件    | 文件同步  | 每天 04:00 | 7 天 |
+| 环境变量    | 手动备份  | 变更时     | 永久 |
+| Docker 配置 | Git       | 每次变更   | 永久 |
 
 ## 10. 灾难恢复
 
-| 故障 | 恢复方案 | RTO | RPO |
-|------|----------|-----|-----|
-| API 进程崩溃 | Docker 自动重启 | < 1 分钟 | 0 |
-| PostgreSQL 宕机 | 重启容器 + 恢复备份 | < 5 分钟 | < 24h |
-| 磁盘故障 | 恢复最新备份 | < 30 分钟 | < 24h |
-| 服务器宕机 | 新服务器部署 + 恢复备份 | < 1 小时 | < 24h |
+| 故障            | 恢复方案                | RTO       | RPO   |
+| --------------- | ----------------------- | --------- | ----- |
+| API 进程崩溃    | Docker 自动重启         | < 1 分钟  | 0     |
+| PostgreSQL 宕机 | 重启容器 + 恢复备份     | < 5 分钟  | < 24h |
+| 磁盘故障        | 恢复最新备份            | < 30 分钟 | < 24h |
+| 服务器宕机      | 新服务器部署 + 恢复备份 | < 1 小时  | < 24h |
 
 ## 11. 成本控制
 
-| 成本项 | 估算/月 |
-|--------|---------|
-| 云服务器 (2C2G) | ¥50-100 |
-| 数据库存储 | ¥10-20 |
-| 备份存储 | ¥5-10 |
-| LLM API 调用 | ¥0.167/项目 |
+| 成本项               | 估算/月     |
+| -------------------- | ----------- |
+| 云服务器 (2C2G)      | ¥50-100     |
+| 数据库存储           | ¥10-20      |
+| 备份存储             | ¥5-10       |
+| LLM API 调用         | ¥0.167/项目 |
 | **合计（不含 LLM）** | **¥70-140** |
 
 ## 12. 常用运维命令

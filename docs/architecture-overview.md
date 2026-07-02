@@ -7,18 +7,18 @@
 
 ## 技术栈
 
-| 层 | 技术 | 版本 |
-|----|------|------|
-| 前端 | Next.js (App Router) | 15.x |
-| 后端 | NestJS | 11.x |
-| 数据库 | PostgreSQL | 16 |
-| ORM | Prisma | 6 |
-| 语言 | TypeScript | 5.5+ |
-| 样式 | Tailwind CSS | 4.x |
-| UI | shadcn/ui | latest |
-| 包管理 | pnpm | 9 |
-| Monorepo | Turborepo | latest |
-| AI 接入 | Baishan OpenAI Compatible API | — |
+| 层       | 技术                          | 版本   |
+| -------- | ----------------------------- | ------ |
+| 前端     | Next.js (App Router)          | 15.x   |
+| 后端     | NestJS                        | 11.x   |
+| 数据库   | PostgreSQL                    | 16     |
+| ORM      | Prisma                        | 6      |
+| 语言     | TypeScript                    | 5.5+   |
+| 样式     | Tailwind CSS                  | 4.x    |
+| UI       | shadcn/ui                     | latest |
+| 包管理   | pnpm                          | 9      |
+| Monorepo | Turborepo                     | latest |
+| AI 接入  | Baishan OpenAI Compatible API | —      |
 
 ## 架构图
 

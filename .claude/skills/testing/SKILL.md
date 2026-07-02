@@ -32,53 +32,61 @@ triggers:
 
 ## 2. 测试框架
 
-| 层 | 工具 |
-|----|------|
-| 后端单元测试 | Jest 30 |
-| 后端集成测试 | Jest + Supertest |
-| 前端单元测试 | Vitest |
+| 层           | 工具                   |
+| ------------ | ---------------------- |
+| 后端单元测试 | Jest 30                |
+| 后端集成测试 | Jest + Supertest       |
+| 前端单元测试 | Vitest                 |
 | 前端组件测试 | @testing-library/react |
-| E2E | Playwright |
-| API 契约测试 | OpenAPI Validator |
-| LLM Mock | MockLLMProvider |
+| E2E          | Playwright             |
+| API 契约测试 | OpenAPI Validator      |
+| LLM Mock     | MockLLMProvider        |
 
 ## 3. 覆盖率目标
 
-| 包 | 目标 |
-|----|------|
-| `packages/llm-core` | 90%+ |
-| `packages/llm-providers` | 85%+ |
-| `packages/llm-orchestrator` | 85%+ |
-| `apps/api/src/modules/workflow` | 80%+ |
+| 包                               | 目标 |
+| -------------------------------- | ---- |
+| `packages/llm-core`              | 90%+ |
+| `packages/llm-providers`         | 85%+ |
+| `packages/llm-orchestrator`      | 85%+ |
+| `apps/api/src/modules/workflow`  | 80%+ |
 | `apps/api/src/modules/synthesis` | 80%+ |
-| `apps/api/src/modules/artifact` | 80%+ |
-| `apps/api/src/modules`（其他） | 70%+ |
-| `apps/web` | 70%+ |
+| `apps/api/src/modules/artifact`  | 80%+ |
+| `apps/api/src/modules`（其他）   | 70%+ |
+| `apps/web`                       | 70%+ |
 
 ## 4. 测试类型
 
 ### Unit Test
+
 覆盖: cost-calculator, schema-validator, retry-policy, response-parser, baishan-adapter, base-provider, provider-registry, retry.strategy, cost-controller, call-tracker, stage.ts, cost.ts, workflow-state-machine, conflict-resolver, token-tracker, 前端组件
 
 ### Integration Test
+
 覆盖: Project CRUD, Conversation + Message, Workflow + Stages, Prisma + PostgreSQL, Orchestrator + Mock Providers。所有集成测试使用真实 PostgreSQL（CI 中 Service Container）
 
 ### API Test
+
 26 个接口，每个 ≥ 3 个用例（正常/异常/边界）。Supertest + OpenAPI 契约校验
 
 ### Workflow Test
+
 状态机（17 条合法 + 非法转换）、9 个阶段（Mock LLM）、澄清循环（多轮 + 上限）、降级路径（1/2/3 模型失败）、错误恢复
 
 ### LLM Mock Test
+
 `MockLLMProvider` 支持 fail/timeout/delay 控制，覆盖: 正常/超时/单模型失败/全模型失败/Schema 校验失败/高延迟/成本超限
 
 ### Prompt Regression Test
+
 变量完整性、长度检查（< 8,000 字符）、结构检查、Snapshot 快照
 
 ### Artifact Generation Test
+
 11 类产物全部生成、格式正确、内容非空、文件存储正确、部分失败不影响其他产物
 
 ### E2E Test
+
 Playwright 覆盖: 完整工作流（创建→运行→澄清→等待→验证产物）、前端 UI 交互
 
 ## 5. Mock Provider
@@ -95,6 +103,7 @@ class MockLLMProvider implements ILLMProvider {
 ## 6. Golden Dataset
 
 3 个标准测试用例:
+
 1. Todo app — 简单项目
 2. 协作平台 — 复杂项目
 3. 饮水追踪 — 移动端项目
@@ -105,10 +114,10 @@ class MockLLMProvider implements ILLMProvider {
 
 ```yaml
 jobs:
-  unit-test:          # 6 个包并行
-  integration-test:   # PostgreSQL Service Container
-  api-contract-test:  # OpenAPI 契约校验
-  prompt-regression:  # Prompt 快照
+  unit-test: # 6 个包并行
+  integration-test: # PostgreSQL Service Container
+  api-contract-test: # OpenAPI 契约校验
+  prompt-regression: # Prompt 快照
   architecture-check: # 禁止技术检查
 ```
 

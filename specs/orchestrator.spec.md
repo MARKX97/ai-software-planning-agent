@@ -43,27 +43,27 @@ healthCheck(): Promise<Record<string, boolean>>
 
 ## 2. 重试策略
 
-| 错误类型 | 是否重试 | 重试次数 | 延迟 |
-|----------|----------|----------|------|
-| LLMTimeoutError | ✅ | 3 | 1s → 2s → 4s |
-| LLMRateLimitError | ✅ | 3 | 1s → 2s → 4s |
-| 网络错误 | ✅ | 3 | 1s → 2s → 4s |
-| LLMAuthError | ❌ | 0 | — |
-| LLMSchemaValidationError | ❌ | 0 | — |
+| 错误类型                 | 是否重试 | 重试次数 | 延迟         |
+| ------------------------ | -------- | -------- | ------------ |
+| LLMTimeoutError          | ✅       | 3        | 1s → 2s → 4s |
+| LLMRateLimitError        | ✅       | 3        | 1s → 2s → 4s |
+| 网络错误                 | ✅       | 3        | 1s → 2s → 4s |
+| LLMAuthError             | ❌       | 0        | —            |
+| LLMSchemaValidationError | ❌       | 0        | —            |
 
 ## 3. 超时策略
 
-| 阶段 | 超时 |
-|------|------|
-| requirement_analysis | 60s |
-| requirement_clarification | 60s |
-| multi_model_analysis | 90s |
-| requirement_synthesis | 60s |
-| feasibility_analysis | 60s |
-| risk_analysis | 60s |
-| mvp_compression | 60s |
-| platform_recommendation | 60s |
-| planning_generation | 120s |
+| 阶段                      | 超时 |
+| ------------------------- | ---- |
+| requirement_analysis      | 60s  |
+| requirement_clarification | 60s  |
+| multi_model_analysis      | 90s  |
+| requirement_synthesis     | 60s  |
+| feasibility_analysis      | 60s  |
+| risk_analysis             | 60s  |
+| mvp_compression           | 60s  |
+| platform_recommendation   | 60s  |
+| planning_generation       | 120s |
 
 ## 4. 降级策略
 
@@ -81,10 +81,10 @@ callWithFallback:
 
 ## 5. 成本控制
 
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| maxCostPerProject | ¥5.00 | 单项目预算上限 |
-| alertThreshold | 80% | 告警比例 |
+| 参数              | 默认值 | 说明           |
+| ----------------- | ------ | -------------- |
+| maxCostPerProject | ¥5.00  | 单项目预算上限 |
+| alertThreshold    | 80%    | 告警比例       |
 
 ## 6. CallTracker
 
@@ -112,13 +112,14 @@ apps/api 只依赖 llm-orchestrator
 
 允许调用 Orchestrator 的模块:
 
-| 模块 | 文件 |
-|------|------|
-| Workflow Stages | `modules/workflow/stages/*.stage.ts` |
-| Synthesis | `modules/synthesis/requirement-synthesizer.service.ts` |
-| Artifact | `modules/artifact/artifact-generator.service.ts` |
+| 模块            | 文件                                                   |
+| --------------- | ------------------------------------------------------ |
+| Workflow Stages | `modules/workflow/stages/*.stage.ts`                   |
+| Synthesis       | `modules/synthesis/requirement-synthesizer.service.ts` |
+| Artifact        | `modules/artifact/artifact-generator.service.ts`       |
 
 禁止调用 Orchestrator 的模块:
+
 - modules/project/
 - modules/conversation/
 - modules/files/

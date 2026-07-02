@@ -24,5 +24,13 @@
     "development_guide": { "type": "string", "description": "开发指南" },
     "ai_coding_prompt": { "type": "string", "description": "用于 AI Coding 工具的上下文提示" }
   },
-  "required": ["phases", "architecture_overview", "component_tree", "data_model", "api_endpoints", "development_guide", "ai_coding_prompt"]
+  "required": [
+    "phases",
+    "architecture_overview",
+    "component_tree",
+    "data_model",
+    "api_endpoints",
+    "development_guide",
+    "ai_coding_prompt"
+  ]
 }

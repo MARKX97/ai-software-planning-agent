@@ -22,7 +22,6 @@ async function bootstrap(): Promise<void> {
   });
 
   await app.listen(config.port);
-  // eslint-disable-next-line no-console
   console.log(`API listening on http://localhost:${config.port}/api/v1`);
 }
 

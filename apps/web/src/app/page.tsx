@@ -12,9 +12,7 @@ export default function HomePage() {
         <p className="text-sm">
           当前阶段: <span className="font-medium">Phase 1 — Skeleton</span>
         </p>
-        <p className="text-sm text-muted-foreground">
-          Web UI 已就绪。完整页面将在 Phase 10 实现。
-        </p>
+        <p className="text-sm text-muted-foreground">Web UI 已就绪。完整页面将在 Phase 10 实现。</p>
         <Link
           href="/projects"
           className="inline-flex w-fit items-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90"

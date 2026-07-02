@@ -45,6 +45,7 @@ L3: packages/llm-orchestrator/  编排层（业务唯一入口）
 ## 2. 开发顺序
 
 ### Phase 4: LLM Core
+
 1. 创建 packages/llm-core/ 包
 2. 定义接口: ILLMProvider, ILLMHttpClient, IRetryPolicy
 3. 定义类型: LLMResponse, LLMCallOptions, TokenUsage, CostInfo, ModelPricing
@@ -55,6 +56,7 @@ L3: packages/llm-orchestrator/  编排层（业务唯一入口）
 验收: `pnpm --filter llm-core test`
 
 ### Phase 5: Provider Layer
+
 1. 创建 packages/llm-providers/ 包
 2. BaseProvider（chat() 通用流程: 构建请求→调用适配器→解析响应→计算成本→Schema 校验）
 3. 3 个 Provider（各 ~10 行）
@@ -64,6 +66,7 @@ L3: packages/llm-orchestrator/  编排层（业务唯一入口）
 验收: `pnpm --filter llm-providers test`
 
 ### Phase 6: AI Orchestrator
+
 1. 创建 packages/llm-orchestrator/ 包
 2. 重试策略（指数退避: 1s→2s→4s，最多 3 次）
 3. 降级策略（部分失败继续，全失败抛异常）
@@ -97,10 +100,12 @@ export const REQUIREMENT_ANALYSIS_PROMPT = `
 ```
 
 变量注入:
+
 ```typescript
-const prompt = REQUIREMENT_ANALYSIS_PROMPT
-  .replace('{{idea}}', project.originalIdea)
-  .replace('{{conversationHistory}}', conversationText);
+const prompt = REQUIREMENT_ANALYSIS_PROMPT.replace('{{idea}}', project.originalIdea).replace(
+  '{{conversationHistory}}',
+  conversationText,
+);
 ```
 
 ## 4. Schema 校验流程

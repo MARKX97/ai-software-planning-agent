@@ -8,14 +8,14 @@
 
 本仓库当前**只做本地验证**，不涉及线上/测试环境部署。前置依赖以"本地能跑通单元测试 + 集成测试 + API 契约测试"为目标。**Phase 2 起必须有可用的本地 PostgreSQL 16**。
 
-| 工具 | 用途 | 安装命令 | 验证方式 |
-|------|------|----------|----------|
-| Node.js ≥18 | 运行时 | `brew install node@20` 或官网下载 | `node -v` |
-| pnpm ≥9 | 包管理 | `npm i -g pnpm@10` | `pnpm -v` |
-| git ≥2.39 | 版本控制 | `brew install git` | `git -v` |
-| curl | API 健康检查 | macOS 自带 | `curl -V` |
-| jq | 解析 JSON 输出 | `brew install jq` | `jq --version` |
-| **PostgreSQL 16（本地）** | **数据库（Phase 2+ 集成/契约测试）** | 见下方「安装本地 PostgreSQL」 | `psql -V` |
+| 工具                      | 用途                                 | 安装命令                          | 验证方式       |
+| ------------------------- | ------------------------------------ | --------------------------------- | -------------- |
+| Node.js ≥18               | 运行时                               | `brew install node@20` 或官网下载 | `node -v`      |
+| pnpm ≥9                   | 包管理                               | `npm i -g pnpm@10`                | `pnpm -v`      |
+| git ≥2.39                 | 版本控制                             | `brew install git`                | `git -v`       |
+| curl                      | API 健康检查                         | macOS 自带                        | `curl -V`      |
+| jq                        | 解析 JSON 输出                       | `brew install jq`                 | `jq --version` |
+| **PostgreSQL 16（本地）** | **数据库（Phase 2+ 集成/契约测试）** | 见下方「安装本地 PostgreSQL」     | `psql -V`      |
 
 ### 安装本地 PostgreSQL 16（推荐：Homebrew，最省事）
 
@@ -79,14 +79,14 @@ pnpm dev
 
 ## Tech Stack
 
-| 层 | 技术 |
-|----|------|
-| Monorepo | pnpm workspaces + Turborepo |
-| 前端 | Next.js 15 (App Router) |
-| 后端 | NestJS 11 |
-| 数据库 | PostgreSQL 16 + Prisma 6 |
-| 语言 | TypeScript 5.5+ |
-| AI 接入 | Baishan OpenAI-compatible API |
+| 层       | 技术                          |
+| -------- | ----------------------------- |
+| Monorepo | pnpm workspaces + Turborepo   |
+| 前端     | Next.js 15 (App Router)       |
+| 后端     | NestJS 11                     |
+| 数据库   | PostgreSQL 16 + Prisma 6      |
+| 语言     | TypeScript 5.5+               |
+| AI 接入  | Baishan OpenAI-compatible API |
 
 ## 测试策略（本地验证用什么测试）
 
@@ -104,26 +104,26 @@ pnpm dev
         └───────┘
 ```
 
-| 层 | 何时跑 | 需要数据库 | 需要运行中的服务 |
-|----|--------|-----------|-----------------|
-| Unit 单元 | 每个 Phase | ❌ | ❌ |
-| Integration 集成 | Phase 2/3/7/8-9 | ✅ 真本地 PostgreSQL | ❌ |
-| API 契约 | Phase 3+ | ✅ | 启动 Nest 即可 |
-| **E2E** | **只有 Phase 10** | ✅ | ✅ 需同时起 API + Web |
+| 层               | 何时跑            | 需要数据库           | 需要运行中的服务      |
+| ---------------- | ----------------- | -------------------- | --------------------- |
+| Unit 单元        | 每个 Phase        | ❌                   | ❌                    |
+| Integration 集成 | Phase 2/3/7/8-9   | ✅ 真本地 PostgreSQL | ❌                    |
+| API 契约         | Phase 3+          | ✅                   | 启动 Nest 即可        |
+| **E2E**          | **只有 Phase 10** | ✅                   | ✅ 需同时起 API + Web |
 
 → 前 9 个 Phase 的本地验证**只需一个本地 PostgreSQL**，不需要部署到任何环境。
 
 ## 各 Phase 本地验证依赖
 
-| Phase | 主题 | 验证命令 | 依赖的工具 | 缺失时的影响 |
-|------|------|----------|-----------|-------------|
-| 1 | Skeleton | `curl localhost:3001/api/v1/health` | Node, pnpm, curl | API 起不来 |
-| 2 | Database | `pnpm db:migrate && pnpm db:seed` | **本地 PostgreSQL 16**, `pnpm approve-builds` | **迁移失败** |
-| 3 | API | `pnpm test`（集成 + 契约） | 本地 PostgreSQL 16 | 集成/契约测试失败 |
-| 4-6 | LLM Core/Providers/Orchestrator | `pnpm --filter llm-* test` | 仅 Node + pnpm（MockLLMProvider） | 可正常跑 |
-| 7 | Workflow | `pnpm test` | 本地 PostgreSQL + MockLLMProvider | 集成测试失败 |
-| 8-9 | Synthesis & Artifact | `pnpm test` | 本地 PostgreSQL + MockLLMProvider | 集成测试失败 |
-| 10 | Frontend | `pnpm test:e2e` | Node + Playwright 浏览器 + 运行中的 API + Web | E2E 失败 |
+| Phase | 主题                            | 验证命令                            | 依赖的工具                                    | 缺失时的影响      |
+| ----- | ------------------------------- | ----------------------------------- | --------------------------------------------- | ----------------- |
+| 1     | Skeleton                        | `curl localhost:3001/api/v1/health` | Node, pnpm, curl                              | API 起不来        |
+| 2     | Database                        | `pnpm db:migrate && pnpm db:seed`   | **本地 PostgreSQL 16**, `pnpm approve-builds` | **迁移失败**      |
+| 3     | API                             | `pnpm test`（集成 + 契约）          | 本地 PostgreSQL 16                            | 集成/契约测试失败 |
+| 4-6   | LLM Core/Providers/Orchestrator | `pnpm --filter llm-* test`          | 仅 Node + pnpm（MockLLMProvider）             | 可正常跑          |
+| 7     | Workflow                        | `pnpm test`                         | 本地 PostgreSQL + MockLLMProvider             | 集成测试失败      |
+| 8-9   | Synthesis & Artifact            | `pnpm test`                         | 本地 PostgreSQL + MockLLMProvider             | 集成测试失败      |
+| 10    | Frontend                        | `pnpm test:e2e`                     | Node + Playwright 浏览器 + 运行中的 API + Web | E2E 失败          |
 
 ### Phase 10 额外：Playwright 浏览器（届时再装）
 
