@@ -4,9 +4,9 @@
 
 > Status: Phase 1 — Skeleton (complete) → Phase 2 next
 
-## Prerequisites（前置依赖）
+## Prerequisites（前置依赖 · 本地验证）
 
-自动化验证不中断的前提是本地装齐以下工具。**Phase 2 起必须有可用的 PostgreSQL 16**。
+本仓库当前**只做本地验证**，不涉及线上/测试环境部署。前置依赖以"本地能跑通单元测试 + 集成测试 + API 契约测试"为目标。**Phase 2 起必须有可用的本地 PostgreSQL 16**。
 
 | 工具 | 用途 | 安装命令 | 验证方式 |
 |------|------|----------|----------|
@@ -15,32 +15,27 @@
 | git ≥2.39 | 版本控制 | `brew install git` | `git -v` |
 | curl | API 健康检查 | macOS 自带 | `curl -V` |
 | jq | 解析 JSON 输出 | `brew install jq` | `jq --version` |
-| **PostgreSQL 16** | **数据库（Phase 2+）** | 见下方「数据库二选一」 | `psql -V` 或 `docker ps` |
-| Docker Desktop | 容器化数据库（可选） | `brew install --cask docker` | `docker info` |
+| **PostgreSQL 16（本地）** | **数据库（Phase 2+ 集成/契约测试）** | 见下方「安装本地 PostgreSQL」 | `psql -V` |
 
-### 数据库二选一（Phase 2 起）
+### 安装本地 PostgreSQL 16（推荐：Homebrew，最省事）
 
-**方案 A（推荐，与项目部署文档一致）**：Docker Desktop 跑 PostgreSQL 容器。
-
-```bash
-# 安装 Docker Desktop 并启动一次（macOS / Apple Silicon）
-brew install --cask docker
-open -a Docker          # 启动后等 Docker Desktop 菜单栏图标变绿
-
-# 后续在 Phase 2 会创建 docker/docker-compose.dev.yml，届时：
-# docker compose -f docker/docker-compose.dev.yml up -d postgres
-```
-
-**方案 B（轻量，无需 Docker）**：Homebrew 直接装 PostgreSQL。
+本地验证只用一个能连上的 PostgreSQL 实例就够，不需要容器编排：
 
 ```bash
 brew install postgresql@16
-brew services start postgresql@16
-# 此时默认有本地 postgres 用户，DATABASE_URL 改为：
-# postgresql://postgres@localhost:5432/ai_planning_agent?schema=public
+brew services start postgresql@16   # 开机自启 + 立即启动
+
+# 验证
+psql postgres -c "SELECT version();"
 ```
 
-> ⚠️ 方案 B 会偏离 `docs/` 与 `.claude/skills/deployment/SKILL.md` 里基于 Docker 的部署约定，未来加 `docker-compose.dev.yml` 时需额外适配。
+`.env` 里 `DATABASE_URL` 用本地连接（默认当前系统用户作为 postgres 角色）：
+
+```
+DATABASE_URL=postgresql://@localhost:5432/ai_planning_agent?schema=public
+```
+
+> 如果你更喜欢 Docker，也可以用 `docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16`，把 `DATABASE_URL` 设为 `postgresql://postgres:postgres@localhost:5432/ai_planning_agent?schema=public`。两边都只是本地实例，与"线上/测试环境"无关。
 
 ### 允许构建脚本（Phase 2 起）
 
@@ -58,17 +53,14 @@ pnpm approve-builds
 ```bash
 # 1. 安装依赖
 pnpm install
-pnpm approve-builds   # 见上方说明
+pnpm approve-builds
 
 # 2. 配置环境变量
 cp .env.example .env
-# 编辑 .env：
-#   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_planning_agent?schema=public
-#   BAISHAN_API_KEY=sk-xxx   ← Phase 4+ 才用到，留空可先跳过真实 LLM 调用
+# 编辑 .env 的 DATABASE_URL 指向本地 PostgreSQL（见上方）
 
-# 3. 启动数据库（Phase 2 起）
-# 方案 A：docker compose -f docker/docker-compose.dev.yml up -d postgres
-# 方案 B：brew services start postgresql@16
+# 3. 启动本地数据库
+brew services start postgresql@16
 
 # 4. 开发
 pnpm dev
@@ -96,32 +88,52 @@ pnpm dev
 | 语言 | TypeScript 5.5+ |
 | AI 接入 | Baishan OpenAI-compatible API |
 
-## Phase 依赖的验证工具
+## 测试策略（本地验证用什么测试）
 
-每个 Phase 的自动化验证依赖不同工具。下表说明缺哪个工具会让哪个阶段的验证中断：
+不是 e2e 单一方案，而是**分层金字塔**（见 `.claude/skills/testing/SKILL.md`）。每个 Phase 的本地验证由不同层组合而成：
+
+```
+        ┌───────┐
+        │  E2E  │  ← ~10 个（Playwright）· 仅 Phase 10
+        ├───────┤
+        │  API  │  ← 26 个接口契约（Supertest + OpenAPI）
+        ├───────┤
+        │  Int  │  ← ~20 个集成（Jest + 真实 PostgreSQL）
+        ├───────┤
+        │ Unit  │  ← 100+ 单元（Jest/Vitest）
+        └───────┘
+```
+
+| 层 | 何时跑 | 需要数据库 | 需要运行中的服务 |
+|----|--------|-----------|-----------------|
+| Unit 单元 | 每个 Phase | ❌ | ❌ |
+| Integration 集成 | Phase 2/3/7/8-9 | ✅ 真本地 PostgreSQL | ❌ |
+| API 契约 | Phase 3+ | ✅ | 启动 Nest 即可 |
+| **E2E** | **只有 Phase 10** | ✅ | ✅ 需同时起 API + Web |
+
+→ 前 9 个 Phase 的本地验证**只需一个本地 PostgreSQL**，不需要部署到任何环境。
+
+## 各 Phase 本地验证依赖
 
 | Phase | 主题 | 验证命令 | 依赖的工具 | 缺失时的影响 |
 |------|------|----------|-----------|-------------|
 | 1 | Skeleton | `curl localhost:3001/api/v1/health` | Node, pnpm, curl | API 起不来 |
-| 2 | Database | `pnpm db:migrate && pnpm db:seed` | **PostgreSQL 16**, `pnpm approve-builds` | **迁移失败** |
-| 3 | API | `pnpm test`（集成测试） | PostgreSQL 16 | 集成测试失败 |
-| 4-6 | LLM Core/Providers/Orchestrator | `pnpm --filter llm-* test` | 仅 Node + pnpm（MockLLMProvider） | 可正常跑，无需真实 API Key |
-| 7 | Workflow | `pnpm test` | PostgreSQL + MockLLMProvider | 集成测试失败 |
-| 8-9 | Synthesis & Artifact | `pnpm test` | PostgreSQL + MockLLMProvider | 集成测试失败 |
-| 10 | Frontend | `pnpm test:e2e` | Node + Playwright 浏览器 + 运行中的 API | E2E 失败 |
+| 2 | Database | `pnpm db:migrate && pnpm db:seed` | **本地 PostgreSQL 16**, `pnpm approve-builds` | **迁移失败** |
+| 3 | API | `pnpm test`（集成 + 契约） | 本地 PostgreSQL 16 | 集成/契约测试失败 |
+| 4-6 | LLM Core/Providers/Orchestrator | `pnpm --filter llm-* test` | 仅 Node + pnpm（MockLLMProvider） | 可正常跑 |
+| 7 | Workflow | `pnpm test` | 本地 PostgreSQL + MockLLMProvider | 集成测试失败 |
+| 8-9 | Synthesis & Artifact | `pnpm test` | 本地 PostgreSQL + MockLLMProvider | 集成测试失败 |
+| 10 | Frontend | `pnpm test:e2e` | Node + Playwright 浏览器 + 运行中的 API + Web | E2E 失败 |
 
-### Phase 10 额外：Playwright 浏览器
+### Phase 10 额外：Playwright 浏览器（届时再装）
 
 ```bash
-# 在 apps/web 下安装浏览器二进制（首次）
 pnpm --filter @ai-planning/web exec playwright install
-# 或项目根目录加 playwright 后：
-# pnpm exec playwright install
 ```
 
 ### Phase 4+：Baishan API Key（可选）
 
-单元测试和集成测试都用 `MockLLMProvider`，**不需要真实 API Key**。只有当你想跑端到端真实工作流时，才需要在 `.env` 里填 `BAISHAN_BASE_URL` 和 `BAISHAN_API_KEY`。
+单元测试和集成测试都用 `MockLLMProvider`，**不需要真实 API Key**。只有本地手动跑一遍端到端真实工作流时，才需要在 `.env` 里填 `BAISHAN_BASE_URL` 和 `BAISHAN_API_KEY`。
 
 ## Project Structure
 
