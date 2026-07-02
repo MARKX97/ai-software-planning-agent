@@ -40,5 +40,13 @@
       "path": ".claude/skills/llm-development/SKILL.md",
       "description": "LLM development — three-layer AI architecture, providers, orchestrator, prompts"
     }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(pnpm lint)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm format:check)"
+    ]
   }
 }
