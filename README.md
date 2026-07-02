@@ -2,7 +2,7 @@
 
 帮助用户将模糊的软件想法逐步收敛为可执行的软件项目方案。
 
-> Status: Phase 1 — Skeleton (complete) → Phase 2 next
+> Status: Phase 1 — Skeleton (complete) → Phase 2 — Database (complete)
 
 ## Prerequisites（前置依赖 · 本地验证）
 

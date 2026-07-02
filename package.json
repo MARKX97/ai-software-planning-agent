@@ -18,7 +18,10 @@
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "clean": "turbo clean && rm -rf node_modules",
-    "prepare": "husky"
+    "prepare": "husky",
+    "db:migrate": "dotenv -e .env -- pnpm --filter @ai-planning/database db:migrate",
+    "db:generate": "dotenv -e .env -- pnpm --filter @ai-planning/database db:generate",
+    "db:seed": "dotenv -e .env -- pnpm --filter @ai-planning/database db:seed"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs}": "eslint --fix",
@@ -28,6 +31,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@types/node": "^20.11.0",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.7.0",
@@ -37,6 +41,7 @@
     "stylelint": "^17.14.0",
     "stylelint-config-standard": "^40.0.0",
     "tsup": "^8.0.0",
+    "tsx": "^4.22.5",
     "turbo": "^2.0.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.62.1"

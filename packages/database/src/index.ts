@@ -1,8 +1,8 @@
 /**
  * Database package — Prisma client singleton + schema.
  *
- * Implementation deferred to Phase 2.
- *
- * @internal
+ * @packageDocumentation @internal
  */
-export const DATABASE_PACKAGE_NAME = '@ai-planning/database';
+export { prisma } from './client.js';
+export { PrismaClient } from './generated/prisma/client.js';
+export * from './generated/prisma/index.js';
