@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RequirementAnalysisResult",
+  "description": "需求分析阶段输出——单模型初步分析",
+  "type": "object",
+  "properties": {
+    "project_summary": { "type": "string", "description": "项目一句话总结" },
+    "target_users": { "type": "array", "items": { "type": "string" }, "description": "目标用户画像" },
+    "core_problems": { "type": "array", "items": { "type": "string" }, "description": "核心解决的问题" },
+    "requirement_points": { "type": "array", "items": { "$ref": "requirement-point.json" }, "description": "需求点列表" },
+    "assumptions": { "type": "array", "items": { "type": "string" }, "description": "分析过程中所做的假设" },
+    "clarification_questions": { "type": "array", "items": { "type": "string" }, "description": "需要用户澄清的问题" }
+  },
+  "required": ["project_summary", "target_users", "core_problems", "requirement_points", "assumptions", "clarification_questions"]
+}

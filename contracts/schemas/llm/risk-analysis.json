@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RiskAnalysisResult",
+  "description": "风险分析阶段输出",
+  "type": "object",
+  "properties": {
+    "risks": { "type": "array", "items": { "$ref": "risk-item.json" }, "description": "风险项列表" },
+    "overall_risk_level": { "type": "string", "enum": ["high", "medium", "low"], "description": "整体风险等级" },
+    "critical_risks": { "type": "array", "items": { "type": "string" }, "description": "需立即关注的风险 ID 列表" }
+  },
+  "required": ["risks", "overall_risk_level", "critical_risks"]
+}

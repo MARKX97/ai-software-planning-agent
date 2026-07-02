@@ -1,0 +1,44 @@
+{
+  "skills": {
+    "development": {
+      "path": ".claude/skills/development/SKILL.md",
+      "description": "Development guide — coding standards, architecture rules, review checklist"
+    },
+    "development-phase-1": {
+      "path": ".claude/skills/development/phase-1-skeleton.md",
+      "description": "Phase 1 — Project Skeleton, Monorepo setup, health endpoint"
+    },
+    "development-phase-2": {
+      "path": ".claude/skills/development/phase-2-database.md",
+      "description": "Phase 2 — Database, Prisma Schema, migrations, seed data"
+    },
+    "development-phase-3": {
+      "path": ".claude/skills/development/phase-3-api.md",
+      "description": "Phase 3 — API, NestJS controllers, DTOs, Swagger"
+    },
+    "development-phase-7": {
+      "path": ".claude/skills/development/phase-7-workflow.md",
+      "description": "Phase 7 — Workflow Engine, state machine, 9 stages"
+    },
+    "development-phase-8-9": {
+      "path": ".claude/skills/development/phase-8-9-synthesis-artifact.md",
+      "description": "Phase 8-9 — Requirement Synthesizer, Artifact Generator"
+    },
+    "development-phase-10": {
+      "path": ".claude/skills/development/phase-10-frontend.md",
+      "description": "Phase 10 — Frontend, Next.js Web UI, shadcn/ui"
+    },
+    "testing": {
+      "path": ".claude/skills/testing/SKILL.md",
+      "description": "Testing strategy — test pyramid, frameworks, coverage goals, mock provider"
+    },
+    "deployment": {
+      "path": ".claude/skills/deployment/SKILL.md",
+      "description": "Deployment guide — Docker, CI/CD, backup, monitoring, disaster recovery"
+    },
+    "llm-development": {
+      "path": ".claude/skills/llm-development/SKILL.md",
+      "description": "LLM development — three-layer AI architecture, providers, orchestrator, prompts"
+    }
+  }
+}

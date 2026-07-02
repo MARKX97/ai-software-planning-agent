@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlatformRecommendation",
+  "description": "平台推荐阶段输出",
+  "type": "object",
+  "properties": {
+    "recommended_platform": { "type": "string", "enum": ["web", "mobile", "desktop", "cli", "api"], "description": "推荐的平台类型" },
+    "tech_stack": { "type": "object", "additionalProperties": { "type": "string" }, "description": "推荐技术栈，key为层次，value为技术" },
+    "rationale": { "type": "string", "description": "推荐理由" },
+    "alternatives": { "type": "array", "items": { "type": "string" }, "description": "备选方案" },
+    "trade_offs": { "type": "string", "description": "权衡说明" }
+  },
+  "required": ["recommended_platform", "tech_stack", "rationale", "alternatives", "trade_offs"]
+}

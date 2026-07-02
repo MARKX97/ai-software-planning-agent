@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SynthesizedRequirement",
+  "description": "需求融合阶段输出——多模型融合后的统一需求文档",
+  "type": "object",
+  "properties": {
+    "project_name": { "type": "string", "description": "项目名称" },
+    "executive_summary": { "type": "string", "description": "执行摘要" },
+    "user_personas": { "type": "array", "items": { "type": "string" }, "description": "用户画像列表" },
+    "functional_requirements": { "type": "array", "items": { "$ref": "requirement-point.json" }, "description": "功能需求列表" },
+    "non_functional_requirements": { "type": "array", "items": { "$ref": "requirement-point.json" }, "description": "非功能需求列表" },
+    "conflicts_resolved": { "type": "array", "items": { "$ref": "conflict-item.json" }, "description": "已消解的冲突项" },
+    "scope_boundary": { "type": "string", "description": "范围边界定义，明确哪些不在范围内" }
+  },
+  "required": ["project_name", "executive_summary", "user_personas", "functional_requirements", "non_functional_requirements", "conflicts_resolved", "scope_boundary"]
+}

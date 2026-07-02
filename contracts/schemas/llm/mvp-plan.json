@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MVPPlan",
+  "description": "MVP 规划阶段输出",
+  "type": "object",
+  "properties": {
+    "mvp_scope": { "type": "array", "items": { "$ref": "requirement-point.json" }, "description": "MVP 包含的需求点" },
+    "deferred_scope": { "type": "array", "items": { "$ref": "requirement-point.json" }, "description": "延期到后续版本的需求点" },
+    "mvp_goal": { "type": "string", "description": "MVP 验证的核心假设" },
+    "success_metrics": { "type": "array", "items": { "type": "string" }, "description": "MVP 成功指标" },
+    "timeline": { "type": "string", "description": "MVP 开发时间线" },
+    "milestones": { "type": "array", "items": { "type": "string" }, "description": "里程碑列表" }
+  },
+  "required": ["mvp_scope", "deferred_scope", "mvp_goal", "success_metrics", "timeline", "milestones"]
+}

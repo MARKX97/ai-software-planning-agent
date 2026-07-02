@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FeasibilityAssessment",
+  "description": "可行性分析阶段输出",
+  "type": "object",
+  "properties": {
+    "technical_feasibility": { "type": "string", "enum": ["high", "medium", "low"], "description": "技术可行性等级" },
+    "technical_risks": { "type": "array", "items": { "type": "string" }, "description": "技术风险列表" },
+    "resource_estimation": { "type": "string", "description": "资源估算（人力、时间）" },
+    "timeline_estimation": { "type": "string", "description": "时间线估算" },
+    "dependencies": { "type": "array", "items": { "type": "string" }, "description": "外部依赖" },
+    "alternative_approaches": { "type": "array", "items": { "type": "string" }, "description": "备选方案" }
+  },
+  "required": ["technical_feasibility", "technical_risks", "resource_estimation", "timeline_estimation", "dependencies", "alternative_approaches"]
+}

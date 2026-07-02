@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProjectPlan",
+  "description": "项目规划输出——用于规划生成阶段的综合输出",
+  "type": "object",
+  "properties": {
+    "phases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "duration": { "type": "string" },
+          "tasks": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["name", "duration", "tasks"]
+      },
+      "description": "开发阶段"
+    },
+    "architecture_overview": { "type": "string", "description": "架构概述" },
+    "component_tree": { "type": "array", "items": { "type": "object" }, "description": "组件树" },
+    "data_model": { "type": "array", "items": { "type": "object" }, "description": "数据模型" },
+    "api_endpoints": { "type": "array", "items": { "type": "object" }, "description": "API 端点" },
+    "development_guide": { "type": "string", "description": "开发指南" },
+    "ai_coding_prompt": { "type": "string", "description": "用于 AI Coding 工具的上下文提示" }
+  },
+  "required": ["phases", "architecture_overview", "component_tree", "data_model", "api_endpoints", "development_guide", "ai_coding_prompt"]
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RiskItem",
+  "description": "单个风险项",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string", "description": "风险唯一标识，格式 risk-{number}" },
+    "category": { "type": "string", "enum": ["technical", "market", "resource", "schedule"], "description": "风险类别" },
+    "description": { "type": "string", "description": "风险描述" },
+    "probability": { "type": "string", "enum": ["high", "medium", "low"], "description": "发生概率" },
+    "impact": { "type": "string", "enum": ["high", "medium", "low"], "description": "影响程度" },
+    "mitigation": { "type": "string", "description": "缓解措施" },
+    "contingency": { "type": "string", "description": "应急预案" }
+  },
+  "required": ["id", "category", "description", "probability", "impact", "mitigation", "contingency"]
+}

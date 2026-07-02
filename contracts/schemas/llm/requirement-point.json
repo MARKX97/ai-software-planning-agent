@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RequirementPoint",
+  "description": "单个需求点",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string", "description": "需求点唯一标识，格式 req-{number}" },
+    "title": { "type": "string", "description": "需求点简短标题" },
+    "description": { "type": "string", "description": "需求点详细描述" },
+    "priority": {
+      "type": "string",
+      "enum": ["P0", "P1", "P2", "P3"],
+      "description": "优先级：P0=Must have, P1=Should have, P2=Nice to have, P3=Future"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["functional", "non_functional", "ux", "business"],
+      "description": "需求类别"
+    },
+    "user_story": { "type": "string", "description": "关联的用户故事（可选）" }
+  },
+  "required": ["id", "title", "description", "priority", "category"]
+}

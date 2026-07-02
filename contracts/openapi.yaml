@@ -1,0 +1,2209 @@
+openapi: "3.1.0"
+info:
+  title: AI Software Planning Agent API
+  description: |
+    AI Software Planning Agent 帮助用户将模糊的软件想法逐步收敛为可执行的软件项目方案。
+
+    ## 核心能力
+    - 多轮需求沟通
+    - 多模型并行分析 (GLM-5.1 / DeepSeek-V4-Pro / MiniMax-M2.5)
+    - 需求融合
+    - 可行性分析
+    - 风险分析
+    - MVP 收缩
+    - 平台推荐
+    - 项目规划生成 (11 类产物)
+
+    ## 认证
+    所有 API (除 `/health` 和 `/models`) 需携带 Bearer Token:
+    ```
+    Authorization: Bearer <api_key>
+    ```
+
+    ## 通用规范
+    - 时间格式: ISO 8601 UTC (`2024-06-24T10:00:00Z`)
+    - ID 格式: UUID v4
+    - 分页: `offset` + `limit` (默认 20, 最大 100)
+    - 错误格式: `{ error: { code, message, details } }`
+  version: "1.0.0"
+  contact:
+    name: AI Planning Agent Team
+
+servers:
+  - url: http://localhost:3001/api/v1
+    description: 本地开发环境
+  - url: https://api.ai-planning-agent.com/api/v1
+    description: 生产环境
+
+tags:
+  - name: Health
+    description: 健康检查
+  - name: Projects
+    description: 项目管理
+  - name: Conversations
+    description: 对话管理
+  - name: Workflow
+    description: 工作流管理
+  - name: Workflow Executions
+    description: 工作流执行历史
+  - name: Artifacts
+    description: 产物管理
+  - name: Export
+    description: 产物导出
+  - name: Models
+    description: AI 模型信息
+  - name: Token Usage
+    description: Token 用量与成本统计
+
+# ─────────────────────────────────────────────────────────
+# Security
+# ─────────────────────────────────────────────────────────
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: API Key 认证。在环境变量 `API_KEY` 为空时跳过认证。
+
+  # ─── Schemas ───
+
+  schemas:
+    # ─── 通用 ───
+    Pagination:
+      type: object
+      properties:
+        offset:
+          type: integer
+          minimum: 0
+          default: 0
+          description: 偏移量
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+          description: 每页数量
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: 错误码
+              enum:
+                - INVALID_INPUT
+                - PROJECT_NOT_FOUND
+                - CONVERSATION_NOT_FOUND
+                - ARTIFACT_NOT_FOUND
+                - WORKFLOW_NOT_FOUND
+                - EXECUTION_NOT_FOUND
+                - INVALID_STAGE_TRANSITION
+                - WORKFLOW_ALREADY_RUNNING
+                - WORKFLOW_NOT_RUNNING
+                - WORKFLOW_STAGE_NOT_CLARIFICATION
+                - LLM_TIMEOUT
+                - LLM_ERROR
+                - ALL_MODELS_FAILED
+                - COST_LIMIT_EXCEEDED
+                - RATE_LIMITED
+                - EXPORT_NOT_READY
+                - EXPORT_FAILED
+                - INTERNAL_ERROR
+            message:
+              type: string
+              description: 人类可读的错误信息
+            details:
+              type: object
+              additionalProperties: true
+              description: 错误详情 (可选)
+
+    # ─── 枚举 ───
+    ProjectStatus:
+      type: string
+      enum: [active, completed, failed]
+
+    WorkflowStage:
+      type: string
+      enum:
+        - init
+        - requirement_analysis
+        - requirement_clarification
+        - multi_model_analysis
+        - requirement_synthesis
+        - feasibility_analysis
+        - risk_analysis
+        - mvp_compression
+        - platform_recommendation
+        - planning_generation
+        - completed
+        - failed
+
+    StageStatus:
+      type: string
+      enum: [pending, running, completed, failed, skipped]
+
+    ExecutionStatus:
+      type: string
+      enum: [success, failed, timeout, cancelled]
+
+    CallStatus:
+      type: string
+      enum: [success, failed, timeout, rate_limited]
+
+    ArtifactType:
+      type: string
+      enum:
+        - requirement_report
+        - feasibility_report
+        - risk_report
+        - mvp_plan
+        - platform_recommendation
+        - project_plan
+        - prd
+        - architecture
+        - frontend_spec
+        - backend_spec
+        - ai_coding_rules
+
+    ExportFormat:
+      type: string
+      enum: [markdown, pdf, html, json]
+
+    MessageRole:
+      type: string
+      enum: [user, assistant, system]
+
+    # ─── Project ───
+    CreateProjectRequest:
+      type: object
+      required: [name, original_idea]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 项目名称
+          example: "AI-Powered Todo App"
+        original_idea:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: 用户原始想法
+          example: "I want to build a todo app that uses AI to prioritize tasks automatically."
+
+    ProjectResponse:
+      type: object
+      required: [id, name, original_idea, status, current_stage, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 项目 ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        name:
+          type: string
+          description: 项目名称
+        original_idea:
+          type: string
+          description: 用户原始想法
+        status:
+          $ref: "#/components/schemas/ProjectStatus"
+        current_stage:
+          $ref: "#/components/schemas/WorkflowStage"
+        requirement_text:
+          type: string
+          nullable: true
+          description: 融合后的需求文档 (Markdown)
+        error_message:
+          type: string
+          nullable: true
+          description: 失败时的错误信息
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 工作流启动时间
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 工作流完成时间
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+        updated_at:
+          type: string
+          format: date-time
+          description: 最后更新时间
+
+    ProjectListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectResponse"
+        total:
+          type: integer
+          minimum: 0
+          description: 项目总数
+        offset:
+          type: integer
+          description: 当前偏移量
+        limit:
+          type: integer
+          description: 每页数量
+
+    # ─── Conversation ───
+    ConversationResponse:
+      type: object
+      required: [id, project_id, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, closed]
+        created_at:
+          type: string
+          format: date-time
+
+    SendMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 50000
+          description: 消息内容
+
+    MessageResponse:
+      type: object
+      required: [id, conversation_id, role, content, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/MessageRole"
+        content:
+          type: string
+        metadata:
+          type: object
+          nullable: true
+          description: 元数据 (token_count, model, etc.)
+        created_at:
+          type: string
+          format: date-time
+
+    MessageListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessageResponse"
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+
+    # ─── Workflow ───
+    WorkflowProgress:
+      type: object
+      required: [completed_stages, total_stages, percentage]
+      properties:
+        completed_stages:
+          type: integer
+          minimum: 0
+          maximum: 9
+        total_stages:
+          type: integer
+          const: 9
+        percentage:
+          type: number
+          minimum: 0
+          maximum: 100
+
+    ClarificationQuestion:
+      type: object
+      required: [question, context, category]
+      properties:
+        question:
+          type: string
+          description: 澄清问题
+        context:
+          type: string
+          description: 为什么需要澄清
+        category:
+          type: string
+          enum: [user, scope, tech, business, risk]
+          description: 问题类别
+
+    ModelStatus:
+      type: object
+      properties:
+        deepseek:
+          type: string
+          enum: [running, completed, failed, pending]
+        glm:
+          type: string
+          enum: [running, completed, failed, pending]
+        minimax:
+          type: string
+          enum: [running, completed, failed, pending]
+
+    WorkflowStatusResponse:
+      type: object
+      required: [project_id, status, current_stage, stage_display_name, progress, updated_at]
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/ProjectStatus"
+        current_stage:
+          $ref: "#/components/schemas/WorkflowStage"
+        stage_display_name:
+          type: string
+          description: 当前阶段的人类可读名称
+          example: "需求分析"
+        progress:
+          $ref: "#/components/schemas/WorkflowProgress"
+        clarification_questions:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/ClarificationQuestion"
+          description: 澄清问题 (仅在 clarification 阶段)
+        model_status:
+          $ref: "#/components/schemas/ModelStatus"
+          nullable: true
+          description: 多模型状态 (仅在 multi_model_analysis 阶段)
+        error_message:
+          type: string
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+
+    ContinueWorkflowRequest:
+      type: object
+      required: [conversation_id, message]
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+          description: 对话 ID
+        message:
+          type: string
+          minLength: 1
+          maxLength: 50000
+          description: 用户对澄清问题的回复
+
+    # ─── Workflow State ───
+    WorkflowStateResponse:
+      type: object
+      required: [id, project_id, stage, status, display_name, progress, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        stage:
+          $ref: "#/components/schemas/WorkflowStage"
+        status:
+          $ref: "#/components/schemas/StageStatus"
+        display_name:
+          type: string
+          example: "需求分析"
+        progress:
+          $ref: "#/components/schemas/WorkflowProgress"
+        data_json:
+          type: object
+          nullable: true
+          description: 阶段输出数据
+        error_message:
+          type: string
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    WorkflowStateListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowStateResponse"
+        total:
+          type: integer
+
+    # ─── Workflow Execution ───
+    WorkflowExecutionResponse:
+      type: object
+      required: [id, project_id, stage, status, started_at, retry_count, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        stage:
+          type: string
+          description: 执行的阶段
+        status:
+          $ref: "#/components/schemas/ExecutionStatus"
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        duration_ms:
+          type: integer
+          nullable: true
+          description: 执行耗时 (ms)
+        error_message:
+          type: string
+          nullable: true
+        retry_count:
+          type: integer
+          description: 阶段级重试次数
+        model_call_count:
+          type: integer
+          nullable: true
+          description: 本次执行中的模型调用次数
+        created_at:
+          type: string
+          format: date-time
+
+    WorkflowExecutionListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowExecutionResponse"
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+
+    WorkflowExecutionDetailResponse:
+      allOf:
+        - $ref: "#/components/schemas/WorkflowExecutionResponse"
+        - type: object
+          properties:
+            model_logs:
+              type: array
+              items:
+                $ref: "#/components/schemas/ModelExecutionLogResponse"
+              description: 关联的模型调用日志
+
+    # ─── Model Execution Log ───
+    ModelExecutionLogResponse:
+      type: object
+      required:
+        - id
+        - project_id
+        - stage
+        - provider_name
+        - model_id
+        - status
+        - attempt_number
+        - input_tokens
+        - output_tokens
+        - cost_total
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        execution_id:
+          type: string
+          format: uuid
+          nullable: true
+        stage:
+          type: string
+        provider_name:
+          type: string
+          description: Provider 逻辑名称
+          example: "deepseek"
+        model_id:
+          type: string
+          description: 模型 ID
+          example: "deepseek-v4-pro"
+        status:
+          $ref: "#/components/schemas/CallStatus"
+        attempt_number:
+          type: integer
+          description: 第几次尝试 (1-based)
+        prompt_version_id:
+          type: string
+          format: uuid
+          nullable: true
+        input_tokens:
+          type: integer
+        output_tokens:
+          type: integer
+        cost_input:
+          type: number
+          description: 输入成本 (元)
+        cost_output:
+          type: number
+          description: 输出成本 (元)
+        cost_total:
+          type: number
+          description: 总成本 (元)
+        latency_ms:
+          type: integer
+          nullable: true
+          description: 调用延迟 (ms)
+        error_code:
+          type: string
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ModelExecutionLogListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelExecutionLogResponse"
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+
+    # ─── Artifact ───
+    ArtifactResponse:
+      type: object
+      required: [id, project_id, type, type_display_name, title, stage, format, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        type:
+          $ref: "#/components/schemas/ArtifactType"
+        type_display_name:
+          type: string
+          description: 产物类型的人类可读名称
+          example: "产品需求文档"
+        title:
+          type: string
+          description: 产物标题
+        stage:
+          type: string
+          description: 生成阶段
+        content:
+          type: string
+          nullable: true
+          description: 产物内容 (列表接口不返回, 详情接口返回)
+        file_path:
+          type: string
+          nullable: true
+        size_bytes:
+          type: integer
+          nullable: true
+        format:
+          type: string
+          default: "markdown"
+        created_at:
+          type: string
+          format: date-time
+
+    ArtifactListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactResponse"
+        total:
+          type: integer
+
+    # ─── Export ───
+    ExportRequest:
+      type: object
+      properties:
+        format:
+          $ref: "#/components/schemas/ExportFormat"
+          default: markdown
+        artifact_types:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactType"
+          description: 要导出的产物类型列表 (空数组 = 全部)
+          example: ["prd", "architecture", "frontend_spec"]
+
+    ExportResponse:
+      type: object
+      required: [id, project_id, format, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        format:
+          $ref: "#/components/schemas/ExportFormat"
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        artifact_count:
+          type: integer
+          description: 导出的产物数量
+        file_path:
+          type: string
+          nullable: true
+          description: 导出文件路径
+        file_size_bytes:
+          type: integer
+          nullable: true
+        download_url:
+          type: string
+          nullable: true
+          description: 下载链接 (有效期 1 小时)
+        error_message:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    # ─── Model ───
+    ModelInfo:
+      type: object
+      required: [provider_name, model_id, display_name, pricing, status, capabilities]
+      properties:
+        provider_name:
+          type: string
+          description: Provider 逻辑名称
+          example: "deepseek"
+        model_id:
+          type: string
+          description: 模型 ID
+          example: "deepseek-v4-pro"
+        display_name:
+          type: string
+          description: 人类可读的模型名称
+          example: "DeepSeek V4 Pro"
+        pricing:
+          type: object
+          required: [input_per_1k, output_per_1k, currency]
+          properties:
+            input_per_1k:
+              type: number
+              description: 每 1K input tokens 价格
+              example: 0.002
+            output_per_1k:
+              type: number
+              description: 每 1K output tokens 价格
+              example: 0.008
+            currency:
+              type: string
+              default: "CNY"
+              description: 货币单位
+        status:
+          type: string
+          enum: [available, degraded, unavailable]
+          description: 模型可用性
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: 模型能力标签
+          example: ["chat", "structured_output", "function_calling", "json_mode"]
+        max_tokens:
+          type: integer
+          description: 最大输出 token 数
+          example: 8192
+        description:
+          type: string
+          description: 模型简介
+
+    ModelListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelInfo"
+        total:
+          type: integer
+
+    # ─── Token Usage ───
+    TokenUsageResponse:
+      type: object
+      required:
+        - project_id
+        - total_input_tokens
+        - total_output_tokens
+        - total_tokens
+        - total_cost
+        - call_count
+        - success_count
+        - failed_count
+        - timeout_count
+        - rate_limited_count
+        - updated_at
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        total_input_tokens:
+          type: integer
+          description: 累计输入 token
+        total_output_tokens:
+          type: integer
+          description: 累计输出 token
+        total_tokens:
+          type: integer
+          description: 累计总 token
+        total_cost:
+          type: number
+          description: 累计成本 (元)
+        call_count:
+          type: integer
+          description: 总调用次数
+        success_count:
+          type: integer
+          description: 成功调用次数
+        failed_count:
+          type: integer
+          description: 失败调用次数
+        timeout_count:
+          type: integer
+          description: 超时调用次数
+        rate_limited_count:
+          type: integer
+          description: 限流调用次数
+        avg_latency_ms:
+          type: integer
+          nullable: true
+          description: 平均延迟 (ms)
+        success_rate:
+          type: number
+          nullable: true
+          description: 成功率 (%)
+        updated_at:
+          type: string
+          format: date-time
+
+    TokenUsageDetailResponse:
+      allOf:
+        - $ref: "#/components/schemas/TokenUsageResponse"
+        - type: object
+          properties:
+            by_provider:
+              type: array
+              items:
+                type: object
+                properties:
+                  provider_name:
+                    type: string
+                  call_count:
+                    type: integer
+                  success_count:
+                    type: integer
+                  failed_count:
+                    type: integer
+                  total_input_tokens:
+                    type: integer
+                  total_output_tokens:
+                    type: integer
+                  total_cost:
+                    type: number
+                  avg_latency_ms:
+                    type: integer
+                    nullable: true
+            by_stage:
+              type: array
+              items:
+                type: object
+                properties:
+                  stage:
+                    type: string
+                  call_count:
+                    type: integer
+                  total_cost:
+                    type: number
+                  avg_latency_ms:
+                    type: integer
+                    nullable: true
+            cost_limit:
+              type: object
+              properties:
+                max_cost_per_project:
+                  type: number
+                  description: 单项目成本上限 (元)
+                remaining:
+                  type: number
+                  description: 剩余预算 (元)
+                alert_triggered:
+                  type: boolean
+                  description: 是否已触发 80% 告警
+
+    # ─── Health ───
+    HealthResponse:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+          description: 服务状态
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          description: API 版本
+        llm_providers:
+          type: object
+          description: 各 LLM Provider 状态
+          additionalProperties:
+            type: string
+            enum: [ok, unavailable]
+          example:
+            deepseek: "ok"
+            glm: "ok"
+            minimax: "ok"
+        database:
+          type: string
+          enum: [ok, error]
+          description: 数据库连接状态
+
+# ─────────────────────────────────────────────────────────
+# Paths
+# ─────────────────────────────────────────────────────────
+
+paths:
+  # ═══════════════════════════════════════════════════════
+  # Health
+  # ═══════════════════════════════════════════════════════
+  /health:
+    get:
+      tags: [Health]
+      summary: 健康检查
+      description: 检查服务、数据库和所有 LLM Provider 的可用性。不需要认证。
+      security: []
+      responses:
+        "200":
+          description: 服务健康
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                ok:
+                  summary: 所有服务正常
+                  value:
+                    status: "ok"
+                    timestamp: "2024-06-24T10:00:00Z"
+                    version: "1.0.0"
+                    llm_providers:
+                      deepseek: "ok"
+                      glm: "ok"
+                      minimax: "ok"
+                    database: "ok"
+                degraded:
+                  summary: 部分服务降级
+                  value:
+                    status: "degraded"
+                    timestamp: "2024-06-24T10:00:00Z"
+                    version: "1.0.0"
+                    llm_providers:
+                      deepseek: "ok"
+                      glm: "unavailable"
+                      minimax: "ok"
+                    database: "ok"
+
+  # ═══════════════════════════════════════════════════════
+  # Models
+  # ═══════════════════════════════════════════════════════
+  /models:
+    get:
+      tags: [Models]
+      summary: 获取可用 AI 模型列表
+      description: |
+        返回所有已注册的 AI 模型信息，包括模型名称、定价、可用性和能力标签。
+        不需要认证。业务代码通过 provider_name 选择模型。
+      security: []
+      responses:
+        "200":
+          description: 模型列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelListResponse"
+              example:
+                items:
+                  - provider_name: "deepseek"
+                    model_id: "deepseek-v4-pro"
+                    display_name: "DeepSeek V4 Pro"
+                    pricing:
+                      input_per_1k: 0.002
+                      output_per_1k: 0.008
+                      currency: "CNY"
+                    status: "available"
+                    capabilities:
+                      - "chat"
+                      - "structured_output"
+                      - "function_calling"
+                      - "json_mode"
+                    max_tokens: 8192
+                    description: "DeepSeek 最新旗舰模型，擅长推理和代码生成"
+                  - provider_name: "glm"
+                    model_id: "glm-5.1"
+                    display_name: "GLM 5.1"
+                    pricing:
+                      input_per_1k: 0.001
+                      output_per_1k: 0.001
+                      currency: "CNY"
+                    status: "available"
+                    capabilities:
+                      - "chat"
+                      - "structured_output"
+                      - "function_calling"
+                    max_tokens: 4096
+                    description: "智谱 AI 最新模型，中英文能力强"
+                  - provider_name: "minimax"
+                    model_id: "minimax-m2.5"
+                    display_name: "MiniMax M2.5"
+                    pricing:
+                      input_per_1k: 0.001
+                      output_per_1k: 0.001
+                      currency: "CNY"
+                    status: "available"
+                    capabilities:
+                      - "chat"
+                      - "structured_output"
+                    max_tokens: 4096
+                    description: "MiniMax 最新模型，性价比高"
+                total: 3
+
+  /models/{provider_name}:
+    get:
+      tags: [Models]
+      summary: 获取指定模型详情
+      security: []
+      parameters:
+        - name: provider_name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Provider 逻辑名称
+          example: "deepseek"
+      responses:
+        "200":
+          description: 模型详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelInfo"
+        "404":
+          description: 模型不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ═══════════════════════════════════════════════════════
+  # Projects
+  # ═══════════════════════════════════════════════════════
+  /projects:
+    post:
+      tags: [Projects]
+      summary: 创建项目
+      description: 创建一个新的软件规划项目，进入 init 状态。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+            example:
+              name: "AI-Powered Todo App"
+              original_idea: "I want to build a todo app that uses AI to prioritize tasks automatically."
+      responses:
+        "201":
+          description: 项目创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "400":
+          description: 参数校验失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未提供认证
+        "403":
+          description: API Key 无效
+
+    get:
+      tags: [Projects]
+      summary: 获取项目列表
+      description: 分页获取项目列表，按创建时间倒序排列。
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ProjectStatus"
+          description: 按状态过滤
+      responses:
+        "200":
+          description: 项目列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectListResponse"
+
+  /projects/{project_id}:
+    get:
+      tags: [Projects]
+      summary: 获取项目详情
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 项目 ID
+      responses:
+        "200":
+          description: 项目详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "404":
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "PROJECT_NOT_FOUND"
+                  message: "Project with id '...' not found"
+
+    delete:
+      tags: [Projects]
+      summary: 软删除项目
+      description: 标记项目为已删除。关联数据通过 CASCADE 处理。30 天后物理删除。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: 删除成功
+        "404":
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ═══════════════════════════════════════════════════════
+  # Workflow
+  # ═══════════════════════════════════════════════════════
+  /projects/{project_id}/run:
+    post:
+      tags: [Workflow]
+      summary: 启动工作流
+      description: |
+        启动项目的完整工作流 Pipeline。
+        工作流按以下顺序自动执行:
+        INIT → REQUIREMENT_ANALYSIS → REQUIREMENT_CLARIFICATION (暂停)
+        → MULTI_MODEL_ANALYSIS → REQUIREMENT_SYNTHESIS
+        → FEASIBILITY_ANALYSIS → RISK_ANALYSIS → MVP_COMPRESSION
+        → PLATFORM_RECOMMENDATION → PLANNING_GENERATION → COMPLETED
+
+        仅在 REQUIREMENT_CLARIFICATION 阶段暂停，等待用户输入。
+        其他阶段自动推进。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 项目 ID
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                conversation_id:
+                  type: string
+                  format: uuid
+                  description: 关联的对话 ID (可选，不传则自动创建)
+      responses:
+        "202":
+          description: 工作流已启动
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStatusResponse"
+              example:
+                project_id: "550e8400-e29b-41d4-a716-446655440000"
+                status: "active"
+                current_stage: "requirement_analysis"
+                stage_display_name: "需求分析"
+                progress:
+                  completed_stages: 0
+                  total_stages: 9
+                  percentage: 0
+                started_at: "2024-06-24T10:00:00Z"
+                updated_at: "2024-06-24T10:00:00Z"
+        "404":
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 工作流已在运行中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "WORKFLOW_ALREADY_RUNNING"
+                  message: "Workflow is already running for this project"
+
+  /projects/{project_id}/workflow/status:
+    get:
+      tags: [Workflow]
+      summary: 获取工作流状态
+      description: |
+        获取当前工作流的实时状态。
+        前端应轮询此接口 (建议间隔: 2s-5s，取决于阶段)。
+        clarification 阶段返回 clarification_questions，
+        multi_model_analysis 阶段返回 model_status。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 工作流状态
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStatusResponse"
+              examples:
+                running:
+                  summary: 执行中
+                  value:
+                    project_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "active"
+                    current_stage: "multi_model_analysis"
+                    stage_display_name: "多模型分析"
+                    progress:
+                      completed_stages: 2
+                      total_stages: 9
+                      percentage: 22.2
+                    model_status:
+                      deepseek: "running"
+                      glm: "running"
+                      minimax: "running"
+                    updated_at: "2024-06-24T10:00:30Z"
+                clarification:
+                  summary: 澄清阶段 (等待用户输入)
+                  value:
+                    project_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "active"
+                    current_stage: "requirement_clarification"
+                    stage_display_name: "需求澄清"
+                    progress:
+                      completed_stages: 1
+                      total_stages: 9
+                      percentage: 11.1
+                    clarification_questions:
+                      - question: "What platform should this be built for?"
+                        context: "Platform choice affects tech stack and architecture"
+                        category: "tech"
+                    updated_at: "2024-06-24T10:00:15Z"
+                completed:
+                  summary: 已完成
+                  value:
+                    project_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "completed"
+                    current_stage: "completed"
+                    stage_display_name: "已完成"
+                    progress:
+                      completed_stages: 9
+                      total_stages: 9
+                      percentage: 100
+                    updated_at: "2024-06-24T10:05:00Z"
+                failed:
+                  summary: 失败
+                  value:
+                    project_id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "failed"
+                    current_stage: "failed"
+                    stage_display_name: "失败"
+                    progress:
+                      completed_stages: 2
+                      total_stages: 9
+                      percentage: 22.2
+                    error_message: "All models failed: deepseek(timeout), glm(timeout), minimax(timeout)"
+                    updated_at: "2024-06-24T10:01:00Z"
+        "404":
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{project_id}/workflow/continue:
+    post:
+      tags: [Workflow]
+      summary: 继续工作流
+      description: |
+        在 REQUIREMENT_CLARIFICATION 阶段，用户回复澄清问题后调用此接口继续工作流。
+        Agent 会重新分析需求，决定是否需要继续澄清还是进入下一阶段。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContinueWorkflowRequest"
+            example:
+              conversation_id: "660e8400-e29b-41d4-a716-446655440001"
+              message: "The app should support web and iOS platforms. It's for individual users only."
+      responses:
+        "202":
+          description: 工作流继续执行
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStatusResponse"
+        "404":
+          description: 项目或对话不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: |
+            当前阶段不是 REQUIREMENT_CLARIFICATION，无法继续。
+            可能原因: 工作流未启动、已不在澄清阶段、已结束。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "WORKFLOW_STAGE_NOT_CLARIFICATION"
+                  message: "Cannot continue workflow from stage 'multi_model_analysis'"
+                  details:
+                    current_stage: "multi_model_analysis"
+                    expected_stage: "requirement_clarification"
+
+  /projects/{project_id}/workflow/states:
+    get:
+      tags: [Workflow]
+      summary: 获取工作流各阶段状态
+      description: 返回项目所有阶段的状态快照列表。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 阶段状态列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStateListResponse"
+        "404":
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ═══════════════════════════════════════════════════════
+  # Workflow Executions
+  # ═══════════════════════════════════════════════════════
+  /projects/{project_id}/workflow/executions:
+    get:
+      tags: [Workflow Executions]
+      summary: 获取工作流执行历史
+      description: |
+        分页获取项目的所有阶段执行历史，按时间倒序。
+        每次阶段执行 (包括重试) 都会生成一条记录。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: stage
+          in: query
+          schema:
+            $ref: "#/components/schemas/WorkflowStage"
+          description: 按阶段过滤
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ExecutionStatus"
+          description: 按执行状态过滤
+      responses:
+        "200":
+          description: 执行历史列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowExecutionListResponse"
+              example:
+                items:
+                  - id: "990e8400-e29b-41d4-a716-446655440010"
+                    project_id: "550e8400-e29b-41d4-a716-446655440000"
+                    stage: "multi_model_analysis"
+                    status: "success"
+                    started_at: "2024-06-24T10:00:20Z"
+                    completed_at: "2024-06-24T10:00:25Z"
+                    duration_ms: 5230
+                    retry_count: 0
+                    model_call_count: 3
+                    created_at: "2024-06-24T10:00:25Z"
+                  - id: "990e8400-e29b-41d4-a716-446655440009"
+                    project_id: "550e8400-e29b-41d4-a716-446655440000"
+                    stage: "requirement_analysis"
+                    status: "failed"
+                    started_at: "2024-06-24T10:00:05Z"
+                    completed_at: "2024-06-24T10:00:08Z"
+                    duration_ms: 3200
+                    retry_count: 3
+                    error_message: "LLM timeout after 3 retries"
+                    model_call_count: 4
+                    created_at: "2024-06-24T10:00:08Z"
+                total: 15
+                offset: 0
+                limit: 20
+        "404":
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{project_id}/workflow/executions/{execution_id}:
+    get:
+      tags: [Workflow Executions]
+      summary: 获取执行详情
+      description: 获取单次阶段执行的详细信息，包含关联的模型调用日志。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: execution_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 执行详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowExecutionDetailResponse"
+        "404":
+          description: 项目或执行记录不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{project_id}/workflow/executions/{execution_id}/logs:
+    get:
+      tags: [Workflow Executions]
+      summary: 获取执行关联的模型调用日志
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: execution_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: 模型调用日志列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelExecutionLogListResponse"
+        "404":
+          description: 项目或执行记录不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ═══════════════════════════════════════════════════════
+  # Conversations
+  # ═══════════════════════════════════════════════════════
+  /projects/{project_id}/conversations:
+    post:
+      tags: [Conversations]
+      summary: 创建对话
+      description: 在项目中创建一个新的对话会话。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "201":
+          description: 对话创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationResponse"
+        "404":
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{project_id}/conversations/{conversation_id}/messages:
+    post:
+      tags: [Conversations]
+      summary: 发送消息
+      description: 在对话中发送一条用户消息。如果工作流处于 clarification 阶段，请使用 /workflow/continue 触发 Agent 回复。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          description: 消息发送成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: 项目或对话不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    get:
+      tags: [Conversations]
+      summary: 获取消息历史
+      description: 分页获取对话的消息历史，按时间正序。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: 消息列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageListResponse"
+        "404":
+          description: 项目或对话不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ═══════════════════════════════════════════════════════
+  # Artifacts
+  # ═══════════════════════════════════════════════════════
+  /projects/{project_id}/artifacts:
+    get:
+      tags: [Artifacts]
+      summary: 获取产物列表
+      description: |
+        获取项目的所有产物列表。
+        列表接口不返回 content 字段 (内容较大)，需通过详情接口获取。
+        产物仅在 planning_generation 阶段完成后可用。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/ArtifactType"
+          description: 按产物类型过滤
+      responses:
+        "200":
+          description: 产物列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactListResponse"
+              example:
+                items:
+                  - id: "880e8400-e29b-41d4-a716-446655440004"
+                    project_id: "550e8400-e29b-41d4-a716-446655440000"
+                    type: "requirement_report"
+                    type_display_name: "需求分析报告"
+                    title: "需求分析报告"
+                    stage: "requirement_synthesis"
+                    file_path: "data/artifacts/550e8400/requirement_report.md"
+                    size_bytes: 4520
+                    format: "markdown"
+                    created_at: "2024-06-24T10:04:00Z"
+                  - id: "880e8400-e29b-41d4-a716-446655440005"
+                    project_id: "550e8400-e29b-41d4-a716-446655440000"
+                    type: "prd"
+                    type_display_name: "产品需求文档"
+                    title: "产品需求文档"
+                    stage: "planning_generation"
+                    file_path: "data/artifacts/550e8400/prd.md"
+                    size_bytes: 12800
+                    format: "markdown"
+                    created_at: "2024-06-24T10:04:30Z"
+                total: 11
+        "404":
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{project_id}/artifacts/{artifact_id}:
+    get:
+      tags: [Artifacts]
+      summary: 获取产物详情
+      description: 获取单个产物的完整内容 (Markdown)。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: artifact_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 产物详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactResponse"
+        "404":
+          description: 项目或产物不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{project_id}/artifacts/{artifact_id}/download:
+    get:
+      tags: [Artifacts]
+      summary: 下载产物文件
+      description: 下载产物为 Markdown 文件。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: artifact_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 文件下载
+          content:
+            text/markdown:
+              schema:
+                type: string
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: "attachment; filename=\"prd.md\""
+        "404":
+          description: 项目或产物不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ═══════════════════════════════════════════════════════
+  # Export
+  # ═══════════════════════════════════════════════════════
+  /projects/{project_id}/export/prd:
+    post:
+      tags: [Export]
+      summary: 导出 PRD 文档
+      description: |
+        将项目生成的 PRD 文档导出为指定格式。
+        支持 Markdown、PDF、HTML、JSON 格式。
+        也可指定导出多个产物类型。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportRequest"
+            examples:
+              prd_only:
+                summary: 仅导出 PRD (Markdown)
+                value:
+                  format: "markdown"
+                  artifact_types: ["prd"]
+              all_markdown:
+                summary: 导出全部产物 (Markdown)
+                value:
+                  format: "markdown"
+                  artifact_types: []
+              prd_and_architecture:
+                summary: 导出 PRD + 架构 (PDF)
+                value:
+                  format: "pdf"
+                  artifact_types: ["prd", "architecture"]
+      responses:
+        "202":
+          description: 导出任务已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResponse"
+              example:
+                id: "aa0e8400-e29b-41d4-a716-446655440020"
+                project_id: "550e8400-e29b-41d4-a716-446655440000"
+                format: "markdown"
+                status: "processing"
+                artifact_count: 1
+                created_at: "2024-06-24T10:06:00Z"
+        "400":
+          description: 参数校验失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 产物尚未生成 (工作流未完成)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "EXPORT_NOT_READY"
+                  message: "Artifacts not ready. Workflow must be completed first."
+
+  /projects/{project_id}/export/{export_id}:
+    get:
+      tags: [Export]
+      summary: 获取导出任务状态
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: export_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 导出任务状态
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResponse"
+              examples:
+                completed:
+                  summary: 导出完成
+                  value:
+                    id: "aa0e8400-e29b-41d4-a716-446655440020"
+                    project_id: "550e8400-e29b-41d4-a716-446655440000"
+                    format: "markdown"
+                    status: "completed"
+                    artifact_count: 1
+                    file_path: "data/exports/550e8400/prd.md"
+                    file_size_bytes: 12800
+                    download_url: "https://api.ai-planning-agent.com/api/v1/projects/550e8400/export/aa0e8400/download?token=xxx"
+                    created_at: "2024-06-24T10:06:00Z"
+                    completed_at: "2024-06-24T10:06:02Z"
+        "404":
+          description: 导出任务不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{project_id}/export/{export_id}/download:
+    get:
+      tags: [Export]
+      summary: 下载导出文件
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: export_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: 下载令牌 (从导出任务状态中获取)
+      responses:
+        "200":
+          description: 文件下载
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: 导出任务不存在或令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ═══════════════════════════════════════════════════════
+  # Token Usage
+  # ═══════════════════════════════════════════════════════
+  /usage/tokens:
+    get:
+      tags: [Token Usage]
+      summary: 获取 Token 用量与成本统计
+      description: |
+        获取项目级的 Token 消耗汇总。
+        包含按 Provider 和按阶段的分布统计, 以及预算信息。
+      parameters:
+        - name: project_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 项目 ID
+      responses:
+        "200":
+          description: Token 用量详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenUsageDetailResponse"
+              example:
+                project_id: "550e8400-e29b-41d4-a716-446655440000"
+                total_input_tokens: 32000
+                total_output_tokens: 24000
+                total_tokens: 56000
+                total_cost: 0.22
+                call_count: 25
+                success_count: 23
+                failed_count: 1
+                timeout_count: 1
+                rate_limited_count: 0
+                avg_latency_ms: 3420
+                success_rate: 92.0
+                updated_at: "2024-06-24T10:05:00Z"
+                by_provider:
+                  - provider_name: "deepseek"
+                    call_count: 18
+                    success_count: 17
+                    failed_count: 1
+                    total_input_tokens: 24000
+                    total_output_tokens: 18000
+                    total_cost: 0.168
+                    avg_latency_ms: 3200
+                  - provider_name: "glm"
+                    call_count: 4
+                    success_count: 3
+                    failed_count: 0
+                    total_input_tokens: 4000
+                    total_output_tokens: 3000
+                    total_cost: 0.007
+                    avg_latency_ms: 2800
+                  - provider_name: "minimax"
+                    call_count: 3
+                    success_count: 3
+                    failed_count: 0
+                    total_input_tokens: 4000
+                    total_output_tokens: 3000
+                    total_cost: 0.007
+                    avg_latency_ms: 3100
+                by_stage:
+                  - stage: "requirement_analysis"
+                    call_count: 1
+                    total_cost: 0.009
+                    avg_latency_ms: 2500
+                  - stage: "multi_model_analysis"
+                    call_count: 3
+                    total_cost: 0.051
+                    avg_latency_ms: 4200
+                  - stage: "requirement_synthesis"
+                    call_count: 1
+                    total_cost: 0.020
+                    avg_latency_ms: 3100
+                  - stage: "planning_generation"
+                    call_count: 11
+                    total_cost: 0.080
+                    avg_latency_ms: 3500
+                cost_limit:
+                  max_cost_per_project: 5.0
+                  remaining: 4.78
+                  alert_triggered: false
+        "404":
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{project_id}/usage/logs:
+    get:
+      tags: [Token Usage]
+      summary: 获取模型调用日志
+      description: 分页获取项目所有模型调用日志，按时间倒序。支持按 Provider、阶段、状态过滤。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: provider_name
+          in: query
+          schema:
+            type: string
+          description: 按 Provider 过滤
+          example: "deepseek"
+        - name: stage
+          in: query
+          schema:
+            $ref: "#/components/schemas/WorkflowStage"
+          description: 按阶段过滤
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/CallStatus"
+          description: 按调用状态过滤
+      responses:
+        "200":
+          description: 模型调用日志列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelExecutionLogListResponse"
+        "404":
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{project_id}/usage/logs/{log_id}:
+    get:
+      tags: [Token Usage]
+      summary: 获取单条模型调用日志详情
+      description: 获取单次模型调用的完整日志，包含发送的 Prompt 和返回的响应文本。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: log_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 模型调用日志详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ModelExecutionLogResponse"
+                  - type: object
+                    properties:
+                      prompt_text:
+                        type: string
+                        description: 发送的完整 Prompt
+                      response_text:
+                        type: string
+                        nullable: true
+                        description: 模型返回的原始文本
+                      structured_output:
+                        type: object
+                        nullable: true
+                        description: 结构化输出
+        "404":
+          description: 项目或日志不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+# ─────────────────────────────────────────────────────────
+# 接口总览
+# ─────────────────────────────────────────────────────────
+# GET    /health                                         健康检查
+# GET    /models                                         可用模型列表
+# GET    /models/{provider_name}                         模型详情
+# POST   /projects                                       创建项目
+# GET    /projects                                       项目列表
+# GET    /projects/{project_id}                          项目详情
+# DELETE /projects/{project_id}                          删除项目
+# POST   /projects/{project_id}/run                      启动工作流
+# GET    /projects/{project_id}/workflow/status          工作流状态
+# POST   /projects/{project_id}/workflow/continue        继续工作流
+# GET    /projects/{project_id}/workflow/states           阶段状态快照
+# GET    /projects/{project_id}/workflow/executions       执行历史
+# GET    /projects/{project_id}/workflow/executions/{eid} 执行详情
+# GET    /projects/{project_id}/workflow/executions/{eid}/logs  执行关联日志
+# POST   /projects/{project_id}/conversations             创建对话
+# POST   /projects/{project_id}/conversations/{cid}/messages  发送消息
+# GET    /projects/{project_id}/conversations/{cid}/messages  消息历史
+# GET    /projects/{project_id}/artifacts                 产物列表
+# GET    /projects/{project_id}/artifacts/{aid}           产物详情
+# GET    /projects/{project_id}/artifacts/{aid}/download  下载产物
+# POST   /projects/{project_id}/export/prd                导出产物
+# GET    /projects/{project_id}/export/{eid}              导出状态
+# GET    /projects/{project_id}/export/{eid}/download     下载导出
+# GET    /usage/tokens                                   Token 用量统计
+# GET    /projects/{project_id}/usage/logs               模型调用日志
+# GET    /projects/{project_id}/usage/logs/{lid}         日志详情
