@@ -2,8 +2,6 @@
 
 帮助用户将模糊的软件想法逐步收敛为可执行的软件项目方案。
 
-> Status: Phase 1 — Skeleton (complete) → Phase 2 — Database (complete)
-
 ## Prerequisites（前置依赖 · 本地验证）
 
 本仓库当前**只做本地验证**，不涉及线上/测试环境部署。前置依赖以"本地能跑通单元测试 + 集成测试 + API 契约测试"为目标。**Phase 2 起必须有可用的本地 PostgreSQL 16**。

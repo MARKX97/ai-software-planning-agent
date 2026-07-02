@@ -28,6 +28,10 @@ export class AppConfigService {
   readonly modelDeepseek: string;
   readonly modelGlm: string;
   readonly modelMinimax: string;
+  /** Per-project LLM cost ceiling (CNY). */
+  readonly costLimitPerProject: number;
+  /** API version surfaced in health/payloads. */
+  readonly version: string;
 
   constructor() {
     this.port = this.parsePort(process.env['API_PORT'], 3001);
@@ -40,10 +44,17 @@ export class AppConfigService {
     this.modelDeepseek = process.env['BAISHAN_MODEL_DEEPSEEK'] ?? 'deepseek-v4-pro';
     this.modelGlm = process.env['BAISHAN_MODEL_GLM'] ?? 'glm-5.1';
     this.modelMinimax = process.env['BAISHAN_MODEL_MINIMAX'] ?? 'minimax-m2.5';
+    this.costLimitPerProject = this.parseNumber(process.env['COST_LIMIT_PER_PROJECT'], 5);
+    this.version = process.env['API_VERSION'] ?? '1.0.0';
   }
 
   private parsePort(value: string | undefined, fallback: number): number {
     const parsed = Number.parseInt(value ?? '', 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private parseNumber(value: string | undefined, fallback: number): number {
+    const parsed = Number.parseFloat(value ?? '');
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 }

@@ -1,8 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "target": "ES2022",
     "lib": ["ES2022"],
     "esModuleInterop": true,
@@ -15,8 +15,7 @@
     "declaration": false,
     "declarationMap": false,
     "sourceMap": true,
-    "isolatedModules": false,
-    "noUnusedLocals": false,
+    "isolatedModules": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "types": ["node"]
