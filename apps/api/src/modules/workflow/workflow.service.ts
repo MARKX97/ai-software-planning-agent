@@ -1,12 +1,11 @@
-import { Injectable } from '@nestjs/common';
-import type { Project, WorkflowExecution } from '@ai-planning/database';
+import { Inject, Injectable } from '@nestjs/common';
+import type { LlmOrchestratorService } from '@ai-planning/llm-orchestrator';
+import { WorkflowStage, type StageResult, type WorkflowContext } from '@ai-planning/shared';
 import { PrismaService } from '../../database/database.module.js';
-import { AppException } from '../../common/exception/app-exception.js';
-import { ErrorCode } from '../../common/exception/error-code.js';
+import { LLM_ORCHESTRATOR } from '../../llm/llm.constants.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import { toModelExecutionLogResponse, type ModelExecutionLogResponse } from '../usage/usage.dto.js';
 import {
-  buildStatusFromProject,
   toWorkflowExecutionDetailResponse,
   toWorkflowExecutionResponse,
   toWorkflowStateResponse,
@@ -22,18 +21,20 @@ import {
   type ListExecutionsQuery,
   type RunWorkflowRequest,
 } from './workflow.dto.js';
-
-const RUNNING_STAGES = new Set([
-  'requirement_analysis',
-  'requirement_clarification',
-  'multi_model_analysis',
-  'requirement_synthesis',
-  'feasibility_analysis',
-  'risk_analysis',
-  'mvp_compression',
-  'platform_recommendation',
-  'planning_generation',
-]);
+import { runPipeline } from './workflow-pipeline-runner.js';
+import { assertCanContinueWorkflow, assertWorkflowNotRunning } from './workflow-guards.js';
+import {
+  buildWorkflowStatus,
+  countModelLogs,
+  createExecution,
+  findConversationOrFail,
+  findExecutionOrFail,
+  loadConversationHistory,
+  markExecutionComplete,
+  markFailed,
+  markProjectComplete,
+  updateProjectStage,
+} from './workflow-store.js';
 
 export interface ExecutionLogsListResponse {
   items: ModelExecutionLogResponse[];
@@ -43,7 +44,10 @@ export interface ExecutionLogsListResponse {
 }
 
 /**
- * Workflow service — Phase 3 STUB. Does NOT run the real pipeline.
+ * Workflow service — runs the full 9-stage pipeline end-to-end via the
+ * orchestrator. Persists every stage result to `analysis_results` and every
+ * model call to `model_execution_logs`, then updates `project.current_stage`.
+ *
  * @internal
  */
 @Injectable()
@@ -51,28 +55,20 @@ export class WorkflowService {
   constructor(
     private readonly db: PrismaService,
     private readonly projects: ProjectsService,
+    @Inject(LLM_ORCHESTRATOR) private readonly orchestrator: LlmOrchestratorService,
   ) {}
 
   async run(projectId: string, _input: RunWorkflowRequest): Promise<WorkflowStatusResponse> {
     const project = await this.projects.findOrFail(projectId);
-    this.assertNotRunning(project);
-    // STUB: create a placeholder execution without mutating project stage.
-    await this.db.client.workflowExecution.create({
-      data: {
-        project_id: projectId,
-        stage: 'requirement_analysis',
-        status: 'success',
-        started_at: new Date(),
-        retry_count: 0,
-      },
-    });
-    return buildStatusFromProject(project, 0);
+    assertWorkflowNotRunning(project);
+    const execution = await createExecution(this.db, projectId);
+    await updateProjectStage(this.db, projectId, WorkflowStage.REQUIREMENT_ANALYSIS);
+    const ctx = await this.buildContext(projectId, execution.id, project.original_idea);
+    return this.executePipeline(projectId, execution.id, ctx);
   }
 
   async getStatus(projectId: string): Promise<WorkflowStatusResponse> {
-    const project = await this.projects.findOrFail(projectId);
-    const completedStages = await this.countCompletedStages(projectId);
-    return buildStatusFromProject(project, completedStages);
+    return buildWorkflowStatus(this.db, this.projects, projectId);
   }
 
   async continue(
@@ -80,17 +76,15 @@ export class WorkflowService {
     input: ContinueWorkflowRequest,
   ): Promise<WorkflowStatusResponse> {
     const project = await this.projects.findOrFail(projectId);
-    await this.findConversationOrFail(projectId, input.conversation_id);
-    if (project.current_stage !== 'requirement_clarification') {
-      throw AppException.conflict(
-        ErrorCode.WORKFLOW_STAGE_NOT_CLARIFICATION,
-        `Cannot continue workflow from stage '${project.current_stage}'`,
-        { current_stage: project.current_stage, expected_stage: 'requirement_clarification' },
-      );
-    }
-    // STUB: do NOT advance the real workflow.
-    const completedStages = await this.countCompletedStages(projectId);
-    return buildStatusFromProject(project, completedStages);
+    await findConversationOrFail(this.db, projectId, input.conversation_id);
+    assertCanContinueWorkflow(project);
+    await this.db.client.message.create({
+      data: { conversation_id: input.conversation_id, role: 'user', content: input.message },
+    });
+    const execution = await createExecution(this.db, projectId);
+    await updateProjectStage(this.db, projectId, WorkflowStage.REQUIREMENT_ANALYSIS);
+    const ctx = await this.buildContext(projectId, execution.id, project.original_idea);
+    return this.executePipeline(projectId, execution.id, ctx);
   }
 
   async listStates(projectId: string): Promise<WorkflowStateListResponse> {
@@ -121,7 +115,7 @@ export class WorkflowService {
       }),
       this.db.client.workflowExecution.count({ where }),
     ]);
-    const counts = await this.countModelLogs(rows);
+    const counts = await countModelLogs(this.db, rows);
     const items: WorkflowExecutionResponse[] = rows.map((e, i) =>
       toWorkflowExecutionResponse(e, counts[i]),
     );
@@ -133,7 +127,7 @@ export class WorkflowService {
     executionId: string,
   ): Promise<WorkflowExecutionDetailResponse> {
     await this.projects.findOrFail(projectId);
-    const execution = await this.findExecutionOrFail(projectId, executionId);
+    const execution = await findExecutionOrFail(this.db, projectId, executionId);
     const logs = await this.db.client.modelExecutionLog.findMany({
       where: { execution_id: executionId },
       orderBy: { created_at: 'asc' },
@@ -147,7 +141,7 @@ export class WorkflowService {
     query: ListExecutionLogsQuery,
   ): Promise<ExecutionLogsListResponse> {
     await this.projects.findOrFail(projectId);
-    await this.findExecutionOrFail(projectId, executionId);
+    await findExecutionOrFail(this.db, projectId, executionId);
     const where = { execution_id: executionId };
     const [rows, total] = await Promise.all([
       this.db.client.modelExecutionLog.findMany({
@@ -166,60 +160,37 @@ export class WorkflowService {
     };
   }
 
-  private async findExecutionOrFail(
+  private async executePipeline(
     projectId: string,
     executionId: string,
-  ): Promise<WorkflowExecution> {
-    const execution = await this.db.client.workflowExecution.findUnique({
-      where: { id: executionId },
-    });
-    if (!execution || execution.project_id !== projectId) {
-      throw AppException.notFound(
-        ErrorCode.EXECUTION_NOT_FOUND,
-        `Execution '${executionId}' not found`,
-      );
+    ctx: WorkflowContext,
+  ): Promise<WorkflowStatusResponse> {
+    try {
+      const finalStage = await runPipeline(ctx, { db: this.db, orchestrator: this.orchestrator });
+      if (finalStage === WorkflowStage.COMPLETED) {
+        await markProjectComplete(this.db, projectId);
+      }
+    } catch (error) {
+      await markFailed(this.db, projectId, executionId, error);
+      return buildWorkflowStatus(this.db, this.projects, projectId);
     }
-    return execution;
+    await markExecutionComplete(this.db, executionId);
+    return buildWorkflowStatus(this.db, this.projects, projectId);
   }
 
-  private async findConversationOrFail(projectId: string, conversationId: string): Promise<void> {
-    const conversation = await this.db.client.conversation.findUnique({
-      where: { id: conversationId },
-    });
-    if (!conversation || conversation.project_id !== projectId) {
-      throw AppException.notFound(
-        ErrorCode.CONVERSATION_NOT_FOUND,
-        `Conversation '${conversationId}' not found in project '${projectId}'`,
-      );
-    }
-  }
-
-  private assertNotRunning(project: Project): void {
-    if (project.status === 'active' && RUNNING_STAGES.has(project.current_stage)) {
-      throw AppException.conflict(
-        ErrorCode.WORKFLOW_ALREADY_RUNNING,
-        'Workflow is already running for this project',
-      );
-    }
-  }
-
-  private async countCompletedStages(projectId: string): Promise<number> {
-    return this.db.client.workflowState.count({
-      where: { project_id: projectId, status: 'completed' },
-    });
-  }
-
-  private async countModelLogs(rows: WorkflowExecution[]): Promise<number[]> {
-    if (rows.length === 0) return [];
-    const grouped = await this.db.client.modelExecutionLog.groupBy({
-      by: ['execution_id'],
-      where: { execution_id: { in: rows.map((r) => r.id) } },
-      _count: { _all: true },
-    });
-    const map = new Map<string, number>();
-    for (const g of grouped) {
-      if (g.execution_id !== null) map.set(g.execution_id, g._count._all);
-    }
-    return rows.map((r) => map.get(r.id) ?? 0);
+  private async buildContext(
+    projectId: string,
+    executionId: string,
+    originalIdea: string,
+  ): Promise<WorkflowContext> {
+    const conversationHistory = await loadConversationHistory(this.db, projectId);
+    return {
+      projectId,
+      executionId,
+      originalIdea,
+      conversationHistory,
+      clarificationRound: 0,
+      resultsByStage: {} as Record<WorkflowStage, StageResult>,
+    };
   }
 }

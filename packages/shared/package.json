@@ -17,7 +17,7 @@
     "dev": "tsup src/index.ts --format esm --dts --watch",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test"
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "zod": "^3.25.76"

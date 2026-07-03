@@ -9,6 +9,7 @@ import {
   type ModelExecutionLogResponse,
   type WorkflowProgress,
 } from '../usage/usage.dto.js';
+import { WorkflowStage } from '@ai-planning/shared';
 
 /**
  * Response DTOs + mappers for the Workflow endpoints.
@@ -175,6 +176,8 @@ export function toWorkflowExecutionDetailResponse(
 export function buildStatusFromProject(
   project: Project,
   completedStages: number,
+  activeState: WorkflowState | null = null,
+  modelStatus: Record<string, string> | null = null,
 ): WorkflowStatusResponse {
   return {
     project_id: project.id,
@@ -182,10 +185,25 @@ export function buildStatusFromProject(
     current_stage: project.current_stage,
     stage_display_name: stageDisplayName(project.current_stage),
     progress: buildProgress(completedStages),
-    clarification_questions: null,
-    model_status: null,
+    clarification_questions: extractClarificationQuestions(project, activeState),
+    model_status: modelStatus,
     error_message: project.error_message,
     started_at: project.started_at?.toISOString() ?? null,
     updated_at: project.updated_at.toISOString(),
   };
+}
+
+function extractClarificationQuestions(
+  project: Project,
+  activeState: WorkflowState | null,
+): unknown[] | null {
+  if (
+    project.current_stage !== WorkflowStage.REQUIREMENT_CLARIFICATION ||
+    !activeState?.data_json
+  ) {
+    return null;
+  }
+  const data = activeState.data_json as Record<string, unknown>;
+  const questions = data['clarification_questions'];
+  return Array.isArray(questions) ? questions : null;
 }

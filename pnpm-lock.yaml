@@ -68,6 +68,9 @@ importers:
       '@ai-planning/llm-orchestrator':
         specifier: workspace:*
         version: link:../../packages/llm-orchestrator
+      '@ai-planning/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.1.27(reflect-metadata@0.2.2)(rxjs@7.8.2)
