@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
+import { OrchestratorModule } from './llm/orchestrator.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ModelsModule } from './modules/models/models.module.js';
 import { ProjectsModule } from './modules/projects/projects.module.js';
@@ -19,6 +20,7 @@ import { AppController } from './app.controller.js';
   imports: [
     ConfigModule,
     DatabaseModule,
+    OrchestratorModule,
     HealthModule,
     ModelsModule,
     ProjectsModule,

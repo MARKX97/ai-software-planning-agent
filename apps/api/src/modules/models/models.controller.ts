@@ -16,15 +16,15 @@ export class ModelsController {
   @Public()
   @Get()
   @ApiOperation({ summary: '获取可用 AI 模型列表' })
-  list(): ModelListResponse {
-    const items = this.models.list();
+  async list(): Promise<ModelListResponse> {
+    const items = await this.models.list();
     return { items, total: items.length };
   }
 
   @Public()
   @Get(':provider_name')
   @ApiOperation({ summary: '获取指定模型详情' })
-  detail(@Param('provider_name') providerName: string): ModelInfo {
+  async detail(@Param('provider_name') providerName: string): Promise<ModelInfo> {
     return this.models.get(providerName);
   }
 }

@@ -1,8 +1,10 @@
 /**
  * LLM Orchestrator — business-code-only entry point for LLM calls.
  *
- * Implementation deferred to Phase 6.
- *
- * @internal
+ * @packageDocumentation @internal
  */
-export const LLM_ORCHESTRATOR_PACKAGE_NAME = '@ai-planning/llm-orchestrator';
+export * from './llm-orchestrator.service.js';
+export * from './factory.js';
+export * from './strategies/index.js';
+export * from './monitoring/index.js';
+export * from './errors/index.js';

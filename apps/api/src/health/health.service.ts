@@ -1,11 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import type { LlmOrchestratorService } from '@ai-planning/llm-orchestrator';
 import { PrismaService } from '../database/database.module.js';
 import { AppConfigService } from '../config/app-config.service.js';
+import { LLM_ORCHESTRATOR } from '../llm/llm.constants.js';
 import type { HealthResponse } from './health.controller.js';
 
 /**
- * Aggregates DB and (stubbed) LLM provider availability for the health check.
- * Real LLM provider probing lands in later phases.
+ * Aggregates DB and LLM provider availability for the health check.
  * @internal
  */
 @Injectable()
@@ -13,6 +14,7 @@ export class HealthService {
   constructor(
     private readonly db: PrismaService,
     private readonly config: AppConfigService,
+    @Inject(LLM_ORCHESTRATOR) private readonly orchestrator: LlmOrchestratorService,
   ) {}
 
   async check(): Promise<HealthResponse> {
@@ -37,11 +39,10 @@ export class HealthService {
   }
 
   private async checkLlm(): Promise<Record<string, 'ok' | 'unavailable'>> {
-    // Phase 3: configs present → "ok"; real probing deferred.
-    const providers = ['deepseek', 'glm', 'minimax'];
+    const health = await this.orchestrator.healthCheck();
     const result: Record<string, 'ok' | 'unavailable'> = {};
-    for (const p of providers) {
-      result[p] = this.config.baishanApiKey ? 'ok' : 'unavailable';
+    for (const [name, ok] of Object.entries(health)) {
+      result[name] = ok ? 'ok' : 'unavailable';
     }
     return result;
   }

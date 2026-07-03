@@ -1,8 +1,8 @@
 /**
- * LLM Providers — DeepSeek / GLM / MiniMax implementations.
+ * LLM Providers — DeepSeek / GLM / MiniMax implementations + registry.
  *
- * Implementation deferred to Phase 5.
- *
- * @internal
+ * @packageDocumentation @internal
  */
-export const LLM_PROVIDERS_PACKAGE_NAME = '@ai-planning/llm-providers';
+export * from './providers/index.js';
+export * from './registry/index.js';
+export * from './config/index.js';

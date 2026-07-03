@@ -54,3 +54,6 @@ packages/database/src/generated/
 
 # Misc
 *.pem
+
+# Local-only progress tracker (never committed; updated after each phase completes)
+PHASE-PROGRESS.md

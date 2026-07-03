@@ -65,6 +65,9 @@ importers:
       '@ai-planning/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@ai-planning/llm-orchestrator':
+        specifier: workspace:*
+        version: link:../../packages/llm-orchestrator
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.1.27(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -202,6 +205,13 @@ importers:
         version: 5.9.3
 
   packages/llm-core:
+    dependencies:
+      '@ai-planning/shared':
+        specifier: workspace:*
+        version: link:../shared
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^20.11.0
@@ -209,6 +219,9 @@ importers:
       tsup:
         specifier: ^8.0.0
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.16)(tsx@4.22.5)(typescript@5.9.3)(yaml@2.9.0)
+      tsx:
+        specifier: ^4.22.5
+        version: 4.22.5
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -218,9 +231,15 @@ importers:
       '@ai-planning/llm-core':
         specifier: workspace:*
         version: link:../llm-core
+      '@ai-planning/llm-providers':
+        specifier: workspace:*
+        version: link:../llm-providers
       '@ai-planning/shared':
         specifier: workspace:*
         version: link:../shared
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^20.11.0
@@ -228,6 +247,9 @@ importers:
       tsup:
         specifier: ^8.0.0
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.16)(tsx@4.22.5)(typescript@5.9.3)(yaml@2.9.0)
+      tsx:
+        specifier: ^4.22.5
+        version: 4.22.5
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -240,6 +262,9 @@ importers:
       '@ai-planning/shared':
         specifier: workspace:*
         version: link:../shared
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^20.11.0
@@ -247,11 +272,18 @@ importers:
       tsup:
         specifier: ^8.0.0
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.16)(tsx@4.22.5)(typescript@5.9.3)(yaml@2.9.0)
+      tsx:
+        specifier: ^4.22.5
+        version: 4.22.5
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
 
   packages/shared:
+    dependencies:
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^20.11.0

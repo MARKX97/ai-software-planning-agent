@@ -1,8 +1,10 @@
 /**
- * LLM Core — abstract interfaces and types.
+ * LLM Core — abstract interfaces, types, adapter, utils, and errors.
  *
- * Implementation deferred to Phase 4 (see .claude/skills/llm-development/SKILL.md).
- *
- * @internal
+ * @packageDocumentation @internal
  */
-export const LLM_CORE_PACKAGE_NAME = '@ai-planning/llm-core';
+export * from './interfaces/index.js';
+export * from './adapters/index.js';
+export * from './utils/index.js';
+export * from './errors/index.js';
+export * from './mock/index.js';
