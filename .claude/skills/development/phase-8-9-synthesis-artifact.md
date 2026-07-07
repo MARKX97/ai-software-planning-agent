@@ -40,7 +40,7 @@ triggers:
 
 1. ArtifactGenerator（11 类产物全部生成）
 2. FileStore（文件存储 + 读取）
-3. 调用链：Generator → `LlmOrchestratorService.callMulti()`
+3. 调用链：Generator → 按 `specs/model-routing.spec.md` 路由调用 `LlmOrchestratorService.callSingle()`
 4. 部分失败不影响其他产物
 
 ### 验收

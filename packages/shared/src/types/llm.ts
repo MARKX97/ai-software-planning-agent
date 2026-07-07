@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * LLM core type definitions shared across llm-core / llm-providers /
- * llm-orchestrator. Defined here per CLAUDE.md §A4 so the three packages do
+ * llm-orchestrator. Defined here per AGENTS.md §1.4 so the three packages do
  * not need to depend on one another merely to share types.
  *
  * Source: specs/provider.spec.md §6-7 + specs/orchestrator.spec.md §1.

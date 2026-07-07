@@ -2,7 +2,7 @@
  * Shared package — types, enums, and Zod schemas.
  *
  * Types live in `src/types/`, enums in `src/enums/`, schemas in `src/schemas/`
- * per CLAUDE.md §A4.
+ * per AGENTS.md §1.4.
  *
  * @packageDocumentation @internal
  */

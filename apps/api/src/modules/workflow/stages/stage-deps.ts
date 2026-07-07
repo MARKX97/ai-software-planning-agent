@@ -1,6 +1,6 @@
 /**
  * Shared dependencies injected into every stage processor. Bundling them avoids
- * each processor declaring 3+ constructor params (CLAUDE.md §A5).
+ * each processor declaring 3+ constructor params (AGENTS.md §1.5).
  *
  * @internal
  */

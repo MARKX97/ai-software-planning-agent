@@ -2,7 +2,7 @@
  * WorkflowPipelineRunner — executes the 9-stage pipeline end-to-end.
  *
  * Extracted from {@link WorkflowService} to keep the service under the 200-line
- * limit (CLAUDE.md §A5). Owns the stage loop, state machine, error mapping,
+ * limit (AGENTS.md §1.5). Owns the stage loop, state machine, error mapping,
  * and per-stage persistence side effects (`analysis_results`, `requirement_text`).
  *
  * @internal
