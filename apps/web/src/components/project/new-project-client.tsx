@@ -1,0 +1,125 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { PageFrame } from '@/components/layout/app-shell';
+import { Button } from '@/components/ui/button';
+import { Card, CardBody } from '@/components/ui/card';
+import { FieldError, Input, Label, Textarea } from '@/components/ui/form';
+import { createProject } from '@/features/projects/api';
+
+interface FormErrors {
+  name?: string;
+  originalIdea?: string;
+  form?: string;
+}
+
+export function NewProjectClient() {
+  const router = useRouter();
+  const [name, setName] = useState('');
+  const [originalIdea, setOriginalIdea] = useState('');
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  function validate(): FormErrors {
+    const next: FormErrors = {};
+    if (name.trim().length < 1) {
+      next.name = '请输入项目名称。';
+    }
+    if (name.length > 200) {
+      next.name = '项目名称不能超过 200 个字符。';
+    }
+    if (originalIdea.trim().length < 1) {
+      next.originalIdea = '请输入原始想法。';
+    }
+    if (originalIdea.length > 10000) {
+      next.originalIdea = '原始想法不能超过 10000 个字符。';
+    }
+    return next;
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextErrors = validate();
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const project = await createProject({
+        name: name.trim(),
+        original_idea: originalIdea.trim(),
+      });
+      router.push(`/projects/${project.id}`);
+    } catch (error) {
+      setErrors({
+        form: error instanceof Error ? error.message : '创建失败，请稍后重试。',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <PageFrame
+      description="把一句模糊的产品想法交给 Agent。后续工作流会用澄清问题和多模型分析把它转成可交付的软件规划。"
+      eyebrow="Project Intake"
+      title="新建规划项目"
+    >
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,720px)_1fr]">
+        <Card>
+          <CardBody>
+            <form className="grid gap-5" onSubmit={(event) => void handleSubmit(event)}>
+              {errors.form ? (
+                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700" role="alert">
+                  {errors.form}
+                </p>
+              ) : null}
+              <div className="grid gap-2">
+                <Label htmlFor="project-name">项目名称</Label>
+                <Input
+                  aria-describedby="project-name-error"
+                  aria-invalid={Boolean(errors.name)}
+                  id="project-name"
+                  maxLength={200}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="例如：面向独立开发者的需求规划 Agent"
+                  value={name}
+                />
+                <FieldError id="project-name-error">{errors.name}</FieldError>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="original-idea">原始想法</Label>
+                <Textarea
+                  aria-describedby="original-idea-error original-idea-help"
+                  aria-invalid={Boolean(errors.originalIdea)}
+                  id="original-idea"
+                  maxLength={10000}
+                  onChange={(event) => setOriginalIdea(event.target.value)}
+                  placeholder="描述你想做什么、目标用户是谁、你现在最不确定的问题是什么。"
+                  value={originalIdea}
+                />
+                <p className="text-xs leading-5 text-slate-500" id="original-idea-help">
+                  建议包含目标用户、核心场景、预期产物和已知约束；不需要一次写完所有细节。
+                </p>
+                <FieldError id="original-idea-error">{errors.originalIdea}</FieldError>
+              </div>
+              <Button disabled={submitting} type="submit">
+                {submitting ? '创建中' : '创建项目'}
+              </Button>
+            </form>
+          </CardBody>
+        </Card>
+        <Card className="h-fit border-amber-200 bg-amber-50">
+          <CardBody>
+            <h2 className="text-base font-bold text-amber-950">输入质量会影响后续产物</h2>
+            <p className="mt-2 text-sm leading-6 text-amber-900">
+              这个 Agent 的意义不是替你写一个漂亮摘要，而是帮你暴露缺口、提出澄清问题、生成工程团队能接着执行的规格文档。
+            </p>
+          </CardBody>
+        </Card>
+      </div>
+    </PageFrame>
+  );
+}
