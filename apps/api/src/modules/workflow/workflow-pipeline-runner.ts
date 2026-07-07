@@ -1,0 +1,150 @@
+/**
+ * WorkflowPipelineRunner — executes the 9-stage pipeline end-to-end.
+ *
+ * Extracted from {@link WorkflowService} to keep the service under the 200-line
+ * limit (CLAUDE.md §A5). Owns the stage loop, state machine, error mapping,
+ * and per-stage persistence side effects (`analysis_results`, `requirement_text`).
+ *
+ * @internal
+ */
+import {
+  AllModelsFailedError,
+  LLMTimeoutError,
+  type LlmOrchestratorService,
+} from '@ai-planning/llm-orchestrator';
+import {
+  MAX_CLARIFICATION_ROUNDS,
+  WorkflowStage,
+  type StageResult,
+  type WorkflowContext,
+} from '@ai-planning/shared';
+import type { PrismaService } from '../../database/database.module.js';
+import { AppException } from '../../common/exception/app-exception.js';
+import { ErrorCode } from '../../common/exception/error-code.js';
+import { WorkflowStateMachine } from './state-machine/workflow-state-machine.js';
+import {
+  markStageCompleted,
+  markStageRunning,
+  markStageWaiting,
+} from './workflow-state-persister.js';
+import { createStageRegistry } from './stages/stage-registry.js';
+import type { StageDeps } from './stages/stage-deps.js';
+import type { StageProcessor } from './stages/stage-processor.js';
+import { persistAnalysisResult } from './stages/analysis-result-persister.js';
+import type { ClarificationResult } from './stages/requirement-clarification.stage.js';
+import type { MultiModelResult } from './stages/multi-model-analysis.stage.js';
+
+export interface PipelineRunDeps {
+  readonly db: PrismaService;
+  readonly orchestrator: LlmOrchestratorService;
+}
+
+/** Run the pipeline until completion or until clarification needs user input. */
+export async function runPipeline(
+  ctx: WorkflowContext,
+  deps: PipelineRunDeps,
+): Promise<WorkflowStage> {
+  const stateMachine = new WorkflowStateMachine();
+  const stageDeps: StageDeps = { orchestrator: deps.orchestrator, db: deps.db };
+  const registry = createStageRegistry(stageDeps);
+  let currentStage = pickStartingStage(ctx);
+  while (!stateMachine.isTerminal(currentStage)) {
+    const processor = registry.get(currentStage);
+    if (!processor) {
+      throw new Error(`No processor registered for stage '${currentStage}'`);
+    }
+    await updateProjectStage(deps.db, ctx.projectId, currentStage);
+    await markStageRunning(deps.db, ctx.projectId, currentStage, stateMachine);
+    const result = await runStage(processor, ctx);
+    ctx.resultsByStage[currentStage] = result;
+    await persistAnalysisResult(deps.db, ctx.projectId, ctx.executionId, currentStage, result);
+    await markStageCompleted(deps.db, ctx.projectId, currentStage, result, stateMachine);
+    if (currentStage === WorkflowStage.REQUIREMENT_SYNTHESIS) {
+      await updateRequirementText(deps.db, ctx.projectId, result);
+    }
+    const next = decideNextStage(stateMachine, currentStage, result);
+    if (next === WorkflowStage.REQUIREMENT_ANALYSIS) {
+      const mutableCtx = ctx as { clarificationRound: number };
+      mutableCtx.clarificationRound += 1;
+      if (mutableCtx.clarificationRound >= MAX_CLARIFICATION_ROUNDS) {
+        throw new Error(`Clarification round limit (${MAX_CLARIFICATION_ROUNDS}) exceeded`);
+      }
+      await updateProjectStage(deps.db, ctx.projectId, WorkflowStage.REQUIREMENT_CLARIFICATION);
+      await markStageWaiting(deps.db, ctx.projectId, currentStage, result, stateMachine);
+      return WorkflowStage.REQUIREMENT_CLARIFICATION;
+    }
+    currentStage = next;
+  }
+  await updateProjectStage(deps.db, ctx.projectId, currentStage);
+  return currentStage;
+}
+
+function pickStartingStage(ctx: WorkflowContext): WorkflowStage {
+  return ctx.resultsByStage[WorkflowStage.REQUIREMENT_ANALYSIS]?.structuredOutput
+    ? WorkflowStage.REQUIREMENT_CLARIFICATION
+    : WorkflowStage.REQUIREMENT_ANALYSIS;
+}
+
+async function runStage(processor: StageProcessor, ctx: WorkflowContext): Promise<StageResult> {
+  try {
+    return await processor.execute(ctx);
+  } catch (error) {
+    mapLlmError(error);
+    throw error;
+  }
+}
+
+function decideNextStage(
+  stateMachine: WorkflowStateMachine,
+  stage: WorkflowStage,
+  result: StageResult,
+): WorkflowStage {
+  if (stage === WorkflowStage.REQUIREMENT_CLARIFICATION) {
+    const needsMore = (result as ClarificationResult).needsMoreClarification;
+    return needsMore ? WorkflowStage.REQUIREMENT_ANALYSIS : WorkflowStage.MULTI_MODEL_ANALYSIS;
+  }
+  if (stage === WorkflowStage.MULTI_MODEL_ANALYSIS) {
+    const successCount = (result as MultiModelResult).successCount ?? 0;
+    if (successCount === 0) {
+      throw new Error('All models failed in multi-model analysis stage');
+    }
+  }
+  return stateMachine.nextStage(stage);
+}
+
+function mapLlmError(error: unknown): void {
+  if (error instanceof AllModelsFailedError) {
+    throw AppException.internal(`All models failed: ${error.message}`);
+  }
+  if (error instanceof LLMTimeoutError) {
+    throw AppException.internal(`LLM timeout: ${error.message}`);
+  }
+  if (error instanceof Error && error.message.includes('Cost limit exceeded')) {
+    throw AppException.badRequest(ErrorCode.COST_LIMIT_EXCEEDED, error.message);
+  }
+}
+
+async function updateProjectStage(
+  db: PrismaService,
+  projectId: string,
+  stage: WorkflowStage,
+): Promise<void> {
+  await db.client.project.update({
+    where: { id: projectId },
+    data: { current_stage: stage, updated_at: new Date() },
+  });
+}
+
+async function updateRequirementText(
+  db: PrismaService,
+  projectId: string,
+  result: StageResult,
+): Promise<void> {
+  const synthesized = result.structuredOutput as { executive_summary?: string };
+  if (synthesized?.executive_summary) {
+    await db.client.project.update({
+      where: { id: projectId },
+      data: { requirement_text: synthesized.executive_summary, updated_at: new Date() },
+    });
+  }
+}

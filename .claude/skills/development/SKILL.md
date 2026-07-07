@@ -1,6 +1,6 @@
 ---
 name: development
-description: Development supplement — actionable review commands, drift prevention, and scope creep control. Core rules live in CLAUDE.md.
+description: Development supplement — actionable review commands, drift prevention, and scope creep control. Core rules live in AGENTS.md.
 triggers:
   - implementing a feature
   - writing code
@@ -12,8 +12,8 @@ triggers:
 
 # Development Supplement
 
-> 核心规范见 CLAUDE.md（MVP First、Tech Stack、LLM 铁律、目录约束、代码规范、Self-Check 等）。
-> 本文件仅补充 CLAUDE.md 未覆盖的操作性内容。
+> 核心规范见 AGENTS.md（MVP First、Tech Stack、LLM 铁律、目录约束、代码规范、Self-Check 等）。
+> 本文件仅补充 AGENTS.md 未覆盖的操作性内容。
 
 ## 1. 提交前 Review
 

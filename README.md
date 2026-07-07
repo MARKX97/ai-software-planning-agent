@@ -86,9 +86,26 @@ pnpm dev
 | 语言     | TypeScript 5.5+               |
 | AI 接入  | Baishan OpenAI-compatible API |
 
+## Agent 使用说明（Codex / Claude）
+
+本项目采用“一套通用规则 + 工具专用入口”的方式，避免 Codex 和 Claude Code 各维护一份规范导致漂移。
+
+| 文件/目录               | 用途                                                         |
+| ----------------------- | ------------------------------------------------------------ |
+| `AGENTS.md`             | 通用 agent 规则唯一来源；Codex 直接识别并使用                |
+| `CLAUDE.md`             | Claude Code 自动识别入口；内容只指向 `AGENTS.md`             |
+| `.claude/skills/`       | Claude 专用 skills；Codex 需要时可直接读取对应 Markdown 文件 |
+| `.claude/settings.json` | Claude 项目级配置                                            |
+
+使用原则：
+
+- 修改长期有效的项目规范时，只改 `AGENTS.md`。
+- 不要在 `CLAUDE.md` 里复制完整规则，避免和 `AGENTS.md` 冲突。
+- `.claude/settings.local.json` 属于个人本机授权/状态，不作为团队规范来源。
+
 ## 测试策略（本地验证用什么测试）
 
-不是 e2e 单一方案，而是**分层金字塔**（见 `.claude/skills/testing/SKILL.md`）。每个 Phase 的本地验证由不同层组合而成：
+不是 e2e 单一方案，而是**分层金字塔**（通用要求见 `AGENTS.md`，Claude playbook 见 `.claude/skills/testing/SKILL.md`）。每个 Phase 的本地验证由不同层组合而成：
 
 ```
         ┌───────┐
@@ -137,6 +154,9 @@ pnpm --filter @ai-planning/web exec playwright install
 
 ```
 ai-software-planning-agent/
+├── AGENTS.md             # Codex/Claude 通用 agent 规则
+├── CLAUDE.md             # Claude Code 入口，指向 AGENTS.md
+├── .claude/              # Claude 专用 settings/skills
 ├── apps/
 │   ├── api/          # NestJS 11
 │   └── web/          # Next.js 15
@@ -157,5 +177,6 @@ ai-software-planning-agent/
 - 产品定位与 MVP 范围：`docs/product-vision.md`
 - 架构与技术栈：`docs/architecture-overview.md`
 - 系统契约：`specs/*.spec.md`
-- 开发规范：`CLAUDE.md`
-- 开发流程：`.claude/skills/development/SKILL.md`
+- 通用 agent 开发规范：`AGENTS.md`
+- Claude Code 入口：`CLAUDE.md`
+- Claude 开发流程 playbook：`.claude/skills/development/SKILL.md`

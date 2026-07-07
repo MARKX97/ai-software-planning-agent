@@ -11,12 +11,13 @@
     "start": "dotenv -e ../../.env -- node dist/main.js",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"no tests yet\""
+    "test": "tsx --test test/**/*.test.ts"
   },
   "dependencies": {
     "@ai-planning/config": "workspace:*",
     "@ai-planning/database": "workspace:*",
     "@ai-planning/llm-orchestrator": "workspace:*",
+    "@ai-planning/shared": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
