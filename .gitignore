@@ -51,6 +51,7 @@ packages/database/src/generated/
 /playwright-report/
 /test-results/
 .cache/
+TEST-PLAN.md
 
 # Misc
 *.pem
