@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Badge, statusVariant } from '@/components/ui/badge';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -11,24 +12,25 @@ import { StageName } from '@/components/project/project-status';
 import { getProject } from '@/features/projects/api';
 import { getWorkflowStatus, runWorkflow } from '@/features/workflow/api';
 import { formatDateTime } from '@/lib/format';
-import { useAsync } from '@/lib/use-async';
 
 export function ProjectOverviewClient({ projectId }: { projectId: string }) {
-  const projectState = useAsync(() => getProject(projectId), [projectId]);
-  const workflowState = useAsync(() => getWorkflowStatus(projectId), [projectId]);
-  const [starting, setStarting] = useState(false);
-  const project = projectState.data;
-  const workflow = workflowState.data;
-
-  async function handleRun() {
-    setStarting(true);
-    try {
-      await runWorkflow(projectId);
-      await Promise.all([projectState.reload(), workflowState.reload()]);
-    } finally {
-      setStarting(false);
-    }
-  }
+  const router = useRouter();
+  const projectQuery = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: () => getProject(projectId),
+  });
+  const workflowQuery = useQuery({
+    queryKey: ['workflow-status', projectId],
+    queryFn: () => getWorkflowStatus(projectId),
+  });
+  const runMutation = useMutation({
+    mutationFn: () => runWorkflow(projectId),
+    onSuccess: () => {
+      router.push(`/projects/${projectId}/workflow`);
+    },
+  });
+  const project = projectQuery.data;
+  const workflow = workflowQuery.data;
 
   return (
     <PageFrame
@@ -46,8 +48,17 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
       eyebrow="Project Overview"
       title={project?.name ?? '项目详情'}
     >
-      {projectState.loading ? <ListSkeleton rows={3} /> : null}
-      {projectState.error ? <ErrorState error={projectState.error} onRetry={projectState.reload} /> : null}
+      {projectQuery.isLoading ? <ListSkeleton rows={3} /> : null}
+      {projectQuery.error ? (
+        <ErrorState error={projectQuery.error} onRetry={() => void projectQuery.refetch()} />
+      ) : null}
+      {runMutation.error ? (
+        <ErrorState
+          error={runMutation.error}
+          onRetry={() => runMutation.mutate()}
+          title="启动工作流失败"
+        />
+      ) : null}
       {project ? (
         <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
           <div className="grid gap-4">
@@ -71,8 +82,8 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
               </CardHeader>
               <CardBody className="flex flex-col gap-3 sm:flex-row">
                 {project.current_stage === 'init' ? (
-                  <Button disabled={starting} onClick={() => void handleRun()}>
-                    {starting ? '启动中' : '启动工作流'}
+                  <Button disabled={runMutation.isPending} onClick={() => runMutation.mutate()}>
+                    {runMutation.isPending ? '启动中' : '启动工作流'}
                   </Button>
                 ) : (
                   <ButtonLink href={`/projects/${projectId}/workflow`}>继续查看工作流</ButtonLink>
@@ -98,7 +109,9 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
                 <h2 className="mt-2 text-2xl font-black text-cyan-950">
                   <StageName stage={project.current_stage} />
                 </h2>
-                <p className="mt-2 text-sm text-cyan-900">更新于 {formatDateTime(project.updated_at)}</p>
+                <p className="mt-2 text-sm text-cyan-900">
+                  更新于 {formatDateTime(project.updated_at)}
+                </p>
               </CardBody>
             </Card>
             <Card>
@@ -115,9 +128,9 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
                     style={{ width: `${workflow?.progress.percentage ?? 0}%` }}
                   />
                 </div>
-                {workflowState.error ? (
+                {workflowQuery.error ? (
                   <p className="mt-3 text-sm text-red-700" role="alert">
-                    {workflowState.error.message}
+                    {workflowQuery.error.message}
                   </p>
                 ) : null}
               </CardBody>

@@ -1,5 +1,9 @@
 import { apiRequest } from '@/lib/api-client';
-import type { ModelExecutionLogListResponse, TokenUsageDetailResponse } from '@/types/api';
+import type {
+  ModelExecutionLogDetailResponse,
+  ModelExecutionLogListResponse,
+  TokenUsageDetailResponse,
+} from '@/types/api';
 
 export function getTokenUsage(projectId: string): Promise<TokenUsageDetailResponse> {
   return apiRequest<TokenUsageDetailResponse>('/usage/tokens', {
@@ -15,4 +19,11 @@ export function listModelLogs(
   return apiRequest<ModelExecutionLogListResponse>(`/projects/${projectId}/usage/logs`, {
     query: { offset, limit },
   });
+}
+
+export function getModelLogDetail(
+  projectId: string,
+  logId: string,
+): Promise<ModelExecutionLogDetailResponse> {
+  return apiRequest<ModelExecutionLogDetailResponse>(`/projects/${projectId}/usage/logs/${logId}`);
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
@@ -9,31 +10,33 @@ import { ListSkeleton } from '@/components/ui/skeleton';
 import { PageFrame } from '@/components/layout/app-shell';
 import { ProjectStatus, StageName } from '@/components/project/project-status';
 import { formatDateTime } from '@/lib/format';
-import { useAsync } from '@/lib/use-async';
 import { deleteProject, listProjects } from '@/features/projects/api';
 
 const PAGE_SIZE = 20;
 
 export function ProjectDashboard() {
   const [status, setStatus] = useState<'active' | 'completed' | 'failed' | ''>('');
-  const { data, error, loading, reload } = useAsync(
-    () => listProjects({ limit: PAGE_SIZE, status }),
-    [status],
-  );
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [offset, setOffset] = useState(0);
+  const queryClient = useQueryClient();
+  const projectsQuery = useQuery({
+    queryKey: ['projects', { limit: PAGE_SIZE, offset, status }],
+    queryFn: () => listProjects({ limit: PAGE_SIZE, offset, status }),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: deleteProject,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
+  const data = projectsQuery.data;
+  const pageEnd = data ? Math.min(data.total, data.offset + data.limit) : 0;
 
   async function handleDelete(projectId: string, name: string) {
     const confirmed = window.confirm(`确认删除项目「${name}」？此操作会从列表隐藏该项目。`);
     if (!confirmed) {
       return;
     }
-    setDeletingId(projectId);
-    try {
-      await deleteProject(projectId);
-      await reload();
-    } finally {
-      setDeletingId(null);
-    }
+    await deleteMutation.mutateAsync(projectId);
   }
 
   return (
@@ -60,7 +63,10 @@ export function ProjectDashboard() {
                     : 'border-slate-300 bg-white text-slate-700 hover:border-slate-500'
                 }`}
                 key={item.value}
-                onClick={() => setStatus(item.value as typeof status)}
+                onClick={() => {
+                  setStatus(item.value as typeof status);
+                  setOffset(0);
+                }}
                 role="tab"
                 type="button"
               >
@@ -69,9 +75,11 @@ export function ProjectDashboard() {
             ))}
           </div>
 
-          {loading ? <ListSkeleton rows={5} /> : null}
-          {error ? <ErrorState error={error} onRetry={reload} /> : null}
-          {!loading && !error && data?.items.length === 0 ? (
+          {projectsQuery.isLoading ? <ListSkeleton rows={5} /> : null}
+          {projectsQuery.error ? (
+            <ErrorState error={projectsQuery.error} onRetry={() => void projectsQuery.refetch()} />
+          ) : null}
+          {!projectsQuery.isLoading && !projectsQuery.error && data?.items.length === 0 ? (
             <EmptyState
               action={<ButtonLink href="/projects/new">创建第一个项目</ButtonLink>}
               description="输入一个产品想法，Agent 会按阶段收敛需求并生成工程产物。"
@@ -79,47 +87,78 @@ export function ProjectDashboard() {
             />
           ) : null}
 
-          {!loading && !error && data?.items.length ? (
-            <div className="grid gap-3">
-              {data.items.map((project) => (
-                <Card className="transition hover:-translate-y-0.5 hover:shadow-md" key={project.id}>
-                  <CardBody className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          className="text-lg font-bold text-slate-950 hover:underline"
-                          href={`/projects/${project.id}`}
+          {!projectsQuery.isLoading && !projectsQuery.error && data?.items.length ? (
+            <>
+              <div className="grid gap-3">
+                {data.items.map((project) => (
+                  <Card
+                    className="transition hover:-translate-y-0.5 hover:shadow-md"
+                    key={project.id}
+                  >
+                    <CardBody className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            className="text-lg font-bold text-slate-950 hover:underline"
+                            href={`/projects/${project.id}`}
+                          >
+                            {project.name}
+                          </Link>
+                          <ProjectStatus status={project.status} />
+                        </div>
+                        <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">
+                          {project.original_idea}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-slate-500">
+                          <span>
+                            当前阶段：
+                            <StageName stage={project.current_stage} />
+                          </span>
+                          <span>更新：{formatDateTime(project.updated_at)}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 md:justify-end">
+                        <ButtonLink href={`/projects/${project.id}`} variant="secondary">
+                          打开
+                        </ButtonLink>
+                        <Button
+                          disabled={
+                            deleteMutation.isPending && deleteMutation.variables === project.id
+                          }
+                          onClick={() => void handleDelete(project.id, project.name)}
+                          variant="danger"
                         >
-                          {project.name}
-                        </Link>
-                        <ProjectStatus status={project.status} />
+                          {deleteMutation.isPending && deleteMutation.variables === project.id
+                            ? '删除中'
+                            : '删除'}
+                        </Button>
                       </div>
-                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">
-                        {project.original_idea}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-slate-500">
-                        <span>
-                          当前阶段：<StageName stage={project.current_stage} />
-                        </span>
-                        <span>更新：{formatDateTime(project.updated_at)}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 md:justify-end">
-                      <ButtonLink href={`/projects/${project.id}`} variant="secondary">
-                        打开
-                      </ButtonLink>
-                      <Button
-                        disabled={deletingId === project.id}
-                        onClick={() => void handleDelete(project.id, project.name)}
-                        variant="danger"
-                      >
-                        {deletingId === project.id ? '删除中' : '删除'}
-                      </Button>
-                    </div>
-                  </CardBody>
-                </Card>
-              ))}
-            </div>
+                    </CardBody>
+                  </Card>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
+                <p className="text-sm font-medium text-slate-600">
+                  显示 {data.offset + 1}-{pageEnd} / 共 {data.total} 个项目
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    disabled={offset === 0}
+                    onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                    variant="secondary"
+                  >
+                    上一页
+                  </Button>
+                  <Button
+                    disabled={offset + PAGE_SIZE >= data.total}
+                    onClick={() => setOffset(offset + PAGE_SIZE)}
+                    variant="secondary"
+                  >
+                    下一页
+                  </Button>
+                </div>
+              </div>
+            </>
           ) : null}
         </div>
 

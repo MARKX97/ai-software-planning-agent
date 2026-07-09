@@ -1,7 +1,10 @@
 import { apiRequest } from '@/lib/api-client';
 import type { ProjectListResponse, ProjectResponse } from '@/types/api';
 
-export interface ProjectListQuery extends Record<string, string | number | boolean | null | undefined> {
+export interface ProjectListQuery extends Record<
+  string,
+  string | number | boolean | null | undefined
+> {
   offset?: number;
   limit?: number;
   status?: 'active' | 'completed' | 'failed' | '';

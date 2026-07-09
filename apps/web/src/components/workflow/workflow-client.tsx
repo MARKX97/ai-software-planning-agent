@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
 import { PageFrame } from '@/components/layout/app-shell';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -15,7 +16,6 @@ import {
   listWorkflowStates,
   runWorkflow,
 } from '@/features/workflow/api';
-import { useAsync } from '@/lib/use-async';
 
 function questionText(question: unknown, index: number): string {
   if (typeof question === 'string') {
@@ -32,37 +32,72 @@ function questionText(question: unknown, index: number): string {
 }
 
 export function WorkflowClient({ projectId }: { projectId: string }) {
-  const loadStatus = useCallback(() => getWorkflowStatus(projectId), [projectId]);
-  const statusState = useAsync(loadStatus, [loadStatus]);
-  const statesState = useAsync(() => listWorkflowStates(projectId), [projectId]);
+  const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
-  const status = statusState.data;
+  const statusQuery = useQuery({
+    queryKey: ['workflow-status', projectId],
+    queryFn: () => getWorkflowStatus(projectId),
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (
+        data?.status === 'active' &&
+        data.current_stage !== 'requirement_clarification' &&
+        data.current_stage !== 'completed' &&
+        data.current_stage !== 'failed'
+      ) {
+        return 3000;
+      }
+      return false;
+    },
+  });
+  const statesQuery = useQuery({
+    queryKey: ['workflow-states', projectId],
+    queryFn: () => listWorkflowStates(projectId),
+    refetchInterval: () => {
+      const data = statusQuery.data;
+      if (
+        data?.status === 'active' &&
+        data.current_stage !== 'requirement_clarification' &&
+        data.current_stage !== 'completed' &&
+        data.current_stage !== 'failed'
+      ) {
+        return 3000;
+      }
+      return false;
+    },
+  });
+  const startMutation = useMutation({
+    mutationFn: () => runWorkflow(projectId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['workflow-status', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['workflow-states', projectId] }),
+      ]);
+    },
+  });
+  const continueMutation = useMutation({
+    mutationFn: async (message: string) => {
+      const conversation = await createConversation(projectId);
+      return continueWorkflow(projectId, conversation.id, message);
+    },
+    onSuccess: async () => {
+      setAnswer('');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['workflow-status', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['workflow-states', projectId] }),
+      ]);
+    },
+  });
+  const status = statusQuery.data;
   const questions = useMemo(() => status?.clarification_questions ?? [], [status]);
-  const shouldPoll =
-    status?.status === 'active' &&
-    status.current_stage !== 'requirement_clarification' &&
-    status.current_stage !== 'completed' &&
-    status.current_stage !== 'failed';
-
-  useEffect(() => {
-    if (!shouldPoll) {
-      return undefined;
-    }
-    const id = window.setInterval(() => {
-      void statusState.reload();
-      void statesState.reload();
-    }, 3000);
-    return () => window.clearInterval(id);
-  }, [shouldPoll, statusState, statesState]);
 
   async function startWorkflow() {
     setBusy(true);
     setActionError(null);
     try {
-      await runWorkflow(projectId);
-      await Promise.all([statusState.reload(), statesState.reload()]);
+      await startMutation.mutateAsync();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : '启动失败');
     } finally {
@@ -78,10 +113,7 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
     setBusy(true);
     setActionError(null);
     try {
-      const conversation = await createConversation(projectId);
-      await continueWorkflow(projectId, conversation.id, answer.trim());
-      setAnswer('');
-      await Promise.all([statusState.reload(), statesState.reload()]);
+      await continueMutation.mutateAsync(answer.trim());
     } catch (error) {
       setActionError(error instanceof Error ? error.message : '提交失败');
     } finally {
@@ -105,11 +137,13 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
       eyebrow="Workflow"
       title="规划流水线"
     >
-      {statusState.loading || statesState.loading ? <ListSkeleton rows={3} /> : null}
-      {statusState.error ? <ErrorState error={statusState.error} onRetry={statusState.reload} /> : null}
+      {statusQuery.isLoading || statesQuery.isLoading ? <ListSkeleton rows={3} /> : null}
+      {statusQuery.error ? (
+        <ErrorState error={statusQuery.error} onRetry={() => void statusQuery.refetch()} />
+      ) : null}
       {status ? (
         <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
-          <StageRail status={status} states={statesState.data?.items ?? []} />
+          <StageRail status={status} states={statesQuery.data?.items ?? []} />
           <aside className="grid h-fit gap-4">
             <Card className="border-slate-950 bg-slate-950 text-white">
               <CardBody>

@@ -1,24 +1,36 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PageFrame } from '@/components/layout/app-shell';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Badge, statusVariant } from '@/components/ui/badge';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/feedback';
 import { ListSkeleton } from '@/components/ui/skeleton';
-import { listModelLogs, getTokenUsage } from '@/features/usage/api';
+import { getModelLogDetail, listModelLogs, getTokenUsage } from '@/features/usage/api';
 import { formatCurrency, formatDateTime, formatNumber } from '@/lib/format';
-import { useAsync } from '@/lib/use-async';
 
 const PAGE_SIZE = 20;
 
 export function UsageClient({ projectId }: { projectId: string }) {
   const [offset, setOffset] = useState(0);
-  const usageState = useAsync(() => getTokenUsage(projectId), [projectId]);
-  const logsState = useAsync(() => listModelLogs(projectId, offset, PAGE_SIZE), [projectId, offset]);
-  const usage = usageState.data;
-  const logs = logsState.data;
+  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const usageQuery = useQuery({
+    queryKey: ['usage', projectId],
+    queryFn: () => getTokenUsage(projectId),
+  });
+  const logsQuery = useQuery({
+    queryKey: ['usage-logs', projectId, offset, PAGE_SIZE],
+    queryFn: () => listModelLogs(projectId, offset, PAGE_SIZE),
+  });
+  const logDetailQuery = useQuery({
+    enabled: Boolean(selectedLogId),
+    queryKey: ['usage-log-detail', projectId, selectedLogId],
+    queryFn: () => getModelLogDetail(projectId, selectedLogId ?? ''),
+  });
+  const usage = usageQuery.data;
+  const logs = logsQuery.data;
 
   return (
     <PageFrame
@@ -36,12 +48,17 @@ export function UsageClient({ projectId }: { projectId: string }) {
       eyebrow="Usage"
       title="模型用量"
     >
-      {usageState.loading ? <ListSkeleton rows={2} /> : null}
-      {usageState.error ? <ErrorState error={usageState.error} onRetry={usageState.reload} /> : null}
+      {usageQuery.isLoading ? <ListSkeleton rows={2} /> : null}
+      {usageQuery.error ? (
+        <ErrorState error={usageQuery.error} onRetry={() => void usageQuery.refetch()} />
+      ) : null}
       {usage ? (
         <>
           {usage.cost_limit.alert_triggered ? (
-            <p className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900" role="status">
+            <p
+              className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900"
+              role="status"
+            >
               成本已超过预算 80%，剩余额度 {formatCurrency(usage.cost_limit.remaining)}。
             </p>
           ) : null}
@@ -50,7 +67,10 @@ export function UsageClient({ projectId }: { projectId: string }) {
               { label: '总成本', value: formatCurrency(usage.total_cost) },
               { label: '总 Token', value: formatNumber(usage.total_tokens) },
               { label: '调用次数', value: formatNumber(usage.call_count) },
-              { label: '成功率', value: usage.success_rate === null ? '暂无' : `${usage.success_rate}%` },
+              {
+                label: '成功率',
+                value: usage.success_rate === null ? '暂无' : `${usage.success_rate}%`,
+              },
             ].map((item) => (
               <Card key={item.label}>
                 <CardBody>
@@ -100,7 +120,10 @@ export function UsageClient({ projectId }: { projectId: string }) {
                   <p className="text-sm text-slate-600">暂无阶段成本。</p>
                 ) : (
                   usage.by_stage.map((item) => (
-                    <div className="flex items-center justify-between gap-3 text-sm" key={item.stage}>
+                    <div
+                      className="flex items-center justify-between gap-3 text-sm"
+                      key={item.stage}
+                    >
                       <span className="font-medium text-slate-700">{item.stage}</span>
                       <span className="font-semibold text-slate-950">
                         {formatCurrency(item.total_cost)}
@@ -119,7 +142,11 @@ export function UsageClient({ projectId }: { projectId: string }) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-base font-bold text-slate-950">模型调用日志</h2>
             <div className="flex gap-2">
-              <Button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))} variant="secondary">
+              <Button
+                disabled={offset === 0}
+                onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                variant="secondary"
+              >
                 上一页
               </Button>
               <Button
@@ -133,9 +160,11 @@ export function UsageClient({ projectId }: { projectId: string }) {
           </div>
         </CardHeader>
         <CardBody>
-          {logsState.loading ? <ListSkeleton rows={4} /> : null}
-          {logsState.error ? <ErrorState error={logsState.error} onRetry={logsState.reload} /> : null}
-          {!logsState.loading && !logsState.error && logs?.items.length === 0 ? (
+          {logsQuery.isLoading ? <ListSkeleton rows={4} /> : null}
+          {logsQuery.error ? (
+            <ErrorState error={logsQuery.error} onRetry={() => void logsQuery.refetch()} />
+          ) : null}
+          {!logsQuery.isLoading && !logsQuery.error && logs?.items.length === 0 ? (
             <p className="text-sm text-slate-600">暂无模型调用日志。</p>
           ) : null}
           {logs?.items.length ? (
@@ -149,12 +178,15 @@ export function UsageClient({ projectId }: { projectId: string }) {
                     <th className="py-3 pr-4">Tokens</th>
                     <th className="py-3 pr-4">Cost</th>
                     <th className="py-3 pr-4">Time</th>
+                    <th className="py-3 pr-4">Detail</th>
                   </tr>
                 </thead>
                 <tbody>
                   {logs.items.map((log) => (
                     <tr className="border-b border-slate-100" key={log.id}>
-                      <td className="py-3 pr-4 font-semibold text-slate-900">{log.provider_name}</td>
+                      <td className="py-3 pr-4 font-semibold text-slate-900">
+                        {log.provider_name}
+                      </td>
                       <td className="py-3 pr-4 text-slate-700">{log.stage}</td>
                       <td className="py-3 pr-4">
                         <Badge variant={statusVariant(log.status)}>{log.status}</Badge>
@@ -166,10 +198,48 @@ export function UsageClient({ projectId }: { projectId: string }) {
                         {formatCurrency(log.cost_total)}
                       </td>
                       <td className="py-3 pr-4 text-slate-600">{formatDateTime(log.created_at)}</td>
+                      <td className="py-3 pr-4">
+                        <Button onClick={() => setSelectedLogId(log.id)} variant="quiet">
+                          查看详情
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+          ) : null}
+          {selectedLogId ? (
+            <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-sm font-bold text-slate-950">Prompt / 响应详情</h3>
+                <Button onClick={() => setSelectedLogId(null)} variant="quiet">
+                  关闭
+                </Button>
+              </div>
+              {logDetailQuery.isLoading ? <ListSkeleton rows={2} /> : null}
+              {logDetailQuery.error ? (
+                <ErrorState
+                  error={logDetailQuery.error}
+                  onRetry={() => void logDetailQuery.refetch()}
+                />
+              ) : null}
+              {logDetailQuery.data ? (
+                <div className="grid gap-4 text-sm">
+                  <section>
+                    <h4 className="mb-2 font-semibold text-slate-800">Prompt</h4>
+                    <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-white p-3 font-mono leading-6 text-slate-700">
+                      {logDetailQuery.data.prompt_text}
+                    </pre>
+                  </section>
+                  <section>
+                    <h4 className="mb-2 font-semibold text-slate-800">Response</h4>
+                    <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-white p-3 font-mono leading-6 text-slate-700">
+                      {logDetailQuery.data.response_text ?? '无响应内容'}
+                    </pre>
+                  </section>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </CardBody>

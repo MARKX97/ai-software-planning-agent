@@ -31,10 +31,13 @@ export function StageRail({
           <div>
             <h2 className="text-lg font-bold text-slate-950">阶段轨道</h2>
             <p className="text-sm text-slate-600">
-              当前：{status?.stage_display_name ?? '未启动'}，进度 {status?.progress.percentage ?? 0}%
+              当前：{status?.stage_display_name ?? '未启动'}，进度{' '}
+              {status?.progress.percentage ?? 0}%
             </p>
           </div>
-          <Badge variant={statusVariant(status?.status ?? 'init')}>{status?.status ?? 'init'}</Badge>
+          <Badge variant={statusVariant(status?.status ?? 'init')}>
+            {status?.status ?? 'init'}
+          </Badge>
         </div>
         <ol className="grid gap-2">
           {stages.map((stage, index) => {

@@ -41,3 +41,13 @@ export function exportPrd(projectId: string): Promise<ExportResponse> {
 export function getExport(projectId: string, exportId: string): Promise<ExportResponse> {
   return apiRequest<ExportResponse>(`/projects/${projectId}/export/${exportId}`);
 }
+
+export function getExportDownload(
+  projectId: string,
+  exportId: string,
+  token: string,
+): Promise<ExportResponse> {
+  return apiRequest<ExportResponse>(`/projects/${projectId}/export/${exportId}/download`, {
+    query: { token },
+  });
+}

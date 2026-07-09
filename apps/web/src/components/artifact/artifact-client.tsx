@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { PageFrame } from '@/components/layout/app-shell';
 import { Button, ButtonLink } from '@/components/ui/button';
@@ -12,11 +13,11 @@ import {
   ARTIFACT_TYPES,
   exportPrd,
   getExport,
+  getExportDownload,
   listArtifacts,
   type ArtifactType,
 } from '@/features/artifacts/api';
 import { formatBytes, formatDateTime } from '@/lib/format';
-import { useAsync } from '@/lib/use-async';
 
 const displayNames: Record<ArtifactType, string> = {
   requirement_report: '需求报告',
@@ -34,27 +35,63 @@ const displayNames: Record<ArtifactType, string> = {
 
 export function ArtifactsClient({ projectId }: { projectId: string }) {
   const [type, setType] = useState('');
-  const state = useAsync(() => listArtifacts(projectId, type), [projectId, type]);
-  const [exportStatus, setExportStatus] = useState<string | null>(null);
+  const [exportId, setExportId] = useState<string | null>(null);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const artifactsQuery = useQuery({
+    queryKey: ['artifacts', projectId, type],
+    queryFn: () => listArtifacts(projectId, type),
+  });
+  const exportMutation = useMutation({
+    mutationFn: () => exportPrd(projectId),
+    onSuccess: (task) => {
+      setExportId(task.id);
+      setExportMessage(`导出任务：${task.status}`);
+    },
+  });
+  const exportQuery = useQuery({
+    enabled: Boolean(exportId),
+    queryKey: ['export', projectId, exportId],
+    queryFn: () => getExport(projectId, exportId ?? ''),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === 'pending' || status === 'processing' ? 2000 : false;
+    },
+  });
+  const downloadExportMutation = useMutation({
+    mutationFn: () => getExportDownload(projectId, exportId ?? '', exportId ?? ''),
+    onSuccess: (result) => {
+      setExportMessage(`导出下载已准备：${result.status}`);
+    },
+  });
+  const exportStatus = exportQuery.data?.status ?? (exportMutation.isPending ? 'creating' : null);
+  const exportComplete = exportQuery.data?.status === 'completed';
 
   async function handleExportPrd() {
-    setExportStatus('创建导出任务中');
-    try {
-      const task = await exportPrd(projectId);
-      const latest = await getExport(projectId, task.id);
-      setExportStatus(`导出任务：${latest.status}`);
-    } catch (error) {
-      setExportStatus(error instanceof Error ? error.message : '导出失败');
-    }
+    setExportMessage(null);
+    setExportId(null);
+    await exportMutation.mutateAsync();
   }
 
   return (
     <PageFrame
       actions={
         <>
-          <Button onClick={() => void handleExportPrd()} variant="secondary">
-            导出 PRD
+          <Button
+            disabled={exportMutation.isPending}
+            onClick={() => void handleExportPrd()}
+            variant="secondary"
+          >
+            {exportMutation.isPending ? '创建导出中' : '导出 PRD'}
           </Button>
+          {exportComplete ? (
+            <Button
+              disabled={downloadExportMutation.isPending}
+              onClick={() => downloadExportMutation.mutate()}
+              variant="secondary"
+            >
+              {downloadExportMutation.isPending ? '准备下载中' : '下载导出'}
+            </Button>
+          ) : null}
           <ButtonLink href={`/projects/${projectId}/usage`} variant="quiet">
             查看用量
           </ButtonLink>
@@ -64,9 +101,14 @@ export function ArtifactsClient({ projectId }: { projectId: string }) {
       eyebrow="Artifacts"
       title="规划产物"
     >
-      {exportStatus ? (
-        <p className="rounded-md border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm font-medium text-cyan-900" role="status">
-          {exportStatus}
+      {exportStatus || exportMessage || exportMutation.error || exportQuery.error ? (
+        <p
+          className="rounded-md border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm font-medium text-cyan-900"
+          role="status"
+        >
+          {exportMutation.error || exportQuery.error
+            ? (exportMutation.error?.message ?? exportQuery.error?.message)
+            : (exportMessage ?? `导出任务：${exportStatus}`)}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">
@@ -95,23 +137,29 @@ export function ArtifactsClient({ projectId }: { projectId: string }) {
         ))}
       </div>
 
-      {state.loading ? <ListSkeleton rows={6} /> : null}
-      {state.error ? <ErrorState error={state.error} onRetry={state.reload} /> : null}
-      {!state.loading && !state.error && state.data?.items.length === 0 ? (
+      {artifactsQuery.isLoading ? <ListSkeleton rows={6} /> : null}
+      {artifactsQuery.error ? (
+        <ErrorState error={artifactsQuery.error} onRetry={() => void artifactsQuery.refetch()} />
+      ) : null}
+      {!artifactsQuery.isLoading &&
+      !artifactsQuery.error &&
+      artifactsQuery.data?.items.length === 0 ? (
         <EmptyState
           action={<ButtonLink href={`/projects/${projectId}/workflow`}>查看工作流</ButtonLink>}
           description="完成规划生成阶段后，这里会出现需求、风险、MVP、PRD、架构和编码规则等产物。"
           title="暂无产物"
         />
       ) : null}
-      {!state.loading && !state.error && state.data?.items.length ? (
+      {!artifactsQuery.isLoading && !artifactsQuery.error && artifactsQuery.data?.items.length ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {state.data.items.map((artifact) => (
+          {artifactsQuery.data.items.map((artifact) => (
             <Link href={`/projects/${projectId}/artifacts/${artifact.id}`} key={artifact.id}>
               <Card className="h-full transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-md">
                 <CardBody className="flex h-full flex-col gap-4">
                   <div className="flex items-start justify-between gap-3">
-                    <h2 className="text-base font-bold leading-6 text-slate-950">{artifact.title}</h2>
+                    <h2 className="text-base font-bold leading-6 text-slate-950">
+                      {artifact.title}
+                    </h2>
                     <Badge>{artifact.format}</Badge>
                   </div>
                   <p className="text-sm text-slate-600">{artifact.type_display_name}</p>
