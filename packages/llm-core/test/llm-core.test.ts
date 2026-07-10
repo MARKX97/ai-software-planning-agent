@@ -125,4 +125,25 @@ describe('MockLLMProvider', () => {
     // zod strips unknown keys by default → only `mock` survives.
     assert.deepEqual(res.structuredOutput, { mock: true });
   });
+  it('asks once for clarification, then continues after a reply', async () => {
+    const schema = z.object({
+      needs_more_clarification: z.boolean(),
+      clarification_questions: z.array(z.object({ question: z.string() })),
+    });
+    const provider = new MockLLMProvider('glm');
+    const first = await provider.chat('needs_more_clarification\nConversation history: (none)', {
+      outputSchema: schema,
+    });
+    const continued = await provider.chat('needs_more_clarification\nConversation history: reply', {
+      outputSchema: schema,
+    });
+    assert.deepEqual(first.structuredOutput, {
+      needs_more_clarification: true,
+      clarification_questions: [{ question: 'Who is the primary user?' }],
+    });
+    assert.deepEqual(continued.structuredOutput, {
+      needs_more_clarification: false,
+      clarification_questions: [],
+    });
+  });
 });

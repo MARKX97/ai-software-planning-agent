@@ -126,6 +126,7 @@ function mockDb(saved: Array<{ type: ArtifactType; content: string }>): unknown 
         },
         findFirst: async () => null,
       },
+      tokenUsage: { upsert: async () => undefined },
     },
   };
 }

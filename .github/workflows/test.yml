@@ -1,0 +1,95 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ai_planning_agent
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ai_planning_agent"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_planning_agent?schema=public
+      BAISHAN_API_KEY: ''
+      BAISHAN_BASE_URL: ''
+      BAISHAN_MODEL_DEEPSEEK: deepseek-v4-pro
+      BAISHAN_MODEL_GLM: glm-5.1
+      BAISHAN_MODEL_MINIMAX: minimax-m2.5
+      COST_MAX_COST_PER_PROJECT: '5'
+      NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:3001/api/v1
+      NEXT_PUBLIC_API_KEY: ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ai-planning/database exec prisma migrate deploy
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+      - run: pnpm --filter @ai-planning/web exec playwright install --with-deps chromium firefox webkit
+
+      - name: Start API
+        run: |
+          node apps/api/dist/main.js > api.log 2>&1 &
+          echo $! > api.pid
+          for _ in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:3001/api/v1/health && exit 0
+            sleep 1
+          done
+          cat api.log
+          exit 1
+
+      - name: Start web
+        run: |
+          pnpm --filter @ai-planning/web start > web.log 2>&1 &
+          echo $! > web.pid
+          for _ in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:3000 && exit 0
+            sleep 1
+          done
+          cat web.log
+          exit 1
+
+      - run: RUN_REAL_INTEGRATION=1 API_TEST_URL=http://127.0.0.1:3001/api/v1 pnpm --filter @ai-planning/api test
+      - run: pnpm --filter @ai-planning/web test:e2e
+
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-diagnostics
+          if-no-files-found: ignore
+          path: |
+            api.log
+            web.log
+            apps/web/playwright-report
+            apps/web/test-results
