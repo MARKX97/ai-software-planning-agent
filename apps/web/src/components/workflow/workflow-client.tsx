@@ -16,6 +16,7 @@ import {
   listWorkflowStates,
   runWorkflow,
 } from '@/features/workflow/api';
+import { getUserErrorMessage } from '@/lib/api-client';
 
 function questionText(question: unknown, index: number): string {
   if (typeof question === 'string') {
@@ -92,6 +93,9 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
   });
   const status = statusQuery.data;
   const questions = useMemo(() => status?.clarification_questions ?? [], [status]);
+  const failureMessage = status?.error_message
+    ? getUserErrorMessage(status.error_message, '工作流执行失败，请稍后重试。')
+    : null;
 
   async function startWorkflow() {
     setBusy(true);
@@ -99,7 +103,7 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
     try {
       await startMutation.mutateAsync();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : '启动失败');
+      setActionError(getUserErrorMessage(error, '工作流启动失败，请稍后重试。'));
     } finally {
       setBusy(false);
     }
@@ -115,7 +119,7 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
     try {
       await continueMutation.mutateAsync(answer.trim());
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : '提交失败');
+      setActionError(getUserErrorMessage(error, '回复提交失败，请稍后重试。'));
     } finally {
       setBusy(false);
     }
@@ -140,6 +144,13 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
       {statusQuery.isLoading || statesQuery.isLoading ? <ListSkeleton rows={3} /> : null}
       {statusQuery.error ? (
         <ErrorState error={statusQuery.error} onRetry={() => void statusQuery.refetch()} />
+      ) : null}
+      {statesQuery.error ? (
+        <ErrorState
+          error={statesQuery.error}
+          onRetry={() => void statesQuery.refetch()}
+          title="阶段记录加载失败"
+        />
       ) : null}
       {status ? (
         <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
@@ -218,13 +229,21 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
               </Card>
             ) : null}
 
-            {status.error_message ? (
+            {failureMessage ? (
               <Card className="border-red-200 bg-red-50">
-                <CardBody>
+                <CardBody className="grid gap-3">
                   <h2 className="text-sm font-bold text-red-800">工作流失败</h2>
-                  <p className="mt-2 text-sm leading-6 text-red-700" role="alert">
-                    {status.error_message}
+                  <p className="text-sm leading-6 text-red-700" role="alert">
+                    {actionError ?? failureMessage}
                   </p>
+                  <Button
+                    className="w-fit"
+                    disabled={busy}
+                    onClick={() => void startWorkflow()}
+                    variant="danger"
+                  >
+                    {busy ? '重新启动中' : '重新运行工作流'}
+                  </Button>
                 </CardBody>
               </Card>
             ) : null}

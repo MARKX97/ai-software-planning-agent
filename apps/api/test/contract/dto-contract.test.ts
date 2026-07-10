@@ -89,6 +89,24 @@ describe('API error and auth contracts', () => {
     });
   });
 
+  it('does not expose unexpected internal exception messages', () => {
+    let payload: unknown;
+    const response = {
+      status() {
+        return {
+          json(value: unknown) {
+            payload = value;
+          },
+        };
+      },
+    };
+    const host = { switchToHttp: () => ({ getResponse: () => response }) } as never;
+    new HttpExceptionFilter().catch(new Error('database password leaked'), host);
+    assert.deepEqual(payload, {
+      error: { code: ErrorCode.INTERNAL_ERROR, message: 'Internal server error' },
+    });
+  });
+
   it('enforces bearer auth while allowing an empty API key configuration', () => {
     const reflector = { getAllAndOverride: () => false } as never;
     const config = { apiKey: 'secret' } as never;

@@ -67,7 +67,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
         typeof res === 'string' ? res : ((res as { message?: string }).message ?? err.message);
       return { code: ErrorCode.INTERNAL_ERROR, message };
     }
-    const message = err instanceof Error ? err.message : 'Internal server error';
-    return { code: ErrorCode.INTERNAL_ERROR, message };
+    return { code: ErrorCode.INTERNAL_ERROR, message: 'Internal server error' };
   }
 }

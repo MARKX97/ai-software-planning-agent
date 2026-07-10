@@ -31,12 +31,12 @@ export function ProjectDashboard() {
   const data = projectsQuery.data;
   const pageEnd = data ? Math.min(data.total, data.offset + data.limit) : 0;
 
-  async function handleDelete(projectId: string, name: string) {
+  function handleDelete(projectId: string, name: string) {
     const confirmed = window.confirm(`确认删除项目「${name}」？此操作会从列表隐藏该项目。`);
     if (!confirmed) {
       return;
     }
-    await deleteMutation.mutateAsync(projectId);
+    deleteMutation.mutate(projectId);
   }
 
   return (
@@ -78,6 +78,17 @@ export function ProjectDashboard() {
           {projectsQuery.isLoading ? <ListSkeleton rows={5} /> : null}
           {projectsQuery.error ? (
             <ErrorState error={projectsQuery.error} onRetry={() => void projectsQuery.refetch()} />
+          ) : null}
+          {deleteMutation.error ? (
+            <ErrorState
+              error={deleteMutation.error}
+              onRetry={
+                deleteMutation.variables
+                  ? () => deleteMutation.mutate(deleteMutation.variables)
+                  : undefined
+              }
+              title="删除项目失败"
+            />
           ) : null}
           {!projectsQuery.isLoading && !projectsQuery.error && data?.items.length === 0 ? (
             <EmptyState

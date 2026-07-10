@@ -1,7 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { WorkflowStage, type LLMResponse, type WorkflowContext } from '@ai-planning/shared';
-import { AllModelsFailedError } from '@ai-planning/llm-orchestrator';
+import { AllModelsFailedError, LLMNetworkError } from '@ai-planning/llm-orchestrator';
+import { AppException } from '../../src/common/exception/app-exception.js';
+import { ErrorCode } from '../../src/common/exception/error-code.js';
+import { runPipeline } from '../../src/modules/workflow/workflow-pipeline-runner.js';
+import { markFailed } from '../../src/modules/workflow/workflow-store.js';
 import { RequirementClarificationStage } from '../../src/modules/workflow/stages/requirement-clarification.stage.js';
 import { MultiModelAnalysisStage } from '../../src/modules/workflow/stages/multi-model-analysis.stage.js';
 
@@ -93,5 +97,51 @@ describe('workflow stage processors', () => {
       db: db([]),
     } as never);
     await assert.rejects(() => stage.execute(context), AllModelsFailedError);
+  });
+
+  it('maps provider network failures to a user-facing workflow error', async () => {
+    const failingContext = { ...context, resultsByStage: {} as never };
+    const failingDb = {
+      client: {
+        project: { update: async () => undefined },
+        workflowState: { upsert: async () => undefined },
+      },
+    };
+    const orchestrator = {
+      callSingle: async () => {
+        throw new LLMNetworkError('fetch failed');
+      },
+    };
+
+    await assert.rejects(
+      () =>
+        runPipeline(failingContext, {
+          db: failingDb as never,
+          orchestrator: orchestrator as never,
+        }),
+      (error: unknown) =>
+        error instanceof AppException &&
+        error.code === ErrorCode.LLM_ERROR &&
+        error.message === '暂时无法连接模型服务，请稍后重试。',
+    );
+  });
+
+  it('does not persist raw unexpected workflow errors', async () => {
+    const messages: string[] = [];
+    const failingDb = {
+      client: {
+        workflowExecution: {
+          update: async (args: { data: { error_message: string } }) =>
+            messages.push(args.data.error_message),
+        },
+        project: {
+          update: async (args: { data: { error_message: string } }) =>
+            messages.push(args.data.error_message),
+        },
+      },
+    };
+
+    await markFailed(failingDb as never, 'project-1', 'execution-1', new Error('fetch failed'));
+    assert.deepEqual(messages, ['工作流执行失败，请稍后重试。', '工作流执行失败，请稍后重试。']);
   });
 });

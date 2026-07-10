@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/form';
 import { createProject } from '@/features/projects/api';
+import { getUserErrorMessage } from '@/lib/api-client';
 
 export const newProjectSchema = z.object({
   name: z.string().trim().min(1, '请输入项目名称。').max(200, '项目名称不能超过 200 个字符。'),
@@ -36,9 +37,7 @@ export function NewProjectClient() {
   });
 
   const formError = mutation.error
-    ? mutation.error instanceof Error
-      ? mutation.error.message
-      : '创建失败，请稍后重试。'
+    ? getUserErrorMessage(mutation.error, '项目创建失败，请稍后重试。')
     : null;
 
   return (

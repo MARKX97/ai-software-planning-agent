@@ -50,7 +50,10 @@ export class AppException extends HttpException {
     return new AppException(ErrorCode.FORBIDDEN, message, HttpStatus.FORBIDDEN);
   }
 
-  static internal(message = 'Internal server error'): AppException {
-    return new AppException(ErrorCode.INTERNAL_ERROR, message, HttpStatus.INTERNAL_SERVER_ERROR);
+  static internal(
+    message = 'Internal server error',
+    code: ErrorCode = ErrorCode.INTERNAL_ERROR,
+  ): AppException {
+    return new AppException(code, message, HttpStatus.INTERNAL_SERVER_ERROR);
   }
 }

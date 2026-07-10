@@ -65,22 +65,20 @@ export function ArtifactsClient({ projectId }: { projectId: string }) {
   });
   const exportStatus = exportQuery.data?.status ?? (exportMutation.isPending ? 'creating' : null);
   const exportComplete = exportQuery.data?.status === 'completed';
+  const exportError =
+    exportMutation.error ?? exportQuery.error ?? downloadExportMutation.error ?? null;
 
-  async function handleExportPrd() {
+  function handleExportPrd() {
     setExportMessage(null);
     setExportId(null);
-    await exportMutation.mutateAsync();
+    exportMutation.mutate();
   }
 
   return (
     <PageFrame
       actions={
         <>
-          <Button
-            disabled={exportMutation.isPending}
-            onClick={() => void handleExportPrd()}
-            variant="secondary"
-          >
+          <Button disabled={exportMutation.isPending} onClick={handleExportPrd} variant="secondary">
             {exportMutation.isPending ? '创建导出中' : '导出 PRD'}
           </Button>
           {exportComplete ? (
@@ -101,14 +99,15 @@ export function ArtifactsClient({ projectId }: { projectId: string }) {
       eyebrow="Artifacts"
       title="规划产物"
     >
-      {exportStatus || exportMessage || exportMutation.error || exportQuery.error ? (
+      {exportError ? (
+        <ErrorState error={exportError} onRetry={handleExportPrd} title="导出失败" />
+      ) : null}
+      {exportStatus || exportMessage ? (
         <p
           className="rounded-md border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm font-medium text-cyan-900"
           role="status"
         >
-          {exportMutation.error || exportQuery.error
-            ? (exportMutation.error?.message ?? exportQuery.error?.message)
-            : (exportMessage ?? `导出任务：${exportStatus}`)}
+          {exportMessage ?? `导出任务：${exportStatus}`}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { PageFrame } from '@/components/layout/app-shell';
 import { Button, ButtonLink } from '@/components/ui/button';
@@ -22,7 +21,6 @@ export function ArtifactDetailClient({
     queryKey: ['artifact', projectId, artifactId],
     queryFn: () => getArtifact(projectId, artifactId),
   });
-  const [downloadError, setDownloadError] = useState<string | null>(null);
   const artifact = artifactQuery.data;
   const downloadMutation = useMutation({
     mutationFn: () => downloadArtifact(projectId, artifactId),
@@ -34,13 +32,9 @@ export function ArtifactDetailClient({
       link.click();
       window.URL.revokeObjectURL(url);
     },
-    onError: (error) => {
-      setDownloadError(error instanceof Error ? error.message : '下载失败');
-    },
   });
 
   function handleDownload() {
-    setDownloadError(null);
     downloadMutation.mutate();
   }
 
@@ -64,13 +58,8 @@ export function ArtifactDetailClient({
       eyebrow="Artifact Detail"
       title={artifact?.title ?? '产物详情'}
     >
-      {downloadError ? (
-        <p
-          className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
-          role="alert"
-        >
-          {downloadError}
-        </p>
+      {downloadMutation.error ? (
+        <ErrorState error={downloadMutation.error} onRetry={handleDownload} title="下载失败" />
       ) : null}
       {artifactQuery.isLoading ? <ListSkeleton rows={3} /> : null}
       {artifactQuery.error ? (

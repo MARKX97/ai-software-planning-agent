@@ -59,6 +59,13 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
           title="启动工作流失败"
         />
       ) : null}
+      {workflowQuery.error ? (
+        <ErrorState
+          error={workflowQuery.error}
+          onRetry={() => void workflowQuery.refetch()}
+          title="工作流状态加载失败"
+        />
+      ) : null}
       {project ? (
         <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
           <div className="grid gap-4">
@@ -128,11 +135,6 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
                     style={{ width: `${workflow?.progress.percentage ?? 0}%` }}
                   />
                 </div>
-                {workflowQuery.error ? (
-                  <p className="mt-3 text-sm text-red-700" role="alert">
-                    {workflowQuery.error.message}
-                  </p>
-                ) : null}
               </CardBody>
             </Card>
           </aside>

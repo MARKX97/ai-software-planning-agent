@@ -77,7 +77,7 @@ export async function markFailed(
   executionId: string,
   error: unknown,
 ): Promise<void> {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = workflowFailureMessage(error);
   await db.client.workflowExecution.update({
     where: { id: executionId },
     data: { status: 'failed', error_message: message, completed_at: new Date() },
@@ -91,6 +91,17 @@ export async function markFailed(
       updated_at: new Date(),
     },
   });
+}
+
+function workflowFailureMessage(error: unknown): string {
+  if (error instanceof AppException) {
+    const response = error.getResponse();
+    if (typeof response === 'object' && response) {
+      const message = (response as { message?: unknown }).message;
+      if (typeof message === 'string') return message;
+    }
+  }
+  return '工作流执行失败，请稍后重试。';
 }
 
 /** Build current workflow status including clarification/model details when present. */
