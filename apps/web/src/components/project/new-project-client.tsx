@@ -42,9 +42,9 @@ export function NewProjectClient() {
 
   return (
     <PageFrame
-      description="把一句模糊的产品想法交给 Agent。后续工作流会用澄清问题和多模型分析把它转成可交付的软件规划。"
-      eyebrow="Project Intake"
-      title="新建规划项目"
+      description="哪怕现在只有一句话也没关系。先把你想做的事说出来，后面我们会一点点把它变得具体。"
+      eyebrow="从一个点子开始"
+      title="说说你想做什么"
     >
       <div className="grid gap-4 lg:grid-cols-[minmax(0,720px)_1fr]">
         <Card>
@@ -62,13 +62,13 @@ export function NewProjectClient() {
                 </p>
               ) : null}
               <div className="grid gap-2">
-                <Label htmlFor="project-name">项目名称</Label>
+                <Label htmlFor="project-name">给这个想法起个名字</Label>
                 <Input
                   aria-describedby="project-name-error"
                   aria-invalid={Boolean(form.formState.errors.name)}
                   id="project-name"
                   maxLength={200}
-                  placeholder="例如：面向独立开发者的需求规划 Agent"
+                  placeholder="例如：帮独立开发者把需求想清楚"
                   {...form.register('name')}
                 />
                 <FieldError id="project-name-error">
@@ -76,17 +76,17 @@ export function NewProjectClient() {
                 </FieldError>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="original-idea">原始想法</Label>
+                <Label htmlFor="original-idea">先随便说说</Label>
                 <Textarea
                   aria-describedby="original-idea-error original-idea-help"
                   aria-invalid={Boolean(form.formState.errors.original_idea)}
                   id="original-idea"
                   maxLength={10000}
-                  placeholder="描述你想做什么、目标用户是谁、你现在最不确定的问题是什么。"
+                  placeholder="你想做什么？谁会用？现在最让你拿不准的地方又是什么？"
                   {...form.register('original_idea')}
                 />
                 <p className="text-xs leading-5 text-slate-500" id="original-idea-help">
-                  建议包含目标用户、核心场景、预期产物和已知约束；不需要一次写完所有细节。
+                  想到哪写到哪就行。用户、场景、已有约束都很有用；漏掉的部分，我们之后再一起补。
                 </p>
                 <FieldError id="original-idea-error">
                   {form.formState.errors.original_idea?.message}
@@ -94,7 +94,7 @@ export function NewProjectClient() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button disabled={mutation.isPending} type="submit">
-                  {mutation.isPending ? '创建中' : '创建项目'}
+                  {mutation.isPending ? '正在放进去' : '把它放进项目里'}
                 </Button>
                 {formError ? (
                   <Button
@@ -114,10 +114,9 @@ export function NewProjectClient() {
         </Card>
         <Card className="h-fit border-amber-200 bg-amber-50">
           <CardBody>
-            <h2 className="text-base font-bold text-amber-950">输入质量会影响后续产物</h2>
+            <h2 className="text-base font-bold text-amber-950">写得不完整也没关系</h2>
             <p className="mt-2 text-sm leading-6 text-amber-900">
-              这个 Agent
-              的意义不是替你写一个漂亮摘要，而是帮你暴露缺口、提出澄清问题、生成工程团队能接着执行的规格文档。
+              这里不是考试。一个真实的困惑、一点已知的限制，往往比一段漂亮的空话更有用。我们会把缺口挑出来，陪你补上。
             </p>
           </CardBody>
         </Card>

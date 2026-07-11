@@ -1,6 +1,15 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { z } from 'zod';
+import {
+  feasibilityAssessmentSchema,
+  multiModelAnalysisSchema,
+  mvpPlanSchema,
+  platformRecommendationSchema,
+  requirementAnalysisSchema,
+  riskAnalysisSchema,
+  synthesizedRequirementSchema,
+} from '@ai-planning/shared';
 import { calculateCost } from '../src/utils/calculate-cost.js';
 import { validateSchema, parseStructuredOutput } from '../src/utils/parse-structured-output.js';
 import { createRetryPolicy } from '../src/utils/create-retry-policy.js';
@@ -139,11 +148,35 @@ describe('MockLLMProvider', () => {
     });
     assert.deepEqual(first.structuredOutput, {
       needs_more_clarification: true,
-      clarification_questions: [{ question: 'Who is the primary user?' }],
+      clarification_questions: [
+        { question: '首版主要想服务哪个城市？' },
+        { question: '用户做选择时，最看重省时间、控制预算，还是吃得健康？' },
+      ],
     });
     assert.deepEqual(continued.structuredOutput, {
       needs_more_clarification: false,
       clarification_questions: [],
     });
+  });
+  it('returns schema-valid content for every demo stage', async () => {
+    const provider = new MockLLMProvider('deepseek');
+    const cases = [
+      ['RequirementAnalysisResult schema', requirementAnalysisSchema],
+      ['MultiModelAnalysisResult schema', multiModelAnalysisSchema],
+      ['SynthesizedRequirement schema', synthesizedRequirementSchema],
+      ['FeasibilityAssessment schema', feasibilityAssessmentSchema],
+      ['RiskAnalysisResult schema', riskAnalysisSchema],
+      ['MVPPlan schema', mvpPlanSchema],
+      ['PlatformRecommendation schema', platformRecommendationSchema],
+    ] as const;
+    for (const [prompt, outputSchema] of cases) {
+      const response = await provider.chat(prompt, { outputSchema });
+      assert.notEqual(response.structuredOutput, null, prompt);
+    }
+  });
+  it('returns readable Markdown for demo artifacts', async () => {
+    const provider = new MockLLMProvider('deepseek');
+    const response = await provider.chat('Artifact type to generate:\nprd');
+    assert.match(response.content, /^# 今晚吃什么 PRD/);
   });
 });

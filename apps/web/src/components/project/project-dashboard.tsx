@@ -41,19 +41,19 @@ export function ProjectDashboard() {
 
   return (
     <PageFrame
-      actions={<ButtonLink href="/projects/new">新建项目</ButtonLink>}
-      description="把一个粗糙的软件想法推进成需求、风险、MVP、架构与工程规则。这里是所有规划任务的入口。"
-      eyebrow="Phase 10 / Frontend"
-      title="规划控制台"
+      actions={<ButtonLink href="/projects/new">放进一个想法</ButtonLink>}
+      description="把还没想清楚的点子放在这里。我们会陪你把它问明白、算明白，最后留下团队真能接着做的计划。"
+      eyebrow="你的项目"
+      title="把想法做成计划"
     >
       <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="grid gap-4">
           <div className="flex flex-wrap gap-2" role="tablist" aria-label="项目状态筛选">
             {[
               { label: '全部', value: '' },
-              { label: '进行中', value: 'active' },
-              { label: '已完成', value: 'completed' },
-              { label: '失败', value: 'failed' },
+              { label: '正在推进', value: 'active' },
+              { label: '已经收好', value: 'completed' },
+              { label: '需要回看', value: 'failed' },
             ].map((item) => (
               <button
                 aria-selected={status === item.value}
@@ -92,9 +92,9 @@ export function ProjectDashboard() {
           ) : null}
           {!projectsQuery.isLoading && !projectsQuery.error && data?.items.length === 0 ? (
             <EmptyState
-              action={<ButtonLink href="/projects/new">创建第一个项目</ButtonLink>}
-              description="输入一个产品想法，Agent 会按阶段收敛需求并生成工程产物。"
-              title="还没有项目"
+              action={<ButtonLink href="/projects/new">放进第一个想法</ButtonLink>}
+              description="不用先写成需求文档。说说你想为谁解决什么问题，剩下的可以边走边补。"
+              title="这里还空着"
             />
           ) : null}
 
@@ -122,15 +122,15 @@ export function ProjectDashboard() {
                         </p>
                         <div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-slate-500">
                           <span>
-                            当前阶段：
+                            现在在做：
                             <StageName stage={project.current_stage} />
                           </span>
-                          <span>更新：{formatDateTime(project.updated_at)}</span>
+                          <span>上次动过：{formatDateTime(project.updated_at)}</span>
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2 md:justify-end">
                         <ButtonLink href={`/projects/${project.id}`} variant="secondary">
-                          打开
+                          继续看看
                         </ButtonLink>
                         <Button
                           disabled={
@@ -140,8 +140,8 @@ export function ProjectDashboard() {
                           variant="danger"
                         >
                           {deleteMutation.isPending && deleteMutation.variables === project.id
-                            ? '删除中'
-                            : '删除'}
+                            ? '正在移除'
+                            : '移除'}
                         </Button>
                       </div>
                     </CardBody>
@@ -150,7 +150,7 @@ export function ProjectDashboard() {
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
                 <p className="text-sm font-medium text-slate-600">
-                  显示 {data.offset + 1}-{pageEnd} / 共 {data.total} 个项目
+                  正在看第 {data.offset + 1}-{pageEnd} 个，共 {data.total} 个项目
                 </p>
                 <div className="flex gap-2">
                   <Button
@@ -176,18 +176,20 @@ export function ProjectDashboard() {
         <aside className="grid h-fit gap-3">
           <Card className="border-slate-950 bg-slate-950 text-white">
             <CardBody>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Workflow</p>
-              <h2 className="mt-2 text-xl font-black">九阶段规划轨道</h2>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">
+                从这里开始
+              </p>
+              <h2 className="mt-2 text-xl font-black">先把事情想明白</h2>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                需求分析、澄清、多模型分析、综合、风险、MVP、平台推荐和最终产物生成会串成一条可追踪的证据链。
+                我们会先听你说，再把关键问题问清楚；能做什么、先做什么、有哪些坑，都会整理成一份能继续往下走的计划。
               </p>
             </CardBody>
           </Card>
           <Card>
             <CardBody>
-              <h2 className="text-sm font-bold text-slate-950">前端设计取向</h2>
+              <h2 className="text-sm font-bold text-slate-950">先说人话就好</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                这个界面不是营销页，而是规划工作台：密度更高，信息层级清楚，状态可扫描，关键操作可恢复。
+                项目不必从一份完整的需求文档开始。告诉我们谁遇到了什么麻烦，剩下的细节可以在路上慢慢补齐。
               </p>
             </CardBody>
           </Card>

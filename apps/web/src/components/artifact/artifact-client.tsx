@@ -45,7 +45,7 @@ export function ArtifactsClient({ projectId }: { projectId: string }) {
     mutationFn: () => exportPrd(projectId),
     onSuccess: (task) => {
       setExportId(task.id);
-      setExportMessage(`导出任务：${task.status}`);
+      setExportMessage('正在把 PRD 打包好，请稍等一会儿。');
     },
   });
   const exportQuery = useQuery({
@@ -59,8 +59,8 @@ export function ArtifactsClient({ projectId }: { projectId: string }) {
   });
   const downloadExportMutation = useMutation({
     mutationFn: () => getExportDownload(projectId, exportId ?? '', exportId ?? ''),
-    onSuccess: (result) => {
-      setExportMessage(`导出下载已准备：${result.status}`);
+    onSuccess: () => {
+      setExportMessage('文件已经准备好了，可以下载。');
     },
   });
   const exportStatus = exportQuery.data?.status ?? (exportMutation.isPending ? 'creating' : null);
@@ -79,7 +79,7 @@ export function ArtifactsClient({ projectId }: { projectId: string }) {
       actions={
         <>
           <Button disabled={exportMutation.isPending} onClick={handleExportPrd} variant="secondary">
-            {exportMutation.isPending ? '创建导出中' : '导出 PRD'}
+            {exportMutation.isPending ? '正在打包' : '打包成 PRD'}
           </Button>
           {exportComplete ? (
             <Button
@@ -87,17 +87,17 @@ export function ArtifactsClient({ projectId }: { projectId: string }) {
               onClick={() => downloadExportMutation.mutate()}
               variant="secondary"
             >
-              {downloadExportMutation.isPending ? '准备下载中' : '下载导出'}
+              {downloadExportMutation.isPending ? '正在准备下载' : '下载文件'}
             </Button>
           ) : null}
           <ButtonLink href={`/projects/${projectId}/usage`} variant="quiet">
-            查看用量
+            看看这次花了多少
           </ButtonLink>
         </>
       }
-      description="浏览工作流生成的 11 类规划产物。列表只展示摘要，打开详情后再读取完整 Markdown。"
-      eyebrow="Artifacts"
-      title="规划产物"
+      description="这里收着这次想明白后留下的东西：需求、取舍、风险和能交给团队继续做的方案。"
+      eyebrow="这次留下了什么"
+      title="已经整理好的内容"
     >
       {exportError ? (
         <ErrorState error={exportError} onRetry={handleExportPrd} title="导出失败" />
@@ -107,7 +107,7 @@ export function ArtifactsClient({ projectId }: { projectId: string }) {
           className="rounded-md border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm font-medium text-cyan-900"
           role="status"
         >
-          {exportMessage ?? `导出任务：${exportStatus}`}
+          {exportMessage ?? '正在准备导出文件。'}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">
@@ -144,9 +144,9 @@ export function ArtifactsClient({ projectId }: { projectId: string }) {
       !artifactsQuery.error &&
       artifactsQuery.data?.items.length === 0 ? (
         <EmptyState
-          action={<ButtonLink href={`/projects/${projectId}/workflow`}>查看工作流</ButtonLink>}
-          description="完成规划生成阶段后，这里会出现需求、风险、MVP、PRD、架构和编码规则等产物。"
-          title="暂无产物"
+          action={<ButtonLink href={`/projects/${projectId}/workflow`}>回到进展页</ButtonLink>}
+          description="等这次梳理走到最后，需求、风险、MVP 和可以交给团队的计划都会放在这里。"
+          title="还在整理中"
         />
       ) : null}
       {!artifactsQuery.isLoading && !artifactsQuery.error && artifactsQuery.data?.items.length ? (

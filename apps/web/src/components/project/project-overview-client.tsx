@@ -3,12 +3,11 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { Button, ButtonLink } from '@/components/ui/button';
-import { Badge, statusVariant } from '@/components/ui/badge';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/feedback';
 import { ListSkeleton } from '@/components/ui/skeleton';
 import { PageFrame } from '@/components/layout/app-shell';
-import { StageName } from '@/components/project/project-status';
+import { ProjectStatus, StageName } from '@/components/project/project-status';
 import { getProject } from '@/features/projects/api';
 import { getWorkflowStatus, runWorkflow } from '@/features/workflow/api';
 import { formatDateTime } from '@/lib/format';
@@ -37,16 +36,16 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
       actions={
         <>
           <ButtonLink href={`/projects/${projectId}/workflow`} variant="secondary">
-            查看工作流
+            看看进展
           </ButtonLink>
           <ButtonLink href={`/projects/${projectId}/artifacts`} variant="secondary">
-            查看产物
+            看看整理好的内容
           </ButtonLink>
         </>
       }
-      description="查看项目当前阶段、启动规划流水线，并进入产物与用量页面。"
-      eyebrow="Project Overview"
-      title={project?.name ?? '项目详情'}
+      description="先回到最初那个想法。准备好后，我们会从最关键的问题开始，一步步把它变成可开工的计划。"
+      eyebrow="这个想法"
+      title={project?.name ?? '正在打开项目'}
     >
       {projectQuery.isLoading ? <ListSkeleton rows={3} /> : null}
       {projectQuery.error ? (
@@ -72,8 +71,8 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
             <Card>
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-lg font-bold text-slate-950">项目输入</h2>
-                  <Badge variant={statusVariant(project.status)}>{project.status}</Badge>
+                  <h2 className="text-lg font-bold text-slate-950">你当时是这样说的</h2>
+                  <ProjectStatus status={project.status} />
                 </div>
               </CardHeader>
               <CardBody>
@@ -85,23 +84,23 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
 
             <Card>
               <CardHeader>
-                <h2 className="text-lg font-bold text-slate-950">下一步操作</h2>
+                <h2 className="text-lg font-bold text-slate-950">接下来怎么走</h2>
               </CardHeader>
               <CardBody className="flex flex-col gap-3 sm:flex-row">
                 {project.current_stage === 'init' ? (
                   <Button disabled={runMutation.isPending} onClick={() => runMutation.mutate()}>
-                    {runMutation.isPending ? '启动中' : '启动工作流'}
+                    {runMutation.isPending ? '正在开始' : '开始把它想清楚'}
                   </Button>
                 ) : (
-                  <ButtonLink href={`/projects/${projectId}/workflow`}>继续查看工作流</ButtonLink>
+                  <ButtonLink href={`/projects/${projectId}/workflow`}>继续看看</ButtonLink>
                 )}
                 {project.status === 'completed' ? (
                   <ButtonLink href={`/projects/${projectId}/artifacts`} variant="secondary">
-                    阅读生成产物
+                    看看整理好的内容
                   </ButtonLink>
                 ) : null}
                 <ButtonLink href={`/projects/${projectId}/usage`} variant="quiet">
-                  查看模型用量
+                  看看这次花了多少
                 </ButtonLink>
               </CardBody>
             </Card>
@@ -111,20 +110,20 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
             <Card className="border-cyan-200 bg-cyan-50">
               <CardBody>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-900">
-                  Current Stage
+                  现在走到这
                 </p>
                 <h2 className="mt-2 text-2xl font-black text-cyan-950">
                   <StageName stage={project.current_stage} />
                 </h2>
                 <p className="mt-2 text-sm text-cyan-900">
-                  更新于 {formatDateTime(project.updated_at)}
+                  最后动过：{formatDateTime(project.updated_at)}
                 </p>
               </CardBody>
             </Card>
             <Card>
               <CardBody>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-semibold text-slate-700">工作流进度</span>
+                  <span className="font-semibold text-slate-700">已经走过</span>
                   <span className="font-bold text-slate-950">
                     {workflow?.progress.percentage ?? 0}%
                   </span>

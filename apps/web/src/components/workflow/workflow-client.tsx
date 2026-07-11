@@ -137,9 +137,9 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
           </ButtonLink>
         </>
       }
-      description="这里展示工作流阶段、模型降级状态和澄清问题。非澄清阶段会自动轮询进度。"
-      eyebrow="Workflow"
-      title="规划流水线"
+      description="这里会把进展摊开给你看。需要你补一句时，我们会停下来等你，不会悄悄替你做决定。"
+      eyebrow="一起把事情想明白"
+      title="项目进展"
     >
       {statusQuery.isLoading || statesQuery.isLoading ? <ListSkeleton rows={3} /> : null}
       {statusQuery.error ? (
@@ -149,7 +149,7 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
         <ErrorState
           error={statesQuery.error}
           onRetry={() => void statesQuery.refetch()}
-          title="阶段记录加载失败"
+          title="进展加载失败"
         />
       ) : null}
       {status ? (
@@ -159,7 +159,7 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
             <Card className="border-slate-950 bg-slate-950 text-white">
               <CardBody>
                 <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-200">
-                  Live Status
+                  正在进行
                 </p>
                 <div className="mt-3 flex items-end justify-between gap-3">
                   <h2 className="text-3xl font-black">{status.progress.percentage}%</h2>
@@ -178,9 +178,9 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
             Object.values(status.model_status).some((value) => value === 'failed') ? (
               <Card className="border-amber-200 bg-amber-50">
                 <CardBody>
-                  <h2 className="text-sm font-bold text-amber-950">模型降级提醒</h2>
+                  <h2 className="text-sm font-bold text-amber-950">有个帮手没接上</h2>
                   <p className="mt-2 text-sm leading-6 text-amber-900">
-                    有模型调用失败，流程会尽量使用可用结果继续。请在 Usage 页面查看明细。
+                    有一个模型这次没有回应，不过其他结果还在继续。想看细节，可以到用量页里翻一翻。
                   </p>
                 </CardBody>
               </Card>
@@ -189,12 +189,12 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
             {status.current_stage === 'init' ? (
               <Card>
                 <CardBody className="grid gap-3">
-                  <h2 className="text-base font-bold text-slate-950">尚未启动</h2>
+                  <h2 className="text-base font-bold text-slate-950">还没开始</h2>
                   <p className="text-sm leading-6 text-slate-600">
-                    启动后，Agent 会按九阶段推进，并在需要人工输入时停在澄清阶段。
+                    点下开始后，我们会先把想法拆开看；遇到关键空白会问你，不会擅自替你补答案。
                   </p>
                   <Button disabled={busy} onClick={() => void startWorkflow()}>
-                    {busy ? '启动中' : '启动工作流'}
+                    {busy ? '正在开始' : '开始梳理'}
                   </Button>
                 </CardBody>
               </Card>
@@ -203,7 +203,7 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
             {status.current_stage === 'requirement_clarification' ? (
               <Card>
                 <CardHeader>
-                  <h2 className="text-base font-bold text-slate-950">需要你补充信息</h2>
+                  <h2 className="text-base font-bold text-slate-950">有几件事想问你</h2>
                 </CardHeader>
                 <CardBody className="grid gap-3">
                   <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700">
@@ -214,7 +214,7 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
                   <Textarea
                     aria-label="澄清回复"
                     onChange={(event) => setAnswer(event.target.value)}
-                    placeholder="逐条回复上面的问题。可以先说明不确定项，Agent 会继续收敛。"
+                    placeholder="怎么回答都行。暂时没想好也请说出来，我们会把不确定的地方留在台面上。"
                     value={answer}
                   />
                   {actionError ? (
@@ -223,7 +223,7 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
                     </p>
                   ) : null}
                   <Button disabled={busy} onClick={() => void submitClarification()}>
-                    {busy ? '提交中' : '提交回复并继续'}
+                    {busy ? '正在继续' : '答完继续'}
                   </Button>
                 </CardBody>
               </Card>
@@ -232,7 +232,7 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
             {failureMessage ? (
               <Card className="border-red-200 bg-red-50">
                 <CardBody className="grid gap-3">
-                  <h2 className="text-sm font-bold text-red-800">工作流失败</h2>
+                  <h2 className="text-sm font-bold text-red-800">这次没走完</h2>
                   <p className="text-sm leading-6 text-red-700" role="alert">
                     {actionError ?? failureMessage}
                   </p>
@@ -242,7 +242,7 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
                     onClick={() => void startWorkflow()}
                     variant="danger"
                   >
-                    {busy ? '重新启动中' : '重新运行工作流'}
+                    {busy ? '正在再试一次' : '再试一次'}
                   </Button>
                 </CardBody>
               </Card>

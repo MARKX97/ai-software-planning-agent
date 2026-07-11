@@ -150,6 +150,8 @@ pnpm --filter @ai-planning/web exec playwright install
 
 单元测试和集成测试都用 `MockLLMProvider`，**不需要真实 API Key**。只有本地手动跑一遍端到端真实工作流时，才需要在 `.env` 里填 `BAISHAN_BASE_URL` 和 `BAISHAN_API_KEY`。
 
+本地体验完整流程时，将 `BAISHAN_API_KEY` 留空。系统会使用一套连贯的演示数据：第一次运行会停下来询问两个问题，提交回复后会继续生成完整阶段记录、11 类产物和用量日志。
+
 ## Project Structure
 
 ```

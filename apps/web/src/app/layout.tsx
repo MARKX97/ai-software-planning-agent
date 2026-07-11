@@ -5,7 +5,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'AI Software Planning Agent',
-  description: '将模糊的软件想法收敛为可执行的软件项目方案',
+  description: '把模糊的软件想法，一步步变成能开工的计划',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

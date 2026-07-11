@@ -16,6 +16,7 @@ import { LLM_ORCHESTRATOR } from './llm.constants.js';
   providers: [
     {
       provide: LLM_ORCHESTRATOR,
+      // An empty key selects deterministic providers for the local interactive demo.
       useFactory: (config: AppConfigService): LlmOrchestratorService =>
         createLlmOrchestrator({
           baseUrl: config.baishanBaseUrl,

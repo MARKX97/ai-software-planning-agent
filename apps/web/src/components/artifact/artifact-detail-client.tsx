@@ -47,16 +47,16 @@ export function ArtifactDetailClient({
             onClick={handleDownload}
             variant="secondary"
           >
-            {downloadMutation.isPending ? '下载中' : '下载 Markdown'}
+            {downloadMutation.isPending ? '正在准备下载' : '下载这份内容'}
           </Button>
           <ButtonLink href={`/projects/${projectId}/artifacts`} variant="quiet">
-            返回列表
+            回到全部内容
           </ButtonLink>
         </>
       }
-      description="完整产物以安全纯文本方式展示，避免把模型输出作为 HTML 注入页面。"
-      eyebrow="Artifact Detail"
-      title={artifact?.title ?? '产物详情'}
+      description="这是这次讨论留下的完整记录。你可以直接阅读，或下载下来交给接手的人继续做。"
+      eyebrow="一份整理好的内容"
+      title={artifact?.title ?? '正在打开内容'}
     >
       {downloadMutation.error ? (
         <ErrorState error={downloadMutation.error} onRetry={handleDownload} title="下载失败" />
@@ -70,7 +70,7 @@ export function ArtifactDetailClient({
           <Card>
             <CardBody>
               <pre className="max-w-none whitespace-pre-wrap break-words font-mono text-sm leading-7 text-slate-800">
-                {artifact.content ?? '该产物没有内容。'}
+                {artifact.content ?? '这份内容暂时还是空的。'}
               </pre>
             </CardBody>
           </Card>
@@ -78,15 +78,15 @@ export function ArtifactDetailClient({
             <Card>
               <CardBody className="grid gap-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-semibold text-slate-600">类型</span>
+                  <span className="font-semibold text-slate-600">这是什么</span>
                   <Badge>{artifact.type_display_name}</Badge>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-semibold text-slate-600">大小</span>
+                  <span className="font-semibold text-slate-600">文件大小</span>
                   <span>{formatBytes(artifact.size_bytes)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-semibold text-slate-600">生成时间</span>
+                  <span className="font-semibold text-slate-600">整理时间</span>
                   <span>{formatDateTime(artifact.created_at)}</span>
                 </div>
               </CardBody>

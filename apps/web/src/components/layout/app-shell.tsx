@@ -6,9 +6,9 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 const navigation = [
-  { href: '/', label: '控制台' },
-  { href: '/projects/new', label: '新建项目' },
-  { href: '/projects', label: '项目列表' },
+  { href: '/', label: '项目台' },
+  { href: '/projects/new', label: '放进一个想法' },
+  { href: '/projects', label: '所有项目' },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </span>
               <span>
                 <span className="block text-sm font-bold tracking-tight">AI Planning Agent</span>
-                <span className="block text-xs text-slate-600">从想法到工程蓝图</span>
+                <span className="block text-xs text-slate-600">把点子带到开工前</span>
               </span>
             </Link>
             <nav aria-label="主导航" className="flex flex-wrap gap-2">

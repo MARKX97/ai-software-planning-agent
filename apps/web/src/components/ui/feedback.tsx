@@ -26,7 +26,7 @@ export function EmptyState({
 }
 
 export function ErrorState({
-  title = '请求失败',
+  title = '这一步没走通',
   error,
   onRetry,
 }: {
@@ -47,7 +47,7 @@ export function ErrorState({
         </div>
         {onRetry ? (
           <Button className="w-fit" onClick={onRetry} variant="danger">
-            重试
+            再试一次
           </Button>
         ) : null}
       </CardBody>

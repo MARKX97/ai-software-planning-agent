@@ -2,6 +2,7 @@ import type { LLMCallOptions, LLMResponse, ModelPricing } from '@ai-planning/sha
 import type { ILLMProvider } from '../interfaces/illm-provider.js';
 import { calculateCost } from '../utils/calculate-cost.js';
 import { validateSchema } from '../utils/parse-structured-output.js';
+import { mockContent } from './mock-demo-content.js';
 
 /**
  * Deterministic mock provider used when no real Baishan key is configured
@@ -49,25 +50,6 @@ export class MockLLMProvider implements ILLMProvider {
       timestamp: new Date().toISOString(),
     };
   }
-}
-
-function mockContent(provider: string, prompt: string): string {
-  if (prompt.includes('needs_more_clarification')) {
-    const needsMore = prompt.includes('(none)');
-    return JSON.stringify({
-      needs_more_clarification: needsMore,
-      clarification_questions: needsMore
-        ? [
-            {
-              question: 'Who is the primary user?',
-              context: 'The initial idea does not identify a target user.',
-              category: 'user',
-            },
-          ]
-        : [],
-    });
-  }
-  return JSON.stringify({ mock: true, provider, echo: prompt.slice(0, 64) });
 }
 
 function safeParse(content: string): unknown {
