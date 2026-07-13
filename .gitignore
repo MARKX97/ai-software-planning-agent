@@ -48,8 +48,8 @@ packages/database/prisma/migrations/dev.db*
 packages/database/src/generated/
 
 # Test artifacts
-/playwright-report/
-/test-results/
+**/playwright-report/
+**/test-results/
 .cache/
 TEST-PLAN.md
 

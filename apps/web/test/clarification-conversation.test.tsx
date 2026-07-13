@@ -35,6 +35,7 @@ const messages: MessageResponse[] = [
 describe('ClarificationConversation', () => {
   it('renders multiple rounds and submits the next reply', async () => {
     const onSubmit = vi.fn();
+    const onAdvance = vi.fn();
     const onAnswerChange = vi.fn();
     render(
       <ClarificationConversation
@@ -48,7 +49,7 @@ describe('ClarificationConversation', () => {
         isLoading={false}
         messages={messages}
         onAnswerChange={onAnswerChange}
-        onAdvance={onSubmit}
+        onAdvance={onAdvance}
         onRetryHistory={vi.fn()}
         onSubmit={onSubmit}
         stageName="需求澄清"
@@ -61,7 +62,9 @@ describe('ClarificationConversation', () => {
     expect(onAnswerChange).toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: '继续讨论' }));
     expect(onSubmit).toHaveBeenCalledOnce();
+    expect(onAdvance).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: '确认，继续下一环节' }));
-    expect(onSubmit).toHaveBeenCalledTimes(2);
+    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(onAdvance).toHaveBeenCalledOnce();
   });
 });
