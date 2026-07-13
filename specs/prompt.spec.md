@@ -1,6 +1,6 @@
 # Prompt Management — System Contract
 
-> Version: 1.0.0
+> Version: 1.0.1
 > Status: Contract
 > Owner: AI Infrastructure Lead
 > Tokens: ~2,000
@@ -74,26 +74,25 @@ apps/api/src/prompts/<name>.prompt.ts
 | platform_recommendation | `contracts/schemas/llm/platform-recommendation.json` |
 | planning_generation     | `contracts/schemas/llm/project-plan.json`            |
 
-## 4. Function Calling 定义
+## 4. LLM 交互边界
 
-| Function                     | 用途       | 场景     |
-| ---------------------------- | ---------- | -------- |
-| `ask_clarification_question` | 向用户提问 | 澄清阶段 |
-| `advance_stage`              | 推进状态   | 阶段完成 |
-| `save_artifact`              | 保存产物   | 规划生成 |
-| `report_error`               | 报告错误   | 异常处理 |
+MVP 不使用模型原生 Function Calling / Tool Use。Provider 请求不发送 `tools`、`tool_choice`，
+Orchestrator 不执行 Tool Call 循环。模型只负责生成文本和结构化输出，工作流推进、数据写入与
+错误处理由应用层确定性执行。
 
-## 5. Function Calling 分类
+模型配置中的 `function_calling` 仅表示 Provider 具备该能力，不表示本项目已启用。
 
-| 类别     | 值       |
-| -------- | -------- |
-| user     | 用户相关 |
-| scope    | 范围相关 |
-| tech     | 技术相关 |
-| business | 业务相关 |
-| risk     | 风险相关 |
+| 应用层动作   | 当前实现                                                                      | 触发依据                       |
+| ------------ | ----------------------------------------------------------------------------- | ------------------------------ |
+| 提出澄清问题 | LLM 返回结构化 `clarification_questions`，Workflow Service 保存并等待用户回复 | 输出 Schema 与澄清状态         |
+| 推进阶段     | Workflow 状态机校验并推进                                                     | 阶段结果、检查点状态与用户确认 |
+| 保存产物     | Artifact 生成流程校验结果后持久化                                             | 固定产物类型与生成结果         |
+| 记录错误     | Adapter、Orchestrator 与 Workflow 统一映射并记录                              | 运行时异常与执行状态           |
 
-## 6. Prompt 版本管理
+仅当后续需求要求模型根据上下文动态选择外部能力，并需要把执行结果回传模型继续推理时，
+才新增 Function Calling / Tool Use 契约。状态推进、权限校验和数据库写入仍不得由模型直接控制。
+
+## 5. Prompt 版本管理
 
 - 所有 Prompt 变更走 Git PR
 - 变更后更新 prompt-regression 快照测试
