@@ -17,16 +17,12 @@ import {
   LLMTimeoutError,
   type LlmOrchestratorService,
 } from '@ai-planning/llm-orchestrator';
-import {
-  MAX_CLARIFICATION_ROUNDS,
-  WorkflowStage,
-  type StageResult,
-  type WorkflowContext,
-} from '@ai-planning/shared';
+import { WorkflowStage, type StageResult, type WorkflowContext } from '@ai-planning/shared';
 import type { PrismaService } from '../../database/database.module.js';
 import { AppException } from '../../common/exception/app-exception.js';
 import { ErrorCode } from '../../common/exception/error-code.js';
 import { WorkflowStateMachine } from './state-machine/workflow-state-machine.js';
+import { waitingForUser } from './workflow-checkpoints.js';
 import {
   markStageCompleted,
   markStageRunning,
@@ -36,7 +32,6 @@ import { createStageRegistry } from './stages/stage-registry.js';
 import type { StageDeps } from './stages/stage-deps.js';
 import type { StageProcessor } from './stages/stage-processor.js';
 import { persistAnalysisResult } from './stages/analysis-result-persister.js';
-import type { ClarificationResult } from './stages/requirement-clarification.stage.js';
 import type { MultiModelResult } from './stages/multi-model-analysis.stage.js';
 
 export interface PipelineRunDeps {
@@ -44,15 +39,20 @@ export interface PipelineRunDeps {
   readonly orchestrator: LlmOrchestratorService;
 }
 
+export interface PipelineRunOptions {
+  readonly startStage?: WorkflowStage;
+}
+
 /** Run the pipeline until completion or until clarification needs user input. */
 export async function runPipeline(
   ctx: WorkflowContext,
   deps: PipelineRunDeps,
+  options: PipelineRunOptions = {},
 ): Promise<WorkflowStage> {
   const stateMachine = new WorkflowStateMachine();
   const stageDeps: StageDeps = { orchestrator: deps.orchestrator, db: deps.db };
   const registry = createStageRegistry(stageDeps);
-  let currentStage = pickStartingStage(ctx);
+  let currentStage = options.startStage ?? pickStartingStage(ctx);
   while (!stateMachine.isTerminal(currentStage)) {
     const processor = registry.get(currentStage);
     if (!processor) {
@@ -67,17 +67,20 @@ export async function runPipeline(
     if (currentStage === WorkflowStage.REQUIREMENT_SYNTHESIS) {
       await updateRequirementText(deps.db, ctx.projectId, result);
     }
-    const next = decideNextStage(stateMachine, currentStage, result);
-    if (next === WorkflowStage.REQUIREMENT_ANALYSIS) {
-      const mutableCtx = ctx as { clarificationRound: number };
-      mutableCtx.clarificationRound += 1;
-      if (mutableCtx.clarificationRound >= MAX_CLARIFICATION_ROUNDS) {
-        throw new Error(`Clarification round limit (${MAX_CLARIFICATION_ROUNDS}) exceeded`);
-      }
-      await updateProjectStage(deps.db, ctx.projectId, WorkflowStage.REQUIREMENT_CLARIFICATION);
-      await markStageWaiting(deps.db, ctx.projectId, currentStage, result, stateMachine);
-      return WorkflowStage.REQUIREMENT_CLARIFICATION;
+    const waitingFor = waitingForUser(currentStage, result, ctx.clarificationRound);
+    if (waitingFor) {
+      await updateProjectStage(deps.db, ctx.projectId, currentStage);
+      await markStageWaiting(
+        deps.db,
+        ctx.projectId,
+        currentStage,
+        result,
+        stateMachine,
+        waitingFor,
+      );
+      return currentStage;
     }
+    const next = decideNextStage(stateMachine, currentStage, result);
     currentStage = next;
   }
   await updateProjectStage(deps.db, ctx.projectId, currentStage);
@@ -104,10 +107,6 @@ function decideNextStage(
   stage: WorkflowStage,
   result: StageResult,
 ): WorkflowStage {
-  if (stage === WorkflowStage.REQUIREMENT_CLARIFICATION) {
-    const needsMore = (result as ClarificationResult).needsMoreClarification;
-    return needsMore ? WorkflowStage.REQUIREMENT_ANALYSIS : WorkflowStage.MULTI_MODEL_ANALYSIS;
-  }
   if (stage === WorkflowStage.MULTI_MODEL_ANALYSIS) {
     const successCount = (result as MultiModelResult).successCount ?? 0;
     if (successCount === 0) {

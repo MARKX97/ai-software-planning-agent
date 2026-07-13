@@ -14,10 +14,11 @@
 | `requirement-analysis.prompt.ts`    | 需求分析                 | `{{idea}}`, `{{conversationHistory}}`                                         |
 | `multi-model-analysis.prompt.ts`    | 多模型分析（3 模型共用） | `{{requirement}}`                                                             |
 | `synthesis.prompt.ts`               | 需求融合                 | `{{originalIdea}}`, `{{commonPoints}}`, `{{conflicts}}`, `{{uniqueInsights}}` |
-| `feasibility-analysis.prompt.ts`    | 可行性分析               | `{{requirement}}`                                                             |
-| `risk-analysis.prompt.ts`           | 风险分析                 | `{{requirement}}`, `{{feasibility}}`                                          |
-| `mvp-compression.prompt.ts`         | MVP 收缩                 | `{{requirement}}`, `{{risks}}`, `{{feasibility}}`                             |
-| `platform-recommendation.prompt.ts` | 平台推荐                 | `{{mvp}}`, `{{requirement}}`                                                  |
+| `checkpoint-discussion.prompt.ts`   | 检查点讨论               | `{{checkpointName}}`, `{{checkpointResult}}`, `{{conversationHistory}}`       |
+| `feasibility-analysis.prompt.ts`    | 可行性分析               | `{{requirement}}`, `{{conversationHistory}}`                                  |
+| `risk-analysis.prompt.ts`           | 风险分析                 | `{{requirement}}`, `{{feasibility}}`, `{{conversationHistory}}`               |
+| `mvp-compression.prompt.ts`         | MVP 收缩                 | `{{requirement}}`, `{{risks}}`, `{{feasibility}}`, `{{conversationHistory}}`  |
+| `platform-recommendation.prompt.ts` | 平台推荐                 | `{{mvp}}`, `{{requirement}}`, `{{conversationHistory}}`                       |
 | `planning-generation.prompt.ts`     | 规划生成（11 产物共用）  | `{{context}}`, `{{artifactType}}`                                             |
 
 ## 2. Prompt 规范
@@ -35,6 +36,7 @@ apps/api/src/prompts/<name>.prompt.ts
 | 需求分析   | `requirement-analysis.prompt.ts`    | `REQUIREMENT_ANALYSIS_PROMPT`    |
 | 多模型分析 | `multi-model-analysis.prompt.ts`    | `MULTI_MODEL_ANALYSIS_PROMPT`    |
 | 需求融合   | `synthesis.prompt.ts`               | `SYNTHESIS_PROMPT`               |
+| 检查点讨论 | `checkpoint-discussion.prompt.ts`   | `CHECKPOINT_DISCUSSION_PROMPT`   |
 | 可行性分析 | `feasibility-analysis.prompt.ts`    | `FEASIBILITY_ANALYSIS_PROMPT`    |
 | 风险分析   | `risk-analysis.prompt.ts`           | `RISK_ANALYSIS_PROMPT`           |
 | MVP 收缩   | `mvp-compression.prompt.ts`         | `MVP_COMPRESSION_PROMPT`         |

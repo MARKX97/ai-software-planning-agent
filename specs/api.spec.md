@@ -46,6 +46,8 @@
 | POST   | `/projects/{project_id}/run`                                      | 启动工作流   |
 | GET    | `/projects/{project_id}/workflow/status`                          | 工作流状态   |
 | POST   | `/projects/{project_id}/workflow/continue`                        | 继续工作流   |
+| POST   | `/projects/{project_id}/workflow/discuss`                         | 讨论检查点   |
+| POST   | `/projects/{project_id}/workflow/advance`                         | 确认并推进   |
 | GET    | `/projects/{project_id}/workflow/states`                          | 阶段状态     |
 | GET    | `/projects/{project_id}/workflow/executions`                      | 执行历史     |
 | GET    | `/projects/{project_id}/workflow/executions/{execution_id}`       | 执行详情     |
@@ -100,6 +102,8 @@
 - 前端 API Client 必须从 `contracts/openapi.yaml` 生成类型或手动保持一致。
 - 所有列表接口必须处理分页。
 - `workflow/status` 是前端轮询的唯一状态入口。
+- `workflow/status.conversation_id` 指向当前检查点会话；`waiting_for=reply` 表示 Agent 需要补充信息，`waiting_for=review` 表示可讨论或确认推进。
+- `workflow/continue` 只用于需求澄清回复；其他检查点讨论使用 `workflow/discuss`，确认后使用 `workflow/advance`。
 - `artifacts` 列表接口不返回完整 `content`，详情接口才返回。
 - 导出接口创建任务后，前端轮询 `export/{export_id}`。
 
@@ -108,7 +112,7 @@
 必须覆盖:
 
 - OpenAPI schema 校验。
-- 26 个接口的 success response。
+- 28 个接口的 success response。
 - 参数错误、未认证、资源不存在、状态冲突。
 - 关键轮询接口: workflow status、export status。
 

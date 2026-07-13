@@ -25,6 +25,7 @@ export class PlatformRecommendationStage implements StageProcessor {
     const prompt = renderPrompt(PLATFORM_RECOMMENDATION_PROMPT, {
       mvp: mvp ? JSON.stringify(mvp) : '(none)',
       requirement: requirement ? JSON.stringify(requirement) : ctx.originalIdea,
+      conversationHistory: ctx.conversationHistory || '(none)',
     });
     const response = await this.deps.orchestrator.callSingle('glm', prompt, {
       outputSchema: platformRecommendationSchema,

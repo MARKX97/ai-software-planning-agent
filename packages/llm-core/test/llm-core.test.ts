@@ -134,18 +134,28 @@ describe('MockLLMProvider', () => {
     // zod strips unknown keys by default → only `mock` survives.
     assert.deepEqual(res.structuredOutput, { mock: true });
   });
-  it('asks once for clarification, then continues after a reply', async () => {
+  it('supports multiple clarification rounds before continuing', async () => {
     const schema = z.object({
       needs_more_clarification: z.boolean(),
       clarification_questions: z.array(z.object({ question: z.string() })),
     });
     const provider = new MockLLMProvider('glm');
-    const first = await provider.chat('needs_more_clarification\nConversation history: (none)', {
-      outputSchema: schema,
-    });
-    const continued = await provider.chat('needs_more_clarification\nConversation history: reply', {
-      outputSchema: schema,
-    });
+    const first = await provider.chat(
+      'needs_more_clarification\nClarification replies received: 0',
+      {
+        outputSchema: schema,
+      },
+    );
+    const second = await provider.chat(
+      'needs_more_clarification\nClarification replies received: 1',
+      {
+        outputSchema: schema,
+      },
+    );
+    const continued = await provider.chat(
+      'needs_more_clarification\nClarification replies received: 2',
+      { outputSchema: schema },
+    );
     assert.deepEqual(first.structuredOutput, {
       needs_more_clarification: true,
       clarification_questions: [
@@ -153,10 +163,21 @@ describe('MockLLMProvider', () => {
         { question: '用户做选择时，最看重省时间、控制预算，还是吃得健康？' },
       ],
     });
+    assert.deepEqual(second.structuredOutput, {
+      needs_more_clarification: true,
+      clarification_questions: [{ question: '首版上线后，你最想用哪个数字判断它有没有帮到用户？' }],
+    });
     assert.deepEqual(continued.structuredOutput, {
       needs_more_clarification: false,
       clarification_questions: [],
     });
+  });
+  it('returns a grounded reply for checkpoint discussions', async () => {
+    const provider = new MockLLMProvider('glm');
+    const result = await provider.chat('WORKFLOW_CHECKPOINT_DISCUSSION\nCheckpoint: MVP 取舍', {
+      outputSchema: z.object({ reply: z.string() }),
+    });
+    assert.match(result.structuredOutput?.reply ?? '', /MVP 取舍/);
   });
   it('returns schema-valid content for every demo stage', async () => {
     const provider = new MockLLMProvider('deepseek');

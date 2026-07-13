@@ -47,6 +47,8 @@ Idea → Requirement Analysis → Requirement Clarification
 → Platform Recommendation → Planning Generation
 ```
 
+需求澄清、需求范围、MVP 取舍和技术方案是用户可参与的检查点。用户可在每个检查点与 Agent 多轮讨论，确认后才推进到下一环节；讨论结论会进入后续分析和最终规划。
+
 ## 多模型分析
 
 需求分析阶段使用 GLM-5.1 / DeepSeek-V4-Pro / MiniMax-M2.5 三个模型并行分析。
@@ -61,14 +63,14 @@ Idea → Requirement Analysis → Requirement Clarification
 
 ### 第一版必须支持
 
-- 多轮需求沟通
+- 多轮需求沟通与关键检查点确认
 - 多模型分析
 - 需求融合
 - 风险分析
 - MVP 收缩
 - 平台推荐
 - 项目规划生成
-- Web UI（创建项目、工作流进度、需求澄清、产物查看与导出）
+- Web UI（创建项目、工作流进度、检查点讨论、产物查看与导出）
 
 ### 第一版不支持
 

@@ -10,22 +10,17 @@ import {
   type WorkflowProgress,
 } from '../usage/usage.dto.js';
 import { WorkflowStage } from '@ai-planning/shared';
+import { workflowInteraction } from './workflow-checkpoints.js';
 
-/**
- * Response DTOs + mappers for the Workflow endpoints.
- * Source: contracts/openapi.yaml → WorkflowStatusResponse / WorkflowStateResponse /
- * WorkflowExecutionResponse / WorkflowExecutionDetailResponse.
- *
- * Basic progress mappers reuse `WorkflowProgress` from the usage module so we
- * do not duplicate shape.
- * @internal
- */
 export interface WorkflowStatusResponse {
   project_id: string;
+  conversation_id: string | null;
   status: string;
   current_stage: string;
   stage_display_name: string;
   progress: WorkflowProgress;
+  waiting_for: 'reply' | 'review' | null;
+  next_stage: string | null;
   clarification_questions: unknown[] | null;
   model_status: Record<string, string> | null;
   error_message: string | null;
@@ -94,19 +89,16 @@ const STAGE_DISPLAY_NAMES: Record<string, string> = {
 
 const TOTAL_STAGES = 9;
 
-/** Map workflow stage → human-readable (Chinese) display name. */
 export function stageDisplayName(stage: string): string {
   return STAGE_DISPLAY_NAMES[stage] ?? stage;
 }
 
-/** Build a progress object from a count of completed stages. */
 export function buildProgress(completedStages: number): WorkflowProgress {
   const safe = Math.max(0, Math.min(completedStages, TOTAL_STAGES));
   const percentage = Math.round((safe / TOTAL_STAGES) * 100);
   return { completed_stages: safe, total_stages: TOTAL_STAGES, percentage };
 }
 
-/** Parse the Json `progress` field of a workflow_state row. */
 function parseProgress(raw: unknown): WorkflowProgress {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
     const r = raw as Record<string, unknown>;
@@ -119,7 +111,6 @@ function parseProgress(raw: unknown): WorkflowProgress {
   return buildProgress(0);
 }
 
-/** Convert a Prisma WorkflowState row to the API response shape. */
 export function toWorkflowStateResponse(s: WorkflowState): WorkflowStateResponse {
   return {
     id: s.id,
@@ -136,7 +127,6 @@ export function toWorkflowStateResponse(s: WorkflowState): WorkflowStateResponse
   };
 }
 
-/** Convert a Prisma WorkflowExecution row + log count to the response shape. */
 export function toWorkflowExecutionResponse(
   e: WorkflowExecution,
   modelCallCount: number | null,
@@ -156,7 +146,6 @@ export function toWorkflowExecutionResponse(
   };
 }
 
-/** Convert a Prisma WorkflowExecution row + logs to the detail response shape. */
 export function toWorkflowExecutionDetailResponse(
   e: WorkflowExecution,
   modelCallCount: number | null,
@@ -168,23 +157,23 @@ export function toWorkflowExecutionDetailResponse(
   };
 }
 
-/**
- * Build a `WorkflowStatusResponse` from a Project row + a count of completed
- * stages. Phase 3: clarification_questions and model_status are always null
- * (no LLM pipeline running yet).
- */
 export function buildStatusFromProject(
   project: Project,
   completedStages: number,
   activeState: WorkflowState | null = null,
   modelStatus: Record<string, string> | null = null,
+  conversationId: string | null = null,
 ): WorkflowStatusResponse {
+  const interaction = workflowInteraction(activeState?.data_json);
   return {
     project_id: project.id,
+    conversation_id: conversationId,
     status: project.status,
     current_stage: project.current_stage,
     stage_display_name: stageDisplayName(project.current_stage),
     progress: buildProgress(completedStages),
+    waiting_for: interaction.waitingFor,
+    next_stage: interaction.nextStage,
     clarification_questions: extractClarificationQuestions(project, activeState),
     model_status: modelStatus,
     error_message: project.error_message,

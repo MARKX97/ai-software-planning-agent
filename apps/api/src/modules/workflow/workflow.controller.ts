@@ -14,10 +14,14 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
 import { WorkflowService, type ExecutionLogsListResponse } from './workflow.service.js';
 import {
   continueWorkflowSchema,
+  advanceWorkflowSchema,
+  discussWorkflowSchema,
+  type AdvanceWorkflowRequest,
   listExecutionLogsQuerySchema,
   listExecutionsQuerySchema,
   runWorkflowSchema,
   type ContinueWorkflowRequest,
+  type DiscussWorkflowRequest,
   type ListExecutionLogsQuery,
   type ListExecutionsQuery,
   type RunWorkflowRequest,
@@ -67,6 +71,28 @@ export class WorkflowController {
     @Body() body: ContinueWorkflowRequest,
   ): Promise<WorkflowStatusResponse> {
     return this.workflow.continue(projectId, body);
+  }
+
+  @Post('projects/:project_id/workflow/discuss')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: '讨论当前检查点' })
+  @UsePipes(new ZodValidationPipe(discussWorkflowSchema))
+  async discuss(
+    @Param('project_id') projectId: string,
+    @Body() body: DiscussWorkflowRequest,
+  ): Promise<WorkflowStatusResponse> {
+    return this.workflow.discuss(projectId, body);
+  }
+
+  @Post('projects/:project_id/workflow/advance')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: '确认并进入下一环节' })
+  @UsePipes(new ZodValidationPipe(advanceWorkflowSchema))
+  async advance(
+    @Param('project_id') projectId: string,
+    @Body() body: AdvanceWorkflowRequest,
+  ): Promise<WorkflowStatusResponse> {
+    return this.workflow.advance(projectId, body);
   }
 
   @Get('projects/:project_id/workflow/states')

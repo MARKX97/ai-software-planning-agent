@@ -12,6 +12,9 @@ Open clarification questions from requirement analysis:
 Conversation history so far:
 {{conversationHistory}}
 
+Clarification replies received:
+{{clarificationRound}}
+
 Return a JSON object with:
 - needs_more_clarification: boolean
 - clarification_questions: array of objects, each with question/context/category

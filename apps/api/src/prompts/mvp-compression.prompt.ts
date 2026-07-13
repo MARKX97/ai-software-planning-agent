@@ -15,6 +15,9 @@ Identified risks:
 Feasibility assessment:
 {{feasibility}}
 
+Confirmed discussion and feedback:
+{{conversationHistory}}
+
 Return a JSON object matching the MVPPlan schema:
 - mvp_scope: array of features included in MVP
 - deferred_scope: array of features deferred to later phases

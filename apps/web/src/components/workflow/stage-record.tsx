@@ -63,10 +63,13 @@ export function StageRecord({ state }: { state?: WorkflowStateResponse }) {
   if (state.error_message) {
     return <p className="text-sm text-red-700">{state.error_message}</p>;
   }
-  if (!state.data_json || Object.keys(state.data_json).length === 0) {
+  const data = Object.fromEntries(
+    Object.entries(state.data_json ?? {}).filter(([key]) => key !== '_workflow'),
+  );
+  if (Object.keys(data).length === 0) {
     return <p className="text-sm text-slate-500">这一步没有留下额外记录。</p>;
   }
-  return <RecordValue value={state.data_json} />;
+  return <RecordValue value={data} />;
 }
 
 function RecordValue({ value }: { value: unknown }) {

@@ -9,6 +9,9 @@ export const FEASIBILITY_ANALYSIS_PROMPT = `You are a senior technical architect
 Synthesized requirement:
 {{requirement}}
 
+Confirmed discussion and feedback:
+{{conversationHistory}}
+
 Return a JSON object matching the FeasibilityAssessment schema:
 - technical_feasibility: one of "high", "medium", "low"
 - technical_risks: array of identified technical risks

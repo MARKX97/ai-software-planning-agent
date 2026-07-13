@@ -27,6 +27,7 @@ export class MvpCompressionStage implements StageProcessor {
       requirement: requirement ? JSON.stringify(requirement) : ctx.originalIdea,
       risks: risks ? JSON.stringify(risks) : '(none)',
       feasibility: feasibility ? JSON.stringify(feasibility) : '(none)',
+      conversationHistory: ctx.conversationHistory || '(none)',
     });
     const response = await this.deps.orchestrator.callSingle('deepseek', prompt, {
       outputSchema: mvpPlanSchema,

@@ -7,10 +7,13 @@ import type { WorkflowStateResponse, WorkflowStatusResponse } from '../src/types
 
 const status: WorkflowStatusResponse = {
   project_id: 'project-1',
+  conversation_id: null,
   status: 'active',
   current_stage: 'requirement_clarification',
   stage_display_name: '需求澄清',
   progress: { completed_stages: 1, total_stages: 9, percentage: 11 },
+  waiting_for: 'reply',
+  next_stage: 'multi_model_analysis',
   clarification_questions: ['Who is the target user?'],
   model_status: null,
   error_message: null,
@@ -35,7 +38,10 @@ describe('StageRail', () => {
       status: 'completed',
       display_name: '需求分析',
       progress: { completed_stages: 1, total_stages: 9, percentage: 11 },
-      data_json: { project_summary: '帮助用户更快决定今晚吃什么。' },
+      data_json: {
+        project_summary: '帮助用户更快决定今晚吃什么。',
+        _workflow: { waiting_for: 'review' },
+      },
       error_message: null,
       started_at: '2026-07-09T00:00:00.000Z',
       completed_at: '2026-07-09T00:00:01.000Z',
@@ -48,5 +54,6 @@ describe('StageRail', () => {
     await userEvent.click(summary!);
     expect(summary?.parentElement).toHaveAttribute('open');
     expect(screen.getByText('帮助用户更快决定今晚吃什么。')).toBeInTheDocument();
+    expect(screen.queryByText('_workflow')).not.toBeInTheDocument();
   });
 });

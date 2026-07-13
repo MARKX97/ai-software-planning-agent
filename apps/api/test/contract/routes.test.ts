@@ -35,6 +35,8 @@ const expectedRoutes = [
   'POST /projects/{project_id}/run',
   'GET /projects/{project_id}/workflow/status',
   'POST /projects/{project_id}/workflow/continue',
+  'POST /projects/{project_id}/workflow/discuss',
+  'POST /projects/{project_id}/workflow/advance',
   'GET /projects/{project_id}/workflow/states',
   'GET /projects/{project_id}/workflow/executions',
   'GET /projects/{project_id}/workflow/executions/{execution_id}',
@@ -59,8 +61,8 @@ const methodNames: Record<number, string> = {
   [RequestMethod.DELETE]: 'DELETE',
 };
 
-function routeEntries(controller: Function): string[] {
-  const prototype = controller.prototype;
+function routeEntries(controller: { prototype: object }): string[] {
+  const prototype = controller.prototype as Record<string, object>;
   const prefix = Reflect.getMetadata(PATH_METADATA, controller) ?? '';
   return Object.getOwnPropertyNames(prototype)
     .filter((name) => name !== 'constructor')
@@ -78,7 +80,7 @@ function routeEntries(controller: Function): string[] {
 }
 
 describe('API route contract', () => {
-  it('keeps all 26 documented routes registered on controllers', () => {
+  it('keeps all 28 documented routes registered on controllers', () => {
     const actual = controllers.flatMap(routeEntries).sort();
     assert.deepEqual(actual, expectedRoutes);
   });

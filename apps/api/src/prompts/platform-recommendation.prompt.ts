@@ -12,6 +12,9 @@ MVP plan:
 Synthesized requirement:
 {{requirement}}
 
+Confirmed discussion and feedback:
+{{conversationHistory}}
+
 Return a JSON object matching the PlatformRecommendation schema:
 - recommended_platform: recommended primary platform/framework
 - tech_stack: array of recommended technologies

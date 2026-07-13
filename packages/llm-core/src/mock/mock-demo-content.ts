@@ -148,29 +148,48 @@ const artifactTitles: Record<string, string> = {
 /** Return deterministic, coherent content for local end-to-end demos. */
 export function mockContent(provider: string, prompt: string): string {
   if (prompt.includes('Artifact type to generate:')) return mockArtifact(prompt);
+  if (prompt.includes('WORKFLOW_CHECKPOINT_DISCUSSION')) return mockCheckpointDiscussion(prompt);
   if (prompt.includes('needs_more_clarification')) return mockClarification(prompt);
   const match = demoResponses.find(([marker]) => prompt.includes(marker));
   return JSON.stringify(match ? match[1](provider) : { mock: true, provider });
 }
 
-function mockClarification(prompt: string): string {
-  const needsMore = prompt.includes('(none)');
+function mockCheckpointDiscussion(prompt: string): string {
+  const checkpoint = prompt.match(/Checkpoint: (.+)/)?.[1] ?? '当前方案';
   return JSON.stringify({
-    needs_more_clarification: needsMore,
-    clarification_questions: needsMore
+    reply: `我记下了你对${checkpoint}的反馈。这个取舍会带入后续规划；如果还有顾虑，可以继续聊，准备好后再确认进入下一环节。`,
+  });
+}
+
+function mockClarification(prompt: string): string {
+  const replyCount = Number(prompt.match(/Clarification replies received:\s*(\d+)/)?.[1] ?? 0);
+  const firstRound = replyCount === 0;
+  const secondRound = replyCount === 1;
+  const questions = firstRound
+    ? [
+        {
+          question: '首版主要想服务哪个城市？',
+          context: '地点数据和可用服务会因城市而不同。',
+          category: 'scope',
+        },
+        {
+          question: '用户做选择时，最看重省时间、控制预算，还是吃得健康？',
+          context: '这会决定推荐排序和首页默认项。',
+          category: 'user',
+        },
+      ]
+    : secondRound
       ? [
           {
-            question: '首版主要想服务哪个城市？',
-            context: '地点数据和可用服务会因城市而不同。',
-            category: 'scope',
-          },
-          {
-            question: '用户做选择时，最看重省时间、控制预算，还是吃得健康？',
-            context: '这会决定推荐排序和首页默认项。',
-            category: 'user',
+            question: '首版上线后，你最想用哪个数字判断它有没有帮到用户？',
+            context: '明确成功标准，才能决定首版需要记录哪些反馈。',
+            category: 'business',
           },
         ]
-      : [],
+      : [];
+  return JSON.stringify({
+    needs_more_clarification: questions.length > 0,
+    clarification_questions: questions,
   });
 }
 

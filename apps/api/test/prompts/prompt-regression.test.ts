@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderPrompt } from '../../src/prompts/prompt-template.js';
 import { CLARIFICATION_PROMPT } from '../../src/prompts/clarification.prompt.js';
+import { CHECKPOINT_DISCUSSION_PROMPT } from '../../src/prompts/checkpoint-discussion.prompt.js';
 import { FEASIBILITY_ANALYSIS_PROMPT } from '../../src/prompts/feasibility-analysis.prompt.js';
 import { MULTI_MODEL_ANALYSIS_PROMPT } from '../../src/prompts/multi-model-analysis.prompt.js';
 import { MVP_COMPRESSION_PROMPT } from '../../src/prompts/mvp-compression.prompt.js';
@@ -13,7 +14,14 @@ import { SYNTHESIS_PROMPT } from '../../src/prompts/synthesis.prompt.js';
 
 const cases = [
   [REQUIREMENT_ANALYSIS_PROMPT, { idea: 'idea', conversationHistory: 'history' }],
-  [CLARIFICATION_PROMPT, { questions: 'questions', conversationHistory: 'history' }],
+  [
+    CLARIFICATION_PROMPT,
+    { questions: 'questions', conversationHistory: 'history', clarificationRound: '1' },
+  ],
+  [
+    CHECKPOINT_DISCUSSION_PROMPT,
+    { checkpointName: 'MVP 取舍', checkpointResult: 'result', conversationHistory: 'history' },
+  ],
   [MULTI_MODEL_ANALYSIS_PROMPT, { requirement: 'requirement' }],
   [
     SYNTHESIS_PROMPT,
@@ -24,13 +32,24 @@ const cases = [
       uniqueInsights: 'unique',
     },
   ],
-  [FEASIBILITY_ANALYSIS_PROMPT, { requirement: 'requirement' }],
-  [RISK_ANALYSIS_PROMPT, { requirement: 'requirement', feasibility: 'feasibility' }],
+  [FEASIBILITY_ANALYSIS_PROMPT, { requirement: 'requirement', conversationHistory: 'history' }],
+  [
+    RISK_ANALYSIS_PROMPT,
+    { requirement: 'requirement', feasibility: 'feasibility', conversationHistory: 'history' },
+  ],
   [
     MVP_COMPRESSION_PROMPT,
-    { requirement: 'requirement', feasibility: 'feasibility', risks: 'risks' },
+    {
+      requirement: 'requirement',
+      feasibility: 'feasibility',
+      risks: 'risks',
+      conversationHistory: 'history',
+    },
   ],
-  [PLATFORM_RECOMMENDATION_PROMPT, { requirement: 'requirement', mvp: 'mvp' }],
+  [
+    PLATFORM_RECOMMENDATION_PROMPT,
+    { requirement: 'requirement', mvp: 'mvp', conversationHistory: 'history' },
+  ],
   [PLANNING_GENERATION_PROMPT, { artifactType: 'prd', context: 'context' }],
 ] as const;
 

@@ -71,6 +71,7 @@ export class ArtifactGenerator {
       risks: ctx.resultsByStage.risk_analysis?.structuredOutput,
       mvp: ctx.resultsByStage.mvp_compression?.structuredOutput,
       platform: ctx.resultsByStage.platform_recommendation?.structuredOutput,
+      confirmed_discussions: ctx.conversationHistory,
     };
     return JSON.stringify(context);
   }

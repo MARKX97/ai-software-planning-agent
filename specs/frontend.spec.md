@@ -118,8 +118,14 @@ API:
 澄清:
 
 - 页面必须展示 `clarification_questions`
+- 同一轮需求澄清必须复用 `workflow/status.conversation_id`
+- 页面展示 conversation 消息历史，刷新后可以恢复
+- Agent 每次仍认为信息不足时继续提问，最多 5 轮
 - 用户提交回复后调用 `workflow/continue`
+- 检查点讨论消息调用 `workflow/discuss`，确认推进调用 `workflow/advance`
 - 同一回复提交按钮在请求期间禁用，防重复提交
+- `waiting_for=review` 时展示“继续讨论”和“确认，继续下一环节”两个操作
+- 需求确认、MVP 取舍和技术方案确认均复用同一对话面板；内部分析阶段不单独打断用户
 
 降级显示:
 

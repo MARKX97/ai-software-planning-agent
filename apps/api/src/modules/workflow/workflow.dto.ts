@@ -19,6 +19,16 @@ export const continueWorkflowSchema = z.object({
 
 export type ContinueWorkflowRequest = z.infer<typeof continueWorkflowSchema>;
 
+export const discussWorkflowSchema = continueWorkflowSchema;
+
+export type DiscussWorkflowRequest = z.infer<typeof discussWorkflowSchema>;
+
+export const advanceWorkflowSchema = z.object({
+  conversation_id: z.string().uuid(),
+});
+
+export type AdvanceWorkflowRequest = z.infer<typeof advanceWorkflowSchema>;
+
 export const listExecutionsQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(100).default(20),

@@ -49,10 +49,13 @@ export interface WorkflowProgress {
 
 export interface WorkflowStatusResponse {
   project_id: string;
+  conversation_id: string | null;
   status: string;
   current_stage: string;
   stage_display_name: string;
   progress: WorkflowProgress;
+  waiting_for: 'reply' | 'review' | null;
+  next_stage: string | null;
   clarification_questions: unknown[] | null;
   model_status: Record<string, string> | null;
   error_message: string | null;
@@ -151,6 +154,22 @@ export interface ConversationResponse {
   project_id: string;
   status: string;
   created_at: string;
+}
+
+export interface MessageResponse {
+  id: string;
+  conversation_id: string;
+  role: string;
+  content: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface MessageListResponse {
+  items: MessageResponse[];
+  total: number;
+  offset: number;
+  limit: number;
 }
 
 export interface TokenUsageDetailResponse {

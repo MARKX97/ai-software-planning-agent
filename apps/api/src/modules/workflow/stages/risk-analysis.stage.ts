@@ -25,6 +25,7 @@ export class RiskAnalysisStage implements StageProcessor {
     const prompt = renderPrompt(RISK_ANALYSIS_PROMPT, {
       requirement: requirement ? JSON.stringify(requirement) : ctx.originalIdea,
       feasibility: feasibility ? JSON.stringify(feasibility) : '(none)',
+      conversationHistory: ctx.conversationHistory || '(none)',
     });
     const response = await this.deps.orchestrator.callSingle('deepseek', prompt, {
       outputSchema: riskAnalysisSchema,

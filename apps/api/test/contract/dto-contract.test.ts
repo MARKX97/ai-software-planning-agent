@@ -15,7 +15,9 @@ import {
   listMessagesQuerySchema,
 } from '../../src/modules/conversations/conversations.dto.js';
 import {
+  advanceWorkflowSchema,
   continueWorkflowSchema,
+  discussWorkflowSchema,
   listExecutionsQuerySchema,
 } from '../../src/modules/workflow/workflow.dto.js';
 import { listArtifactsQuerySchema } from '../../src/modules/artifacts/artifacts.dto.js';
@@ -44,6 +46,11 @@ describe('API request contracts', () => {
     assert.equal(sendMessageSchema.safeParse({ content: '' }).success, false);
     assert.equal(
       continueWorkflowSchema.safeParse({ conversation_id: 'bad', message: 'reply' }).success,
+      false,
+    );
+    assert.equal(advanceWorkflowSchema.safeParse({ conversation_id: 'bad' }).success, false);
+    assert.equal(
+      discussWorkflowSchema.safeParse({ conversation_id: 'bad', message: 'reply' }).success,
       false,
     );
     assert.equal(tokenUsageQuerySchema.safeParse({ project_id: 'bad' }).success, false);

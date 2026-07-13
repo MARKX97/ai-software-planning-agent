@@ -10,6 +10,7 @@ import { StageStatus, type StageResult, type WorkflowStage } from '@ai-planning/
 import type { PrismaService } from '../../database/database.module.js';
 import { WorkflowStateMachine } from './state-machine/workflow-state-machine.js';
 import { stageDisplayName } from './workflow-response.dto.js';
+import { nextStageAfterCheckpoint, type WorkflowWait } from './workflow-checkpoints.js';
 
 const TOTAL_STAGES = 9;
 
@@ -60,16 +61,46 @@ export async function markStageWaiting(
   stage: WorkflowStage,
   result: StageResult,
   stateMachine: WorkflowStateMachine,
+  waitingFor: WorkflowWait,
 ): Promise<void> {
   await db.client.workflowState.update({
     where: { project_id_stage: { project_id: projectId, stage } },
     data: {
       status: StageStatus.RUNNING,
       progress: buildProgress(stage, stateMachine),
-      data_json: (result.structuredOutput ?? { content: result.content }) as never,
+      data_json: waitingData(result, waitingFor) as never,
       updated_at: new Date(),
     },
   });
+}
+
+export async function markCheckpointConfirmed(
+  db: PrismaService,
+  projectId: string,
+  stage: WorkflowStage,
+): Promise<void> {
+  const state = await db.client.workflowState.findUnique({
+    where: { project_id_stage: { project_id: projectId, stage } },
+  });
+  const data = state?.data_json;
+  const nextData = data && typeof data === 'object' && !Array.isArray(data) ? { ...data } : data;
+  if (nextData && typeof nextData === 'object' && !Array.isArray(nextData)) {
+    delete (nextData as Record<string, unknown>)['_workflow'];
+  }
+  await db.client.workflowState.update({
+    where: { project_id_stage: { project_id: projectId, stage } },
+    data: { status: StageStatus.COMPLETED, data_json: nextData as never, updated_at: new Date() },
+  });
+}
+
+function waitingData(result: StageResult, waitingFor: WorkflowWait): Record<string, unknown> {
+  const output = result.structuredOutput;
+  const data = output && typeof output === 'object' && !Array.isArray(output) ? output : {};
+  return {
+    ...data,
+    _workflow: { waiting_for: waitingFor, next_stage: nextStageAfterCheckpoint(result.stage) },
+    ...(Object.keys(data).length === 0 ? { content: result.content } : {}),
+  };
 }
 
 function buildStageState(

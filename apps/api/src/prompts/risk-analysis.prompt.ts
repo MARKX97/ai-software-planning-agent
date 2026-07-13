@@ -12,6 +12,9 @@ Synthesized requirement:
 Feasibility assessment:
 {{feasibility}}
 
+Confirmed discussion and feedback:
+{{conversationHistory}}
+
 Return a JSON object matching the RiskAnalysisResult schema:
 - risks: array of risk items (each with id/category/description/probability/impact/mitigation/contingency)
 - overall_risk_level: one of "high", "medium", "low"

@@ -5,39 +5,21 @@ import { AppException } from '../../common/exception/app-exception.js';
 import { ErrorCode } from '../../common/exception/error-code.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import { buildStatusFromProject, type WorkflowStatusResponse } from './workflow-response.dto.js';
-
-/** Persistence helpers for workflow service orchestration. */
 export async function createExecution(
   db: PrismaService,
   projectId: string,
+  stage: WorkflowStage = WorkflowStage.REQUIREMENT_ANALYSIS,
 ): Promise<WorkflowExecution> {
   return db.client.workflowExecution.create({
     data: {
       project_id: projectId,
-      stage: WorkflowStage.REQUIREMENT_ANALYSIS,
+      stage,
       status: 'success',
       started_at: new Date(),
       retry_count: 0,
     },
   });
 }
-
-/** Load all project conversation messages as a model-friendly transcript. */
-export async function loadConversationHistory(
-  db: PrismaService,
-  projectId: string,
-): Promise<string> {
-  const conversations = await db.client.conversation.findMany({
-    where: { project_id: projectId },
-    include: { messages: { orderBy: { created_at: 'asc' } } },
-  });
-  return conversations
-    .flatMap((c) => c.messages)
-    .map((m) => `${m.role}: ${m.content}`)
-    .join('\n');
-}
-
-/** Update the project's current workflow stage. */
 export async function updateProjectStage(
   db: PrismaService,
   projectId: string,
@@ -49,7 +31,6 @@ export async function updateProjectStage(
   });
 }
 
-/** Mark an execution as successful. */
 export async function markExecutionComplete(db: PrismaService, executionId: string): Promise<void> {
   await db.client.workflowExecution.update({
     where: { id: executionId },
@@ -57,7 +38,21 @@ export async function markExecutionComplete(db: PrismaService, executionId: stri
   });
 }
 
-/** Mark the project as fully completed. */
+export async function markExecutionFailed(
+  db: PrismaService,
+  executionId: string,
+  error: unknown,
+): Promise<void> {
+  await db.client.workflowExecution.update({
+    where: { id: executionId },
+    data: {
+      status: 'failed',
+      error_message: workflowFailureMessage(error),
+      completed_at: new Date(),
+    },
+  });
+}
+
 export async function markProjectComplete(db: PrismaService, projectId: string): Promise<void> {
   await db.client.project.update({
     where: { id: projectId },
@@ -70,7 +65,6 @@ export async function markProjectComplete(db: PrismaService, projectId: string):
   });
 }
 
-/** Mark the execution and project as failed with a user-visible error message. */
 export async function markFailed(
   db: PrismaService,
   projectId: string,
@@ -104,24 +98,48 @@ function workflowFailureMessage(error: unknown): string {
   return '工作流执行失败，请稍后重试。';
 }
 
-/** Build current workflow status including clarification/model details when present. */
 export async function buildWorkflowStatus(
   db: PrismaService,
   projects: ProjectsService,
   projectId: string,
 ): Promise<WorkflowStatusResponse> {
   const project = await projects.findOrFail(projectId);
-  const [completedStages, activeState, modelStatus] = await Promise.all([
+  const [completedStages, activeState, modelStatus, conversation] = await Promise.all([
     countCompletedStages(db, projectId),
     db.client.workflowState.findUnique({
       where: { project_id_stage: { project_id: projectId, stage: project.current_stage } },
     }),
     buildModelStatus(db, projectId, project.current_stage),
+    findWorkflowConversation(db, projectId, project.current_stage, project.status),
   ]);
-  return buildStatusFromProject(project, completedStages, activeState, modelStatus);
+  return buildStatusFromProject(
+    project,
+    completedStages,
+    activeState,
+    modelStatus,
+    conversation?.id ?? null,
+  );
 }
 
-/** Find an execution belonging to the project or throw the contract error. */
+async function findWorkflowConversation(
+  db: PrismaService,
+  projectId: string,
+  stage: WorkflowStage,
+  projectStatus: string,
+): Promise<{ id: string } | null> {
+  if (stage === WorkflowStage.INIT) return null;
+  const status = projectStatus === 'active' ? 'active' : undefined;
+  return db.client.conversation.findFirst({
+    where: {
+      project_id: projectId,
+      ...(status ? { status } : {}),
+      messages: { some: { metadata: { path: ['workflow'], equals: true } } },
+    },
+    orderBy: { updated_at: 'desc' },
+    select: { id: true },
+  });
+}
+
 export async function findExecutionOrFail(
   db: PrismaService,
   projectId: string,
@@ -137,22 +155,6 @@ export async function findExecutionOrFail(
   return execution;
 }
 
-/** Assert a conversation belongs to the project. */
-export async function findConversationOrFail(
-  db: PrismaService,
-  projectId: string,
-  conversationId: string,
-): Promise<void> {
-  const conversation = await db.client.conversation.findUnique({ where: { id: conversationId } });
-  if (!conversation || conversation.project_id !== projectId) {
-    throw AppException.notFound(
-      ErrorCode.CONVERSATION_NOT_FOUND,
-      `Conversation '${conversationId}' not found in project '${projectId}'`,
-    );
-  }
-}
-
-/** Count model call logs for a page of execution rows. */
 export async function countModelLogs(
   db: PrismaService,
   rows: WorkflowExecution[],

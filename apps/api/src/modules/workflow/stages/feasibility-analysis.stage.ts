@@ -23,6 +23,7 @@ export class FeasibilityAnalysisStage implements StageProcessor {
     const requirement = ctx.resultsByStage[WorkflowStage.REQUIREMENT_SYNTHESIS]?.structuredOutput;
     const prompt = renderPrompt(FEASIBILITY_ANALYSIS_PROMPT, {
       requirement: requirement ? JSON.stringify(requirement) : ctx.originalIdea,
+      conversationHistory: ctx.conversationHistory || '(none)',
     });
     const response = await this.deps.orchestrator.callSingle('glm', prompt, {
       outputSchema: feasibilityAssessmentSchema,

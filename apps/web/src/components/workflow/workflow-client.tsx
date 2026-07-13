@@ -1,36 +1,24 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { PageFrame } from '@/components/layout/app-shell';
-import { Button, ButtonLink } from '@/components/ui/button';
-import { Card, CardBody, CardHeader } from '@/components/ui/card';
+import { ButtonLink } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/feedback';
-import { Textarea } from '@/components/ui/form';
 import { ListSkeleton } from '@/components/ui/skeleton';
+import { ClarificationConversation } from '@/components/workflow/clarification-conversation';
 import { StageRail } from '@/components/workflow/stage-rail';
+import { WorkflowStatusPanels } from '@/components/workflow/workflow-status-panels';
 import {
+  advanceWorkflow,
   continueWorkflow,
-  createConversation,
+  discussWorkflow,
   getWorkflowStatus,
+  listConversationMessages,
   listWorkflowStates,
   runWorkflow,
 } from '@/features/workflow/api';
 import { getUserErrorMessage } from '@/lib/api-client';
-
-function questionText(question: unknown, index: number): string {
-  if (typeof question === 'string') {
-    return question;
-  }
-  if (question && typeof question === 'object') {
-    const record = question as Record<string, unknown>;
-    const text = record['question'] ?? record['content'] ?? record['text'];
-    if (typeof text === 'string') {
-      return text;
-    }
-  }
-  return `澄清问题 ${index + 1}`;
-}
 
 export function WorkflowClient({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
@@ -69,30 +57,13 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
       return false;
     },
   });
-  const startMutation = useMutation({
-    mutationFn: () => runWorkflow(projectId),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['workflow-status', projectId] }),
-        queryClient.invalidateQueries({ queryKey: ['workflow-states', projectId] }),
-      ]);
-    },
-  });
-  const continueMutation = useMutation({
-    mutationFn: async (message: string) => {
-      const conversation = await createConversation(projectId);
-      return continueWorkflow(projectId, conversation.id, message);
-    },
-    onSuccess: async () => {
-      setAnswer('');
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['workflow-status', projectId] }),
-        queryClient.invalidateQueries({ queryKey: ['workflow-states', projectId] }),
-      ]);
-    },
+  const conversationId = statusQuery.data?.conversation_id ?? null;
+  const messagesQuery = useQuery({
+    enabled: Boolean(conversationId),
+    queryKey: ['conversation-messages', projectId, conversationId],
+    queryFn: () => listConversationMessages(projectId, conversationId ?? ''),
   });
   const status = statusQuery.data;
-  const questions = useMemo(() => status?.clarification_questions ?? [], [status]);
   const failureMessage = status?.error_message
     ? getUserErrorMessage(status.error_message, '工作流执行失败，请稍后重试。')
     : null;
@@ -101,7 +72,8 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
     setBusy(true);
     setActionError(null);
     try {
-      await startMutation.mutateAsync();
+      await runWorkflow(projectId);
+      await refreshWorkflow();
     } catch (error) {
       setActionError(getUserErrorMessage(error, '工作流启动失败，请稍后重试。'));
     } finally {
@@ -117,12 +89,38 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
     setBusy(true);
     setActionError(null);
     try {
-      await continueMutation.mutateAsync(answer.trim());
+      if (!conversationId || !status?.waiting_for) throw new Error('当前没有可继续的讨论。');
+      const submit = status.waiting_for === 'reply' ? continueWorkflow : discussWorkflow;
+      await submit(projectId, conversationId, answer.trim());
+      setAnswer('');
+      await refreshWorkflow();
     } catch (error) {
       setActionError(getUserErrorMessage(error, '回复提交失败，请稍后重试。'));
     } finally {
       setBusy(false);
     }
+  }
+
+  async function advanceCheckpoint() {
+    setBusy(true);
+    setActionError(null);
+    try {
+      if (!conversationId) throw new Error('当前没有可确认的讨论。');
+      await advanceWorkflow(projectId, conversationId);
+      await refreshWorkflow();
+    } catch (error) {
+      setActionError(getUserErrorMessage(error, '暂时无法进入下一环节，请稍后重试。'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refreshWorkflow() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['workflow-status', projectId] }),
+      queryClient.invalidateQueries({ queryKey: ['workflow-states', projectId] }),
+      queryClient.invalidateQueries({ queryKey: ['conversation-messages', projectId] }),
+    ]);
   }
 
   return (
@@ -156,96 +154,31 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
         <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
           <StageRail status={status} states={statesQuery.data?.items ?? []} />
           <aside className="grid h-fit gap-4">
-            <Card className="border-slate-950 bg-slate-950 text-white">
-              <CardBody>
-                <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-200">
-                  正在进行
-                </p>
-                <div className="mt-3 flex items-end justify-between gap-3">
-                  <h2 className="text-3xl font-black">{status.progress.percentage}%</h2>
-                  <span className="text-sm text-slate-300">{status.stage_display_name}</span>
-                </div>
-                <div className="mt-4 h-2 rounded-full bg-white/15">
-                  <div
-                    className="h-2 rounded-full bg-cyan-300 transition-all"
-                    style={{ width: `${status.progress.percentage}%` }}
-                  />
-                </div>
-              </CardBody>
-            </Card>
+            <WorkflowStatusPanels
+              actionError={actionError}
+              busy={busy}
+              failureMessage={failureMessage}
+              onStart={() => void startWorkflow()}
+              status={status}
+            />
 
-            {status.model_status &&
-            Object.values(status.model_status).some((value) => value === 'failed') ? (
-              <Card className="border-amber-200 bg-amber-50">
-                <CardBody>
-                  <h2 className="text-sm font-bold text-amber-950">有个帮手没接上</h2>
-                  <p className="mt-2 text-sm leading-6 text-amber-900">
-                    有一个模型这次没有回应，不过其他结果还在继续。想看细节，可以到用量页里翻一翻。
-                  </p>
-                </CardBody>
-              </Card>
-            ) : null}
-
-            {status.current_stage === 'init' ? (
-              <Card>
-                <CardBody className="grid gap-3">
-                  <h2 className="text-base font-bold text-slate-950">还没开始</h2>
-                  <p className="text-sm leading-6 text-slate-600">
-                    点下开始后，我们会先把想法拆开看；遇到关键空白会问你，不会擅自替你补答案。
-                  </p>
-                  <Button disabled={busy} onClick={() => void startWorkflow()}>
-                    {busy ? '正在开始' : '开始梳理'}
-                  </Button>
-                </CardBody>
-              </Card>
-            ) : null}
-
-            {status.current_stage === 'requirement_clarification' ? (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-bold text-slate-950">有几件事想问你</h2>
-                </CardHeader>
-                <CardBody className="grid gap-3">
-                  <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700">
-                    {questions.map((question, index) => (
-                      <li key={index}>{questionText(question, index)}</li>
-                    ))}
-                  </ol>
-                  <Textarea
-                    aria-label="澄清回复"
-                    onChange={(event) => setAnswer(event.target.value)}
-                    placeholder="怎么回答都行。暂时没想好也请说出来，我们会把不确定的地方留在台面上。"
-                    value={answer}
-                  />
-                  {actionError ? (
-                    <p className="text-sm font-medium text-red-700" role="alert">
-                      {actionError}
-                    </p>
-                  ) : null}
-                  <Button disabled={busy} onClick={() => void submitClarification()}>
-                    {busy ? '正在继续' : '答完继续'}
-                  </Button>
-                </CardBody>
-              </Card>
-            ) : null}
-
-            {failureMessage ? (
-              <Card className="border-red-200 bg-red-50">
-                <CardBody className="grid gap-3">
-                  <h2 className="text-sm font-bold text-red-800">这次没走完</h2>
-                  <p className="text-sm leading-6 text-red-700" role="alert">
-                    {actionError ?? failureMessage}
-                  </p>
-                  <Button
-                    className="w-fit"
-                    disabled={busy}
-                    onClick={() => void startWorkflow()}
-                    variant="danger"
-                  >
-                    {busy ? '正在再试一次' : '再试一次'}
-                  </Button>
-                </CardBody>
-              </Card>
+            {conversationId ? (
+              <ClarificationConversation
+                actionError={actionError}
+                answer={answer}
+                busy={busy}
+                canAdvance={status.waiting_for === 'review' && Boolean(status.next_stage)}
+                canReply={Boolean(status.waiting_for)}
+                currentQuestions={status.clarification_questions ?? []}
+                historyError={messagesQuery.error}
+                isLoading={messagesQuery.isLoading}
+                messages={messagesQuery.data?.items ?? []}
+                onAnswerChange={setAnswer}
+                onAdvance={() => void advanceCheckpoint()}
+                onRetryHistory={() => void messagesQuery.refetch()}
+                onSubmit={() => void submitClarification()}
+                stageName={status.stage_display_name}
+              />
             ) : null}
           </aside>
         </div>

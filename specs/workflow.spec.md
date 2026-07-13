@@ -70,6 +70,23 @@ INIT
 | 循环控制 | `MAX_CLARIFICATION_ROUNDS = 5`                                     |
 | 输出     | `{needs_more_clarification: bool, clarification_questions: [...]}` |
 
+同一轮澄清复用一个 conversation。Agent 问题与用户回复按顺序写入 `messages`，
+刷新页面后可通过 `workflow/status.conversation_id` 恢复；达到 5 轮后使用现有信息继续后续阶段。
+
+### 4.2.1 人工检查点
+
+工作流在以下产出完成后暂停，用户可与 Agent 多轮讨论，再通过确认按钮进入下一环节：
+
+| 当前阶段                    | 讨论重点         | 确认后进入                |
+| --------------------------- | ---------------- | ------------------------- |
+| `requirement_clarification` | 需求范围与优先级 | `multi_model_analysis`    |
+| `requirement_synthesis`     | 需求取舍         | `feasibility_analysis`    |
+| `mvp_compression`           | 首版范围         | `platform_recommendation` |
+| `platform_recommendation`   | 技术方案         | `planning_generation`     |
+
+状态接口以 `waiting_for=reply` 表示 Agent 还需要信息，以 `waiting_for=review` 表示用户可继续讨论或确认推进。
+已确认的讨论历史会作为后续分析和规划生成的上下文，不能只保留在页面展示层。
+
 ### 4.3 MULTI_MODEL_ANALYSIS
 
 | 属性        | 值                                       |

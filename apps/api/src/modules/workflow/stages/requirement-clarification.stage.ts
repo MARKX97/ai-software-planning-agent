@@ -45,6 +45,7 @@ export class RequirementClarificationStage implements StageProcessor {
     const prompt = renderPrompt(CLARIFICATION_PROMPT, {
       questions: JSON.stringify(questions),
       conversationHistory: ctx.conversationHistory || '(none)',
+      clarificationRound: String(ctx.clarificationRound),
     });
     const response = await this.deps.orchestrator.callSingle('glm', prompt, {
       outputSchema: clarificationSchema,

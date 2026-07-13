@@ -13,7 +13,7 @@
 
 - 状态数: 12
 - 转换边: 17
-- 循环: 1（澄清循环）
+- 循环: 1（澄清对话循环）
 - 终态: 2（COMPLETED, FAILED）
 
 ## 2. 阶段状态
@@ -51,6 +51,9 @@ PLANNING_GENERATION         → { COMPLETED, FAILED }
 COMPLETED                   → { }
 FAILED                      → { }
 ```
+
+`requirement_clarification`、`requirement_synthesis`、`mvp_compression` 和
+`platform_recommendation` 完成后进入等待状态。等待期间允许多轮讨论，只有用户确认后才走到矩阵中的下一阶段。
 
 ## 5. 进度计算
 

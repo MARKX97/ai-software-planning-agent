@@ -76,40 +76,89 @@ describe('real HTTP + PostgreSQL workflow integration', () => {
           body: '{}',
         });
         assert.equal(run.response.status, 202);
-        assert.equal(bodyOf(run)['current_stage'], 'requirement_clarification');
+        const runBody = bodyOf(run);
+        assert.equal(runBody['current_stage'], 'requirement_clarification');
+        assert.equal(typeof runBody['conversation_id'], 'string');
+        const conversationId = runBody['conversation_id'] as string;
         const waiting = await request(`/projects/${projectId}/workflow/status`);
         assert.equal(bodyOf(waiting)['current_stage'], 'requirement_clarification');
+        const firstMessages = await request(
+          `/projects/${projectId}/conversations/${conversationId}/messages?offset=0&limit=20`,
+        );
+        assert.equal(bodyOf(firstMessages)['total'], 1);
+        const continuedOnce = await request(`/projects/${projectId}/workflow/continue`, {
+          method: 'POST',
+          body: JSON.stringify({
+            conversation_id: conversationId,
+            message: 'The primary user is a product manager in Shanghai.',
+          }),
+        });
+        assert.equal(continuedOnce.response.status, 202);
+        assert.equal(bodyOf(continuedOnce)['current_stage'], 'requirement_clarification');
+        const multiRoundMessages = await request(
+          `/projects/${projectId}/conversations/${conversationId}/messages?offset=0&limit=20`,
+        );
+        assert.equal(bodyOf(multiRoundMessages)['total'], 3);
+        const continuedTwice = await request(`/projects/${projectId}/workflow/continue`, {
+          method: 'POST',
+          body: JSON.stringify({
+            conversation_id: conversationId,
+            message: 'Success means 40 percent of users choose one recommendation.',
+          }),
+        });
+        assert.equal(continuedTwice.response.status, 202);
+        assert.equal(bodyOf(continuedTwice)['waiting_for'], 'review');
+        const requirementsConversation = bodyOf(continuedTwice)['conversation_id'] as string;
+        const requirementDiscussion = await request(`/projects/${projectId}/workflow/discuss`, {
+          method: 'POST',
+          body: JSON.stringify({
+            conversation_id: requirementsConversation,
+            message: '首版先保证推荐结果真实可执行，会员功能以后再说。',
+          }),
+        });
+        assert.equal(requirementDiscussion.response.status, 202);
+        const synthesis = await request(`/projects/${projectId}/workflow/advance`, {
+          method: 'POST',
+          body: JSON.stringify({ conversation_id: requirementsConversation }),
+        });
+        assert.equal(synthesis.response.status, 202);
+        assert.equal(bodyOf(synthesis)['current_stage'], 'requirement_synthesis');
+        assert.equal(bodyOf(synthesis)['waiting_for'], 'review');
+        const synthesisConversation = bodyOf(synthesis)['conversation_id'] as string;
+        const mvp = await request(`/projects/${projectId}/workflow/advance`, {
+          method: 'POST',
+          body: JSON.stringify({ conversation_id: synthesisConversation }),
+        });
+        assert.equal(mvp.response.status, 202);
+        assert.equal(bodyOf(mvp)['current_stage'], 'mvp_compression');
+        const mvpConversation = bodyOf(mvp)['conversation_id'] as string;
+        const platform = await request(`/projects/${projectId}/workflow/advance`, {
+          method: 'POST',
+          body: JSON.stringify({ conversation_id: mvpConversation }),
+        });
+        assert.equal(platform.response.status, 202);
+        assert.equal(bodyOf(platform)['current_stage'], 'platform_recommendation');
+        const platformConversation = bodyOf(platform)['conversation_id'] as string;
+        const completed = await request(`/projects/${projectId}/workflow/advance`, {
+          method: 'POST',
+          body: JSON.stringify({ conversation_id: platformConversation }),
+        });
+        assert.equal(completed.response.status, 202);
+        assert.equal(bodyOf(completed)['current_stage'], 'completed');
 
-        const conversation = await request(`/projects/${projectId}/conversations`, {
+        const standaloneConversation = await request(`/projects/${projectId}/conversations`, {
           method: 'POST',
           body: '{}',
         });
-        assert.equal(conversation.response.status, 201);
-        const conversationBody = bodyOf(conversation);
-        assert.equal(typeof conversationBody['id'], 'string');
-        const message = await request(
-          `/projects/${projectId}/conversations/${conversationBody['id'] as string}/messages`,
-          {
-            method: 'POST',
-            body: JSON.stringify({ content: 'The target user is a product manager.' }),
-          },
+        assert.equal(standaloneConversation.response.status, 201);
+        const standaloneId = bodyOf(standaloneConversation)['id'] as string;
+        const standaloneMessage = await request(
+          `/projects/${projectId}/conversations/${standaloneId}/messages`,
+          { method: 'POST', body: JSON.stringify({ content: 'A standalone note.' }) },
         );
-        assert.equal(message.response.status, 201);
-        const messages = await request(
-          `/projects/${projectId}/conversations/${conversationBody['id'] as string}/messages?offset=0&limit=20`,
-        );
-        assert.equal(bodyOf(messages)['total'], 1);
-        const continued = await request(`/projects/${projectId}/workflow/continue`, {
-          method: 'POST',
-          body: JSON.stringify({
-            conversation_id: conversationBody['id'],
-            message: 'The primary user is a product manager.',
-          }),
-        });
-        assert.equal(continued.response.status, 202);
-        assert.equal(bodyOf(continued)['status'], 'completed');
-        const completed = await request(`/projects/${projectId}/workflow/status`);
-        assert.equal(bodyOf(completed)['current_stage'], 'completed');
+        assert.equal(standaloneMessage.response.status, 201);
+        const statusAfterStandalone = await request(`/projects/${projectId}/workflow/status`);
+        assert.equal(bodyOf(statusAfterStandalone)['conversation_id'], platformConversation);
 
         const states = await request(`/projects/${projectId}/workflow/states`);
         const statesBody = bodyOf(states);
@@ -171,10 +220,17 @@ describe('real HTTP + PostgreSQL workflow integration', () => {
 
         const logs = await request(`/projects/${projectId}/usage/logs?offset=0&limit=100`);
         assert.ok(Number(bodyOf(logs)['total']) > 0);
-        const logId = (bodyOf(logs)['items'] as Array<{ id: string }>)[0]?.id;
+        const logItems = bodyOf(logs)['items'] as Array<{ id: string; stage: string }>;
+        const logId = logItems[0]?.id;
         assert.ok(logId);
         const log = await request(`/projects/${projectId}/usage/logs/${logId}`);
         assert.equal(log.response.status, 200);
+        const feasibilityLog = logItems.find((item) => item.stage === 'feasibility_analysis');
+        assert.ok(feasibilityLog);
+        const feasibilityDetail = await request(
+          `/projects/${projectId}/usage/logs/${feasibilityLog.id}`,
+        );
+        assert.match(bodyOf(feasibilityDetail)['prompt_text'] as string, /会员功能以后再说/);
       } finally {
         if (projectId) {
           const cleanup = await request(`/projects/${projectId}`, { method: 'DELETE' });

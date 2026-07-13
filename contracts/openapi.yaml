@@ -376,11 +376,16 @@ components:
 
     WorkflowStatusResponse:
       type: object
-      required: [project_id, status, current_stage, stage_display_name, progress, updated_at]
+      required: [project_id, conversation_id, status, current_stage, stage_display_name, progress, updated_at]
       properties:
         project_id:
           type: string
           format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: 当前工作流检查点会话 ID；尚未开始时为空
         status:
           $ref: "#/components/schemas/ProjectStatus"
         current_stage:
@@ -391,6 +396,15 @@ components:
           example: "需求分析"
         progress:
           $ref: "#/components/schemas/WorkflowProgress"
+        waiting_for:
+          type: string
+          nullable: true
+          enum: [reply, review]
+          description: reply 表示等待补充信息；review 表示可讨论或确认推进
+        next_stage:
+          $ref: "#/components/schemas/WorkflowStage"
+          nullable: true
+          description: 确认当前检查点后将进入的阶段
         clarification_questions:
           type: array
           nullable: true
@@ -425,6 +439,15 @@ components:
           minLength: 1
           maxLength: 50000
           description: 用户对澄清问题的回复
+
+    AdvanceWorkflowRequest:
+      type: object
+      required: [conversation_id]
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+          description: 当前检查点会话 ID
 
     # ─── Workflow State ───
     WorkflowStateResponse:
@@ -1403,6 +1426,58 @@ paths:
                     current_stage: "multi_model_analysis"
                     expected_stage: "requirement_clarification"
 
+  /projects/{project_id}/workflow/discuss:
+    post:
+      tags: [Workflow]
+      summary: 讨论当前检查点
+      description: 在等待用户确认的检查点中发送一条消息，Agent 会基于当前阶段结果回复；不会自动推进工作流。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContinueWorkflowRequest"
+      responses:
+        "202":
+          description: Agent 已回复
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStatusResponse"
+
+  /projects/{project_id}/workflow/advance:
+    post:
+      tags: [Workflow]
+      summary: 确认并进入下一环节
+      description: 关闭当前检查点会话，并执行到下一个需要用户决策的检查点或工作流完成。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdvanceWorkflowRequest"
+      responses:
+        "202":
+          description: 工作流已推进
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStatusResponse"
+
   /projects/{project_id}/workflow/states:
     get:
       tags: [Workflow]
@@ -2191,6 +2266,8 @@ paths:
 # POST   /projects/{project_id}/run                      启动工作流
 # GET    /projects/{project_id}/workflow/status          工作流状态
 # POST   /projects/{project_id}/workflow/continue        继续工作流
+# POST   /projects/{project_id}/workflow/discuss          讨论当前检查点
+# POST   /projects/{project_id}/workflow/advance          确认进入下一环节
 # GET    /projects/{project_id}/workflow/states           阶段状态快照
 # GET    /projects/{project_id}/workflow/executions       执行历史
 # GET    /projects/{project_id}/workflow/executions/{eid} 执行详情
