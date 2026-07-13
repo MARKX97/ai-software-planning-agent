@@ -135,49 +135,47 @@ describe('MockLLMProvider', () => {
     assert.deepEqual(res.structuredOutput, { mock: true });
   });
   it('supports multiple clarification rounds before continuing', async () => {
-    const schema = z.object({
-      needs_more_clarification: z.boolean(),
-      clarification_questions: z.array(z.object({ question: z.string() })),
-    });
     const provider = new MockLLMProvider('glm');
     const first = await provider.chat(
-      'needs_more_clarification\nClarification replies received: 0',
-      {
-        outputSchema: schema,
-      },
+      'WORKFLOW_REQUIREMENT_CLARIFICATION\nClarification replies received: 0',
     );
     const second = await provider.chat(
-      'needs_more_clarification\nClarification replies received: 1',
-      {
-        outputSchema: schema,
-      },
+      'WORKFLOW_REQUIREMENT_CLARIFICATION\nClarification replies received: 1',
     );
     const continued = await provider.chat(
-      'needs_more_clarification\nClarification replies received: 2',
-      { outputSchema: schema },
+      'WORKFLOW_REQUIREMENT_CLARIFICATION\nClarification replies received: 2',
     );
-    assert.deepEqual(first.structuredOutput, {
-      needs_more_clarification: true,
-      clarification_questions: [
-        { question: '首版主要想服务哪个城市？' },
-        { question: '用户做选择时，最看重省时间、控制预算，还是吃得健康？' },
-      ],
-    });
-    assert.deepEqual(second.structuredOutput, {
-      needs_more_clarification: true,
-      clarification_questions: [{ question: '首版上线后，你最想用哪个数字判断它有没有帮到用户？' }],
-    });
-    assert.deepEqual(continued.structuredOutput, {
-      needs_more_clarification: false,
-      clarification_questions: [],
-    });
+    assert.match(first.content, /首版主要服务哪个城市/);
+    assert.match(second.content, /最后一个问题/);
+    assert.match(continued.content, /足够清楚/);
   });
   it('returns a grounded reply for checkpoint discussions', async () => {
     const provider = new MockLLMProvider('glm');
-    const result = await provider.chat('WORKFLOW_CHECKPOINT_DISCUSSION\nCheckpoint: MVP 取舍', {
-      outputSchema: z.object({ reply: z.string() }),
-    });
-    assert.match(result.structuredOutput?.reply ?? '', /MVP 取舍/);
+    const chunks: string[] = [];
+    const result = await provider.chatStream(
+      'WORKFLOW_CHECKPOINT_DISCUSSION\nCheckpoint: MVP 取舍',
+      {
+        onDelta: (content) => chunks.push(content),
+      },
+    );
+    assert.match(result.content, /MVP 取舍/);
+    assert.equal(chunks.join(''), result.content);
+  });
+  it('varies repeated checkpoint replies using the latest user feedback', async () => {
+    const provider = new MockLLMProvider('glm');
+    const budget = await provider.chat(
+      'WORKFLOW_CHECKPOINT_DISCUSSION\nCheckpoint: MVP 取舍\nuser: 首版预算要控制住',
+    );
+    const scope = await provider.chat(
+      'WORKFLOW_CHECKPOINT_DISCUSSION\nCheckpoint: MVP 取舍\nuser: 登录功能以后再做',
+    );
+    const deferredPlatform = await provider.chat(
+      'WORKFLOW_CHECKPOINT_DISCUSSION\nCheckpoint: 平台推荐\nuser: 移动端和微信小程序以后再评估',
+    );
+    assert.match(budget.content, /预算优先级/);
+    assert.match(scope.content, /移出首版/);
+    assert.match(deferredPlatform.content, /移出首版/);
+    assert.notEqual(budget.content, scope.content);
   });
   it('returns schema-valid content for every demo stage', async () => {
     const provider = new MockLLMProvider('deepseek');

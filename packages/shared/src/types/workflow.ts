@@ -32,3 +32,21 @@ export interface WorkflowContext {
 
 /** Maximum number of clarification rounds before forcing progression. */
 export const MAX_CLARIFICATION_ROUNDS = 5;
+
+export interface WorkflowStreamError {
+  readonly code: string;
+  readonly message: string;
+  readonly details?: Record<string, unknown>;
+}
+
+/** Wire-level SSE event shared by API producers and stream consumers. */
+export type WorkflowStreamEvent<TMessage = unknown, TStatus = unknown> =
+  | { readonly event: 'delta'; readonly data: { readonly content: string } }
+  | {
+      readonly event: 'done';
+      readonly data: { readonly assistant_message: TMessage; readonly status: TStatus };
+    }
+  | {
+      readonly event: 'error';
+      readonly data: { readonly error: WorkflowStreamError; readonly retryable: boolean };
+    };

@@ -27,9 +27,23 @@ describe('llm schemas', () => {
       core_problems: ['no plan'],
       requirement_points: [validRequirementPoint],
       assumptions: ['budget ok'],
-      clarification_questions: ['who?'],
+      clarification_questions: [
+        { question: 'Who is the first user?', context: 'Defines MVP scope', category: 'user' },
+      ],
     });
     assert.ok(r.success);
+  });
+
+  it('rejects legacy string-only clarification questions', () => {
+    const r = requirementAnalysisSchema.safeParse({
+      project_summary: 'x',
+      target_users: [],
+      core_problems: [],
+      requirement_points: [],
+      assumptions: [],
+      clarification_questions: ['who?'],
+    });
+    assert.equal(r.success, false);
   });
 
   it('rejects requirement-analysis with missing required field', () => {

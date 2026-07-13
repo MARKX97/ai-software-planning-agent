@@ -19,7 +19,11 @@ const context: WorkflowContext = {
     [WorkflowStage.REQUIREMENT_ANALYSIS]: {
       stage: WorkflowStage.REQUIREMENT_ANALYSIS,
       content: 'analysis',
-      structuredOutput: { clarification_questions: ['scope?'] },
+      structuredOutput: {
+        clarification_questions: [
+          { question: 'scope?', context: 'scope matters', category: 'scope' },
+        ],
+      },
     },
   } as never,
 };
@@ -56,15 +60,14 @@ describe('workflow stage processors', () => {
       const logs: unknown[] = [];
       const stage = new RequirementClarificationStage({
         orchestrator: {
-          callSingle: async () =>
-            response('glm', {
-              needs_more_clarification: needsMore,
-              clarification_questions: [],
-            }),
+          callSingle: async () => response('glm', null),
         },
         db: db(logs),
       } as never);
-      const result = await stage.execute(context);
+      const result = await stage.execute({
+        ...context,
+        clarificationRound: needsMore ? 0 : 5,
+      });
       assert.equal(
         (result as { needsMoreClarification: boolean }).needsMoreClarification,
         needsMore,
@@ -126,7 +129,7 @@ describe('workflow stage processors', () => {
         }),
       (error: unknown) =>
         error instanceof AppException &&
-        error.code === ErrorCode.LLM_ERROR &&
+        error.code === ErrorCode.LLM_NETWORK_ERROR &&
         error.message === '暂时无法连接模型服务，请稍后重试。',
     );
   });

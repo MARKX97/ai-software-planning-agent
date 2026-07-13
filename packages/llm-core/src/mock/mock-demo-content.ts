@@ -1,3 +1,6 @@
+import { mockArtifact } from './mock-artifact.js';
+import { mockCheckpointDiscussion } from './mock-discussion.js';
+
 const requirementPoint = {
   id: 'REQ-1',
   title: '按真实约束推荐晚餐',
@@ -7,10 +10,10 @@ const requirementPoint = {
   user_story: '作为忙碌的上班族，我想快速得到靠谱的晚餐选择，不再反复纠结。',
 };
 
-const demoResponses: Array<[string, (provider: string) => unknown]> = [
+const demoResponses: Array<[string, (provider: string, prompt: string) => unknown]> = [
   [
     'RequirementAnalysisResult schema',
-    () => ({
+    (_provider, prompt) => ({
       project_summary: '一个帮助忙碌上班族快速决定今晚吃什么的晚餐助手。',
       target_users: ['工作日没有精力做决定的上班族', '需要同时照顾预算和忌口的家庭'],
       core_problems: ['晚餐决策耗时', '推荐不考虑真实限制', '做饭和外出就餐的信息分散'],
@@ -26,10 +29,7 @@ const demoResponses: Array<[string, (provider: string) => unknown]> = [
         },
       ],
       assumptions: ['首版服务一个城市', '首版不直接下单或支付'],
-      clarification_questions: [
-        '首版主要服务哪个城市？',
-        '用户更看重省时间、控制预算还是吃得健康？',
-      ],
+      clarification_questions: mockRequirementQuestions(prompt),
     }),
   ],
   [
@@ -139,70 +139,48 @@ const demoResponses: Array<[string, (provider: string) => unknown]> = [
   ],
 ];
 
-const artifactTitles: Record<string, string> = {
-  requirement_report: '需求分析报告',
-  feasibility_report: '可行性分析报告',
-  risk_report: '风险清单',
-  mvp_plan: 'MVP 计划',
-  platform_recommendation: '技术平台建议',
-  project_plan: '项目推进计划',
-  prd: '今晚吃什么 PRD',
-  architecture: '系统架构说明',
-  frontend_spec: '前端体验规格',
-  backend_spec: '后端接口规格',
-  ai_coding_rules: 'AI 编码约定',
-};
-
 /** Return deterministic, coherent content for local end-to-end demos. */
 export function mockContent(provider: string, prompt: string): string {
   if (prompt.includes('Artifact type to generate:')) return mockArtifact(prompt);
   if (prompt.includes('WORKFLOW_CHECKPOINT_DISCUSSION')) return mockCheckpointDiscussion(prompt);
-  if (prompt.includes('needs_more_clarification')) return mockClarification(prompt);
+  if (prompt.includes('WORKFLOW_REQUIREMENT_CLARIFICATION')) return mockClarification(prompt);
   const match = demoResponses.find(([marker]) => prompt.includes(marker));
-  return JSON.stringify(match ? match[1](provider) : { mock: true, provider });
+  return JSON.stringify(match ? match[1](provider, prompt) : { mock: true, provider });
 }
 
-function mockCheckpointDiscussion(prompt: string): string {
-  const checkpoint = prompt.match(/Checkpoint: (.+)/)?.[1] ?? '当前方案';
-  return JSON.stringify({
-    reply: `我记下了你对${checkpoint}的反馈。这个取舍会带入后续规划；如果还有顾虑，可以继续聊，准备好后再确认进入下一环节。`,
-  });
+function mockRequirementQuestions(prompt: string): unknown[] {
+  const replies = prompt.match(/^user:/gm)?.length ?? 0;
+  if (replies >= 2) return [];
+  if (replies === 1) {
+    return [
+      {
+        question: '首版上线后，你最想用哪个数字判断它有没有帮到用户？',
+        context: '明确成功标准，才能决定首版需要记录哪些反馈。',
+        category: 'business',
+      },
+    ];
+  }
+  return [
+    {
+      question: '首版主要服务哪个城市？',
+      context: '地点数据和可用服务会因城市而不同。',
+      category: 'scope',
+    },
+    {
+      question: '用户更看重省时间、控制预算还是吃得健康？',
+      context: '这会决定推荐排序和首页默认项。',
+      category: 'user',
+    },
+  ];
 }
 
 function mockClarification(prompt: string): string {
   const replyCount = Number(prompt.match(/Clarification replies received:\s*(\d+)/)?.[1] ?? 0);
   const firstRound = replyCount === 0;
   const secondRound = replyCount === 1;
-  const questions = firstRound
-    ? [
-        {
-          question: '首版主要想服务哪个城市？',
-          context: '地点数据和可用服务会因城市而不同。',
-          category: 'scope',
-        },
-        {
-          question: '用户做选择时，最看重省时间、控制预算，还是吃得健康？',
-          context: '这会决定推荐排序和首页默认项。',
-          category: 'user',
-        },
-      ]
-    : secondRound
-      ? [
-          {
-            question: '首版上线后，你最想用哪个数字判断它有没有帮到用户？',
-            context: '明确成功标准，才能决定首版需要记录哪些反馈。',
-            category: 'business',
-          },
-        ]
-      : [];
-  return JSON.stringify({
-    needs_more_clarification: questions.length > 0,
-    clarification_questions: questions,
-  });
-}
-
-function mockArtifact(prompt: string): string {
-  const type = prompt.match(/Artifact type to generate:\n([a-z_]+)/)?.[1] ?? 'project_plan';
-  const title = artifactTitles[type] ?? '项目文档';
-  return `# ${title}\n\n> 本地演示模式生成，用于体验完整流程。\n\n## 目标\n\n帮助忙碌的上班族在一分钟内决定今晚吃什么，并得到三种真正能执行的方案。\n\n## 首版范围\n\n- 收集人数、预算、忌口和可用时间\n- 给出三种带时间、花费和理由的方案\n- 支持收藏与不喜欢反馈\n- 暂不处理支付、配送和商户后台\n\n## 验收标准\n\n1. 用户不登录也能完成一次推荐。\n2. 提交条件后 3 秒内展示结果。\n3. 每种方案都说明预计时间、花费和推荐理由。\n4. 第三方数据不可用时，仍能给出可执行的家庭餐方案。`;
+  if (firstRound) {
+    return '先补两件事：首版主要服务哪个城市？用户更看重省时间、控制预算，还是吃得健康？';
+  }
+  if (secondRound) return '还有最后一个问题：首版上线后，你最想用哪个数字判断它有没有帮到用户？';
+  return '现在已经足够清楚了。你可以再检查一遍需求范围，确认后我们继续往下走。';
 }

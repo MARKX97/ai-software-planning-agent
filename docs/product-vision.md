@@ -1,6 +1,6 @@
 # Product Vision
 
-> Version: 1.0.0
+> Version: 1.1.0
 > Status: Product Source of Truth
 
 ---
@@ -47,7 +47,7 @@ Idea → Requirement Analysis → Requirement Clarification
 → Platform Recommendation → Planning Generation
 ```
 
-需求澄清、需求范围、MVP 取舍和技术方案是用户可参与的检查点。用户可在每个检查点与 Agent 多轮讨论，确认后才推进到下一环节；讨论结论会进入后续分析和最终规划。
+需求澄清、需求范围、MVP 取舍和技术方案是用户可参与的检查点。用户可在每个检查点与 Agent 实时、多轮讨论，边生成边阅读，确认后才推进到下一环节；讨论结论会进入后续分析和最终规划。
 
 ## 多模型分析
 
@@ -63,7 +63,7 @@ Idea → Requirement Analysis → Requirement Clarification
 
 ### 第一版必须支持
 
-- 多轮需求沟通与关键检查点确认
+- 实时多轮需求沟通与关键检查点确认
 - 多模型分析
 - 需求融合
 - 风险分析

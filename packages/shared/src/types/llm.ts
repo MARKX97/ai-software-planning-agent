@@ -73,6 +73,14 @@ export interface LLMCallOptions {
   readonly projectId?: string;
 }
 
+/** Options for a streamed single-model call. */
+export interface LLMStreamOptions extends LLMCallOptions {
+  /** Receives each text delta in provider order. */
+  readonly onDelta: (content: string) => void | Promise<void>;
+  /** Cancels the upstream request when the client disconnects. */
+  readonly signal?: AbortSignal;
+}
+
 /** Normalized response from a single model invocation. */
 export interface LLMResponse {
   /** Provider logical name. */

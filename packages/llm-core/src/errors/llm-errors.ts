@@ -63,6 +63,13 @@ export class LLMNetworkError extends LLMError {
   }
 }
 
+/** Raised when the caller cancels an in-flight model request. Not retryable. */
+export class LLMCancelledError extends LLMError {
+  constructor(message = 'LLM call cancelled') {
+    super('LLM_CANCELLED', message);
+  }
+}
+
 /** True for errors the retry policy should retry (spec §2). */
 export function isRetryable(error: unknown): boolean {
   return (

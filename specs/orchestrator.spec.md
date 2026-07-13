@@ -1,6 +1,6 @@
 # AI Orchestrator — System Contract
 
-> Version: 1.0.0
+> Version: 1.1.0
 > Status: Contract
 > Owner: AI Infrastructure Lead
 > Tokens: ~4,000
@@ -25,7 +25,19 @@ callMulti(prompt: string, options?: LLMCallOptions): Promise<Record<string, LLMR
 
 并行调用所有已注册 Provider。部分失败返回 null，全失败抛 AllModelsFailedError。
 
-### 1.3 callWithFallback
+### 1.3 callSingleStream
+
+```typescript
+callSingleStream(
+  providerName: string,
+  prompt: string,
+  options: LLMStreamOptions,
+): Promise<LLMResponse>
+```
+
+单模型流式调用。继续执行预算检查、CallTracker、成本聚合和统一错误映射；`onDelta` 只负责向调用方传递增量文本。
+
+### 1.4 callWithFallback
 
 ```
 callWithFallback(providerNames: string[], prompt: string, options?: LLMCallOptions): Promise<LLMResponse>
@@ -33,7 +45,7 @@ callWithFallback(providerNames: string[], prompt: string, options?: LLMCallOptio
 
 按优先级依次尝试，第一个成功即返回。
 
-### 1.4 healthCheck
+### 1.5 healthCheck
 
 ```
 healthCheck(): Promise<Record<string, boolean>>
@@ -50,6 +62,8 @@ healthCheck(): Promise<Record<string, boolean>>
 | 网络错误                 | ✅       | 3        | 1s → 2s → 4s |
 | LLMAuthError             | ❌       | 0        | —            |
 | LLMSchemaValidationError | ❌       | 0        | —            |
+
+流式调用只允许在第一个 delta 之前自动重试。任意文本已经输出后不得自动重试，避免客户端收到重复内容。`AbortSignal` 取消不重试；Orchestrator 只记录 CallTracker 失败统计，Workflow 层负责将对应 `workflow_execution` 标记为 `cancelled`。
 
 ## 3. 超时策略
 
@@ -97,6 +111,8 @@ getStats(): {
   byProvider: Record<string, { calls, success, failed }>
 }
 ```
+
+流式调用只有在完整结束并取得最终 usage 后才向 CallTracker 写入成功调用、Token 与成本；取消或失败按 0 Token、0 成本写入失败统计，不估算半条回复成本。数据库 execution 与模型调用日志由 Workflow 层负责。
 
 ## 7. 依赖约束
 

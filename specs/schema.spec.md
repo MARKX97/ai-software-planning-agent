@@ -33,14 +33,16 @@
 
 ### 2.2 RequirementAnalysisResult
 
-| 字段                      | 类型               | 必填 |
-| ------------------------- | ------------------ | ---- |
-| `project_summary`         | string             | 是   |
-| `target_users`            | string[]           | 是   |
-| `core_problems`           | string[]           | 是   |
-| `requirement_points`      | RequirementPoint[] | 是   |
-| `assumptions`             | string[]           | 是   |
-| `clarification_questions` | string[]           | 是   |
+| 字段                      | 类型                    | 必填 |
+| ------------------------- | ----------------------- | ---- |
+| `project_summary`         | string                  | 是   |
+| `target_users`            | string[]                | 是   |
+| `core_problems`           | string[]                | 是   |
+| `requirement_points`      | RequirementPoint[]      | 是   |
+| `assumptions`             | string[]                | 是   |
+| `clarification_questions` | ClarificationQuestion[] | 是   |
+
+`ClarificationQuestion`: `{ question: string, context: string, category: user|scope|tech|business|risk }`
 
 ### 2.3 MultiModelAnalysisResult
 

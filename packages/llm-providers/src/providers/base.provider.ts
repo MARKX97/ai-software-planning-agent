@@ -1,4 +1,10 @@
-import type { LLMCallOptions, LLMResponse, ModelPricing } from '@ai-planning/shared';
+import type {
+  LLMCallOptions,
+  LLMRequest,
+  LLMResponse,
+  LLMStreamOptions,
+  ModelPricing,
+} from '@ai-planning/shared';
 import type { ILLMHttpClient } from '@ai-planning/llm-core';
 import type { ILLMProvider } from '@ai-planning/llm-core';
 import { calculateCost } from '@ai-planning/llm-core';
@@ -25,15 +31,34 @@ export abstract class BaseProvider implements ILLMProvider {
   async chat(prompt: string, options?: LLMCallOptions): Promise<LLMResponse> {
     const start = Date.now();
     const timeout = options?.timeout ?? DEFAULT_TIMEOUT_MS;
-    const result = await this.httpClient.complete(
-      {
-        model: this.modelId,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: options?.temperature ?? 0.7,
-        maxTokens: options?.maxTokens ?? 4096,
-      },
-      timeout,
+    const result = await this.httpClient.complete(this.request(prompt, options), timeout);
+    return this.response(result, start, options);
+  }
+
+  async chatStream(prompt: string, options: LLMStreamOptions): Promise<LLMResponse> {
+    const start = Date.now();
+    const result = await this.httpClient.stream(
+      this.request(prompt, options),
+      options.timeout ?? DEFAULT_TIMEOUT_MS,
+      options,
     );
+    return this.response(result, start, options);
+  }
+
+  private request(prompt: string, options?: LLMCallOptions): LLMRequest {
+    return {
+      model: this.modelId,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: options?.temperature ?? 0.7,
+      maxTokens: options?.maxTokens ?? 4096,
+    };
+  }
+
+  private response(
+    result: Awaited<ReturnType<ILLMHttpClient['complete']>>,
+    start: number,
+    options?: LLMCallOptions,
+  ): LLMResponse {
     const usage = {
       inputTokens: result.usage.inputTokens,
       outputTokens: result.usage.outputTokens,

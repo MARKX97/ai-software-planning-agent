@@ -5,6 +5,7 @@ import { AppException } from '../../common/exception/app-exception.js';
 import { ErrorCode } from '../../common/exception/error-code.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import { buildStatusFromProject, type WorkflowStatusResponse } from './workflow-response.dto.js';
+import { workflowFailureMessage } from './workflow-execution-state.js';
 export async function createExecution(
   db: PrismaService,
   projectId: string,
@@ -46,28 +47,6 @@ export async function markProjectStarted(db: PrismaService, projectId: string): 
   });
 }
 
-export async function markExecutionComplete(db: PrismaService, executionId: string): Promise<void> {
-  await db.client.workflowExecution.update({
-    where: { id: executionId },
-    data: { status: 'success', completed_at: new Date() },
-  });
-}
-
-export async function markExecutionFailed(
-  db: PrismaService,
-  executionId: string,
-  error: unknown,
-): Promise<void> {
-  await db.client.workflowExecution.update({
-    where: { id: executionId },
-    data: {
-      status: 'failed',
-      error_message: workflowFailureMessage(error),
-      completed_at: new Date(),
-    },
-  });
-}
-
 export async function markProjectComplete(db: PrismaService, projectId: string): Promise<void> {
   await db.client.project.update({
     where: { id: projectId },
@@ -100,17 +79,6 @@ export async function markFailed(
       updated_at: new Date(),
     },
   });
-}
-
-function workflowFailureMessage(error: unknown): string {
-  if (error instanceof AppException) {
-    const response = error.getResponse();
-    if (typeof response === 'object' && response) {
-      const message = (response as { message?: unknown }).message;
-      if (typeof message === 'string') return message;
-    }
-  }
-  return '工作流执行失败，请稍后重试。';
 }
 
 export async function buildWorkflowStatus(

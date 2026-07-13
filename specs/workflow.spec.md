@@ -1,6 +1,6 @@
 # Workflow State Machine — System Contract
 
-> Version: 1.0.0
+> Version: 1.1.0
 > Status: Contract
 > Owner: Backend Lead
 > Tokens: ~5,000
@@ -63,15 +63,16 @@ INIT
 
 ### 4.2 REQUIREMENT_CLARIFICATION
 
-| 属性     | 值                                                                 |
-| -------- | ------------------------------------------------------------------ |
-| 触发     | 自动（从 REQUIREMENT_ANALYSIS 进入）                               |
-| 模型     | GLM（单模型）                                                      |
-| 循环控制 | `MAX_CLARIFICATION_ROUNDS = 5`                                     |
-| 输出     | `{needs_more_clarification: bool, clarification_questions: [...]}` |
+| 属性     | 值                                                                            |
+| -------- | ----------------------------------------------------------------------------- |
+| 触发     | 自动（从 REQUIREMENT_ANALYSIS 进入）                                          |
+| 模型     | GLM（单模型）                                                                 |
+| 循环控制 | `MAX_CLARIFICATION_ROUNDS = 5`                                                |
+| 输出     | 自然语言回复 + `{needs_more_clarification, clarification_questions}` 阶段决策 |
 
 同一轮澄清复用一个 conversation。Agent 问题与用户回复按顺序写入 `messages`，
 刷新页面后可通过 `workflow/status.conversation_id` 恢复；达到 5 轮后使用现有信息继续后续阶段。
+`needs_more_clarification` 由需求分析阶段尚未解决的结构化问题决定；GLM 只把这些问题组织成自然语言，不新增一次决策调用。
 
 ### 4.2.1 人工检查点
 
@@ -86,6 +87,13 @@ INIT
 
 状态接口以 `waiting_for=reply` 表示 Agent 还需要信息，以 `waiting_for=review` 表示用户可继续讨论或确认推进。
 已确认的讨论历史会作为后续分析和规划生成的上下文，不能只保留在页面展示层。
+
+### 4.2.2 流式对话一致性
+
+- `run`、`continue`、`discuss` 的模型回复通过 SSE 输出；流式期间不推进检查点。
+- 本轮用户消息只作为临时上下文传入模型。完整生成成功后，在一个事务中保存用户消息、助手消息和 conversation 更新时间。
+- 取消或失败不保存半条助手消息，也不重复保存用户消息；`continue/discuss` 恢复原检查点，`run` 可重新启动。
+- 客户端断开会取消上游模型请求并将 execution 标记为 `cancelled`。
 
 ### 4.3 MULTI_MODEL_ANALYSIS
 

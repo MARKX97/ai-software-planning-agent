@@ -7,8 +7,10 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UsePipes,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
 import { UUID_V4_PIPE } from '../../common/pipes/uuid-validation.pipe.js';
@@ -33,6 +35,7 @@ import type {
   WorkflowStateListResponse,
   WorkflowStatusResponse,
 } from './workflow-response.dto.js';
+import { WorkflowSse } from './workflow-sse.js';
 
 /**
  * Workflow endpoints — run, status, continue, states, executions, execution logs.
@@ -47,14 +50,14 @@ export class WorkflowController {
   constructor(private readonly workflow: WorkflowService) {}
 
   @Post('projects/:project_id/run')
-  @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: '启动工作流' })
   @UsePipes(new ZodValidationPipe(runWorkflowSchema))
   async run(
     @Param('project_id', UUID_V4_PIPE) projectId: string,
     @Body() body: RunWorkflowRequest,
-  ): Promise<WorkflowStatusResponse> {
-    return this.workflow.run(projectId, body);
+    @Res() response: Response,
+  ): Promise<void> {
+    return this.workflow.run(projectId, body, new WorkflowSse(response));
   }
 
   @Get('projects/:project_id/workflow/status')
@@ -66,25 +69,25 @@ export class WorkflowController {
   }
 
   @Post('projects/:project_id/workflow/continue')
-  @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: '继续工作流' })
   @UsePipes(new ZodValidationPipe(continueWorkflowSchema))
   async continue(
     @Param('project_id', UUID_V4_PIPE) projectId: string,
     @Body() body: ContinueWorkflowRequest,
-  ): Promise<WorkflowStatusResponse> {
-    return this.workflow.continue(projectId, body);
+    @Res() response: Response,
+  ): Promise<void> {
+    return this.workflow.continue(projectId, body, new WorkflowSse(response));
   }
 
   @Post('projects/:project_id/workflow/discuss')
-  @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: '讨论当前检查点' })
   @UsePipes(new ZodValidationPipe(discussWorkflowSchema))
   async discuss(
     @Param('project_id', UUID_V4_PIPE) projectId: string,
     @Body() body: DiscussWorkflowRequest,
-  ): Promise<WorkflowStatusResponse> {
-    return this.workflow.discuss(projectId, body);
+    @Res() response: Response,
+  ): Promise<void> {
+    return this.workflow.discuss(projectId, body, new WorkflowSse(response));
   }
 
   @Post('projects/:project_id/workflow/advance')

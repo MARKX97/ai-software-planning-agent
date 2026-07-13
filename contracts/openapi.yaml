@@ -25,7 +25,7 @@ info:
     - ID 格式: UUID v4
     - 分页: `offset` + `limit` (默认 20, 最大 100)
     - 错误格式: `{ error: { code, message, details } }`
-  version: '1.1.0'
+  version: '1.2.0'
   contact:
     name: AI Planning Agent Team
 
@@ -67,6 +67,18 @@ components:
       type: http
       scheme: bearer
       description: API Key 认证。在环境变量 `API_KEY` 为空时跳过认证。
+
+  headers:
+    SseCacheControl:
+      description: 禁止浏览器和代理缓存、转换 SSE 响应
+      schema:
+        type: string
+        const: no-cache, no-transform
+    SseBuffering:
+      description: 禁止 Nginx 缓冲 SSE 响应
+      schema:
+        type: string
+        const: 'no'
 
   # ─── Schemas ───
 
@@ -114,6 +126,8 @@ components:
                 - WORKFLOW_NOT_RUNNING
                 - WORKFLOW_STAGE_NOT_CLARIFICATION
                 - LLM_TIMEOUT
+                - LLM_NETWORK_ERROR
+                - LLM_CANCELLED
                 - LLM_ERROR
                 - ALL_MODELS_FAILED
                 - COST_LIMIT_EXCEEDED
@@ -452,6 +466,33 @@ components:
           minLength: 1
           maxLength: 50000
           description: 用户对澄清问题的回复
+
+    WorkflowStreamDeltaData:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          description: 本次新增的回复文本
+
+    WorkflowStreamDoneData:
+      type: object
+      required: [assistant_message, status]
+      properties:
+        assistant_message:
+          $ref: '#/components/schemas/MessageResponse'
+        status:
+          $ref: '#/components/schemas/WorkflowStatusResponse'
+
+    WorkflowStreamErrorData:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          required: [retryable]
+          properties:
+            retryable:
+              type: boolean
+              description: 客户端是否应提供重新生成操作
 
     AdvanceWorkflowRequest:
       type: object
@@ -1244,7 +1285,8 @@ paths:
         → PLATFORM_RECOMMENDATION → PLANNING_GENERATION → COMPLETED
 
         仅在 REQUIREMENT_CLARIFICATION 阶段暂停，等待用户输入。
-        其他阶段自动推进。
+        首次澄清回复使用 SSE 实时返回。事件顺序为多个 delta，随后恰好一个 done 或 error。
+        每 15 秒可能发送一个 SSE comment heartbeat。请求校验错误在流开始前仍使用 JSON ErrorResponse。
       parameters:
         - name: project_id
           in: path
@@ -1265,37 +1307,38 @@ paths:
                   format: uuid
                   description: 关联的对话 ID (可选，不传则自动创建)
       responses:
-        '202':
-          description: 工作流已启动
+        '200':
+          description: 工作流已启动，流式返回首次澄清回复
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/SseCacheControl'
+            X-Accel-Buffering:
+              $ref: '#/components/headers/SseBuffering'
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              x-sse-events:
+                delta:
+                  $ref: '#/components/schemas/WorkflowStreamDeltaData'
+                done:
+                  $ref: '#/components/schemas/WorkflowStreamDoneData'
+                error:
+                  $ref: '#/components/schemas/WorkflowStreamErrorData'
+              example: |
+                event: delta
+                data: {"content":"先聊两件事："}
+
+                event: done
+                data: {"assistant_message":{"id":"770e8400-e29b-41d4-a716-446655440002","conversation_id":"660e8400-e29b-41d4-a716-446655440001","role":"assistant","content":"先聊两件事：...","metadata":null,"created_at":"2026-07-14T02:00:00Z"},"status":{"project_id":"550e8400-e29b-41d4-a716-446655440000","conversation_id":"660e8400-e29b-41d4-a716-446655440001","status":"active","current_stage":"requirement_clarification","stage_display_name":"需求澄清","progress":{"completed_stages":1,"total_stages":9,"percentage":11.1},"waiting_for":"reply","clarification_questions":[],"updated_at":"2026-07-14T02:00:00Z"}}
+        '400':
+          description: 请求参数无效
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkflowStatusResponse'
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: 项目或对话不存在
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: 当前阶段不是可讨论检查点
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                project_id: '550e8400-e29b-41d4-a716-446655440000'
-                status: 'active'
-                current_stage: 'requirement_analysis'
-                stage_display_name: '需求分析'
-                progress:
-                  completed_stages: 0
-                  total_stages: 9
-                  percentage: 0
-                started_at: '2024-06-24T10:00:00Z'
-                updated_at: '2024-06-24T10:00:00Z'
-        '404':
-          description: 项目不存在
           content:
             application/json:
               schema:
@@ -1405,7 +1448,8 @@ paths:
       summary: 继续工作流
       description: |
         在 REQUIREMENT_CLARIFICATION 阶段，用户回复澄清问题后调用此接口继续工作流。
-        Agent 会重新分析需求，决定是否需要继续澄清还是进入下一阶段。
+        Agent 会重新分析需求，决定是否需要继续澄清还是进入下一阶段，并通过 SSE 返回回复。
+        事件顺序、heartbeat 及流前/流后错误语义与启动接口一致。
       parameters:
         - name: project_id
           in: path
@@ -1423,12 +1467,30 @@ paths:
               conversation_id: '660e8400-e29b-41d4-a716-446655440001'
               message: "The app should support web and iOS platforms. It's for individual users only."
       responses:
-        '202':
-          description: 工作流继续执行
+        '200':
+          description: 工作流继续执行并流式返回回复
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/SseCacheControl'
+            X-Accel-Buffering:
+              $ref: '#/components/headers/SseBuffering'
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              x-sse-events:
+                delta:
+                  $ref: '#/components/schemas/WorkflowStreamDeltaData'
+                done:
+                  $ref: '#/components/schemas/WorkflowStreamDoneData'
+                error:
+                  $ref: '#/components/schemas/WorkflowStreamErrorData'
+        '400':
+          description: 请求参数无效
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkflowStatusResponse'
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: 项目或对话不存在
           content:
@@ -1455,7 +1517,9 @@ paths:
     post:
       tags: [Workflow]
       summary: 讨论当前检查点
-      description: 在等待用户确认的检查点中发送一条消息，Agent 会基于当前阶段结果回复；不会自动推进工作流。
+      description: |
+        在等待用户确认的检查点中发送一条消息，Agent 会基于当前阶段结果通过 SSE 回复；不会自动推进工作流。
+        事件顺序、heartbeat 及流前/流后错误语义与启动接口一致。
       parameters:
         - name: project_id
           in: path
@@ -1470,12 +1534,30 @@ paths:
             schema:
               $ref: '#/components/schemas/ContinueWorkflowRequest'
       responses:
-        '202':
-          description: Agent 已回复
+        '200':
+          description: Agent 流式回复
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/SseCacheControl'
+            X-Accel-Buffering:
+              $ref: '#/components/headers/SseBuffering'
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              x-sse-events:
+                delta:
+                  $ref: '#/components/schemas/WorkflowStreamDeltaData'
+                done:
+                  $ref: '#/components/schemas/WorkflowStreamDoneData'
+                error:
+                  $ref: '#/components/schemas/WorkflowStreamErrorData'
+        '400':
+          description: 请求参数无效
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkflowStatusResponse'
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: 项目或对话不存在
           content:

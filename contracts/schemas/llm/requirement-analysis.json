@@ -27,7 +27,19 @@
     },
     "clarification_questions": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "object",
+        "required": ["question", "context", "category"],
+        "properties": {
+          "question": { "type": "string" },
+          "context": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": ["user", "scope", "tech", "business", "risk"]
+          }
+        },
+        "additionalProperties": false
+      },
       "description": "需要用户澄清的问题"
     }
   },

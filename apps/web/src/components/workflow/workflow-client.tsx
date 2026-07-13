@@ -1,7 +1,6 @@
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
 import { PageFrame } from '@/components/layout/app-shell';
 import { ButtonLink } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/feedback';
@@ -9,22 +8,23 @@ import { ListSkeleton } from '@/components/ui/skeleton';
 import { ClarificationConversation } from '@/components/workflow/clarification-conversation';
 import { StageRail } from '@/components/workflow/stage-rail';
 import { WorkflowStatusPanels } from '@/components/workflow/workflow-status-panels';
+import { useWorkflowActions } from '@/components/workflow/use-workflow-actions';
 import {
-  advanceWorkflow,
-  continueWorkflow,
-  discussWorkflow,
   getWorkflowStatus,
   listConversationMessages,
   listWorkflowStates,
-  runWorkflow,
 } from '@/features/workflow/api';
 import { getUserErrorMessage } from '@/lib/api-client';
+import type { MessageListResponse, WorkflowStreamResponse } from '@/types/api';
 
-export function WorkflowClient({ projectId }: { projectId: string }) {
+export function WorkflowClient({
+  projectId,
+  autoStart = false,
+}: {
+  projectId: string;
+  autoStart?: boolean;
+}) {
   const queryClient = useQueryClient();
-  const [busy, setBusy] = useState(false);
-  const [answer, setAnswer] = useState('');
-  const [actionError, setActionError] = useState<string | null>(null);
   const statusQuery = useQuery({
     queryKey: ['workflow-status', projectId],
     queryFn: () => getWorkflowStatus(projectId),
@@ -64,58 +64,32 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
     queryFn: () => listConversationMessages(projectId, conversationId ?? ''),
   });
   const status = statusQuery.data;
+  const actions = useWorkflowActions({
+    autoStart,
+    projectId,
+    conversationId,
+    status,
+    onDone: syncStreamResult,
+    refresh: refreshWorkflow,
+  });
   const failureMessage = status?.error_message
     ? getUserErrorMessage(status.error_message, '工作流执行失败，请稍后重试。')
     : null;
 
-  async function startWorkflow() {
-    setBusy(true);
-    setActionError(null);
-    try {
-      await runWorkflow(projectId);
-      await refreshWorkflow();
-    } catch (error) {
-      setActionError(getUserErrorMessage(error, '工作流启动失败，请稍后重试。'));
-    } finally {
-      setBusy(false);
-    }
+  function syncStreamResult(result: WorkflowStreamResponse): void {
+    queryClient.setQueryData(['workflow-status', projectId], result.status);
+    queryClient.setQueryData<MessageListResponse>(
+      ['conversation-messages', projectId, result.assistant_message.conversation_id],
+      (current) => {
+        const items = current?.items ?? [];
+        const exists = items.some((message) => message.id === result.assistant_message.id);
+        const next = exists ? items : [...items, result.assistant_message];
+        return { items: next, total: next.length, offset: 0, limit: 100 };
+      },
+    );
   }
 
-  async function submitClarification() {
-    if (answer.trim().length === 0) {
-      setActionError('请输入澄清回复。');
-      return;
-    }
-    setBusy(true);
-    setActionError(null);
-    try {
-      if (!conversationId || !status?.waiting_for) throw new Error('当前没有可继续的讨论。');
-      const submit = status.waiting_for === 'reply' ? continueWorkflow : discussWorkflow;
-      await submit(projectId, conversationId, answer.trim());
-      setAnswer('');
-      await refreshWorkflow();
-    } catch (error) {
-      setActionError(getUserErrorMessage(error, '回复提交失败，请稍后重试。'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function advanceCheckpoint() {
-    setBusy(true);
-    setActionError(null);
-    try {
-      if (!conversationId) throw new Error('当前没有可确认的讨论。');
-      await advanceWorkflow(projectId, conversationId);
-      await refreshWorkflow();
-    } catch (error) {
-      setActionError(getUserErrorMessage(error, '暂时无法进入下一环节，请稍后重试。'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function refreshWorkflow() {
+  async function refreshWorkflow(): Promise<void> {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['workflow-status', projectId] }),
       queryClient.invalidateQueries({ queryKey: ['workflow-states', projectId] }),
@@ -155,29 +129,31 @@ export function WorkflowClient({ projectId }: { projectId: string }) {
           <StageRail status={status} states={statesQuery.data?.items ?? []} />
           <aside className="grid h-fit gap-4">
             <WorkflowStatusPanels
-              actionError={actionError}
-              busy={busy}
+              actionError={actions.actionError}
+              busy={actions.busy}
               failureMessage={failureMessage}
-              onStart={() => void startWorkflow()}
+              onStart={() => void actions.startWorkflow()}
               status={status}
             />
 
-            {conversationId ? (
+            {conversationId || actions.streamingReply !== null ? (
               <ClarificationConversation
-                actionError={actionError}
-                answer={answer}
-                busy={busy}
+                actionError={actions.actionError}
+                answer={actions.answer}
+                busy={actions.busy}
                 canAdvance={status.waiting_for === 'review' && Boolean(status.next_stage)}
                 canReply={Boolean(status.waiting_for)}
                 currentQuestions={status.clarification_questions ?? []}
                 historyError={messagesQuery.error}
                 isLoading={messagesQuery.isLoading}
                 messages={messagesQuery.data?.items ?? []}
-                onAnswerChange={setAnswer}
-                onAdvance={() => void advanceCheckpoint()}
+                onAnswerChange={actions.setAnswer}
+                onAdvance={() => void actions.advanceCheckpoint()}
                 onRetryHistory={() => void messagesQuery.refetch()}
-                onSubmit={() => void submitClarification()}
+                onSubmit={() => void actions.submitReply()}
+                pendingUserMessage={actions.pendingUserMessage}
                 stageName={status.stage_display_name}
+                streamingReply={actions.streamingReply}
               />
             ) : null}
           </aside>

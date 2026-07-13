@@ -10,6 +10,7 @@
 import {
   AllModelsFailedError,
   LLMAuthError,
+  LLMCancelledError,
   LLMError,
   LLMNetworkError,
   LLMRateLimitError,
@@ -17,7 +18,12 @@ import {
   LLMTimeoutError,
   type LlmOrchestratorService,
 } from '@ai-planning/llm-orchestrator';
-import { WorkflowStage, type StageResult, type WorkflowContext } from '@ai-planning/shared';
+import {
+  WorkflowStage,
+  type LLMStreamOptions,
+  type StageResult,
+  type WorkflowContext,
+} from '@ai-planning/shared';
 import type { PrismaService } from '../../database/database.module.js';
 import { AppException } from '../../common/exception/app-exception.js';
 import { ErrorCode } from '../../common/exception/error-code.js';
@@ -38,6 +44,7 @@ export interface PipelineRunDeps {
   readonly db: PrismaService;
   readonly orchestrator: LlmOrchestratorService;
   readonly dataDir: string;
+  readonly stream?: Pick<LLMStreamOptions, 'onDelta' | 'signal'>;
 }
 
 export interface PipelineRunOptions {
@@ -55,6 +62,7 @@ export async function runPipeline(
     orchestrator: deps.orchestrator,
     db: deps.db,
     dataDir: deps.dataDir,
+    stream: deps.stream,
   };
   const registry = createStageRegistry(stageDeps);
   let currentStage = options.startStage ?? pickStartingStage(ctx);
@@ -125,6 +133,7 @@ function decideNextStage(
 }
 
 function mapLlmError(error: unknown): void {
+  if (error instanceof LLMCancelledError) throw error;
   if (error instanceof AllModelsFailedError) {
     throw AppException.internal(
       '所有模型服务当前均不可用，请稍后重试。',
@@ -147,7 +156,7 @@ function mapLlmError(error: unknown): void {
     throw AppException.internal('模型返回的数据无法处理，请重新运行工作流。', ErrorCode.LLM_ERROR);
   }
   if (error instanceof LLMNetworkError) {
-    throw AppException.internal('暂时无法连接模型服务，请稍后重试。', ErrorCode.LLM_ERROR);
+    throw AppException.internal('暂时无法连接模型服务，请稍后重试。', ErrorCode.LLM_NETWORK_ERROR);
   }
   if (error instanceof LLMError) {
     throw AppException.internal('模型服务暂时不可用，请稍后重试。', ErrorCode.LLM_ERROR);

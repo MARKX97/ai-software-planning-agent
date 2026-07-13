@@ -58,7 +58,11 @@ describe('prompt regression', () => {
     for (const [template, vars] of cases) {
       const rendered = renderPrompt(template, vars);
       assert.doesNotMatch(rendered, /\{\{\w+\}\}/);
-      if (template !== PLANNING_GENERATION_PROMPT) {
+      if (
+        template !== PLANNING_GENERATION_PROMPT &&
+        template !== CLARIFICATION_PROMPT &&
+        template !== CHECKPOINT_DISCUSSION_PROMPT
+      ) {
         assert.match(rendered, /Return ONLY valid JSON/);
       }
       assert.ok(rendered.length < 8_000);

@@ -1,6 +1,6 @@
 # Model Routing — System Contract
 
-> Version: 1.0.0
+> Version: 1.1.0
 > Status: Contract
 > Owner: AI Infrastructure Lead
 > Tokens: ~2,000
@@ -9,17 +9,19 @@
 
 ## 1. 阶段模型路由
 
-| 阶段                      | 调用方式        | 模型                                             | 理由                |
-| ------------------------- | --------------- | ------------------------------------------------ | ------------------- |
-| requirement_analysis      | callSingle      | **deepseek**                                     | 高质量分析          |
-| requirement_clarification | callSingle      | **glm**                                          | 对话交互，性价比    |
-| multi_model_analysis      | callMulti       | **全部 3 模型**                                  | 核心价值：多视角    |
-| requirement_synthesis     | callSingle      | **deepseek**                                     | 强推理              |
-| feasibility_analysis      | callSingle      | **glm**                                          | 性价比              |
-| risk_analysis             | callSingle      | **deepseek**                                     | 强判断力            |
-| mvp_compression           | callSingle      | **deepseek**                                     | 强判断力            |
-| platform_recommendation   | callSingle      | **glm**                                          | 性价比              |
-| planning_generation       | callSingle × 11 | **deepseek** (PRD/Architecture) + **glm** (其余) | 核心产物用 DeepSeek |
+| 阶段                      | 调用方式         | 模型                                             | 理由                |
+| ------------------------- | ---------------- | ------------------------------------------------ | ------------------- |
+| requirement_analysis      | callSingle       | **deepseek**                                     | 高质量分析          |
+| requirement_clarification | callSingleStream | **glm**                                          | 用户可见实时对话    |
+| multi_model_analysis      | callMulti        | **全部 3 模型**                                  | 核心价值：多视角    |
+| requirement_synthesis     | callSingle       | **deepseek**                                     | 强推理              |
+| feasibility_analysis      | callSingle       | **glm**                                          | 性价比              |
+| risk_analysis             | callSingle       | **deepseek**                                     | 强判断力            |
+| mvp_compression           | callSingle       | **deepseek**                                     | 强判断力            |
+| platform_recommendation   | callSingle       | **glm**                                          | 性价比              |
+| planning_generation       | callSingle × 11  | **deepseek** (PRD/Architecture) + **glm** (其余) | 核心产物用 DeepSeek |
+
+需求范围、MVP 与技术方案检查点中的讨论也使用 `callSingleStream(glm)`。这些对话调用不改变对应阶段的结构化产出路由。
 
 ## 2. 产物级模型路由
 
@@ -53,6 +55,7 @@
 3. GLM: 辅助任务（澄清/可行性/平台推荐）+ 辅助产物
 4. MiniMax: 多模型分析中提供第三方视角
 5. 避免所有阶段都调用 3 个模型
+6. 仅用户直接看到的对话回复走流式；内部结构化分析保持非流式
 ```
 
 ## 5. 成本对比

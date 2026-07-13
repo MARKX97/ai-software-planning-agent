@@ -18,6 +18,8 @@ export function ClarificationConversation({
   canAdvance,
   onAdvance,
   stageName,
+  pendingUserMessage,
+  streamingReply,
 }: {
   messages: MessageResponse[];
   currentQuestions: unknown[];
@@ -33,13 +35,19 @@ export function ClarificationConversation({
   canAdvance: boolean;
   onAdvance: () => void;
   stageName: string;
+  pendingUserMessage: string | null;
+  streamingReply: string | null;
 }) {
   const fallback = messages.length === 0 ? questionsText(currentQuestions) : null;
   return (
     <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
       <header className="border-b border-slate-100 px-5 py-4">
         <h2 className="text-base font-bold text-slate-950">
-          {canReply ? '把不清楚的地方聊明白' : '我们聊过这些'}
+          {streamingReply !== null
+            ? '规划助手正在回复'
+            : canReply
+              ? '把不清楚的地方聊明白'
+              : '我们聊过这些'}
         </h2>
         <p className="mt-1 text-xs leading-5 text-slate-500">
           {canReply
@@ -63,12 +71,20 @@ export function ClarificationConversation({
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} />
           ))}
+          {pendingUserMessage ? <ConversationBubble content={pendingUserMessage} user /> : null}
+          {streamingReply !== null ? (
+            <ConversationBubble content={streamingReply || '正在把这件事想清楚...'} streaming />
+          ) : null}
           {!isLoading && !historyError && fallback ? (
             <div className="mr-8 rounded-md bg-slate-100 px-3 py-2 text-sm leading-6 text-slate-700">
               {fallback}
             </div>
           ) : null}
-          {!isLoading && !historyError && !fallback && messages.length === 0 ? (
+          {!isLoading &&
+          !historyError &&
+          !fallback &&
+          messages.length === 0 &&
+          streamingReply === null ? (
             <p className="text-sm text-slate-500">这次没有留下对话记录。</p>
           ) : null}
         </div>
@@ -88,7 +104,13 @@ export function ClarificationConversation({
               </p>
             ) : null}
             <Button disabled={busy} onClick={onSubmit}>
-              {busy ? '正在想下一步' : canAdvance ? '继续讨论' : '发出回复'}
+              {busy
+                ? '正在想下一步'
+                : actionError
+                  ? '重新生成'
+                  : canAdvance
+                    ? '继续讨论'
+                    : '发出回复'}
             </Button>
             {canAdvance ? (
               <Button disabled={busy} onClick={onAdvance} variant="secondary">
@@ -103,9 +125,21 @@ export function ClarificationConversation({
 }
 
 function MessageBubble({ message }: { message: MessageResponse }) {
-  const user = message.role === 'user';
+  return <ConversationBubble content={message.content} user={message.role === 'user'} />;
+}
+
+function ConversationBubble({
+  content,
+  user = false,
+  streaming = false,
+}: {
+  content: string;
+  user?: boolean;
+  streaming?: boolean;
+}) {
   return (
     <article
+      aria-busy={streaming}
       className={`max-w-[90%] whitespace-pre-wrap rounded-md px-3 py-2 text-sm leading-6 ${
         user ? 'ml-auto bg-slate-950 text-white' : 'mr-auto bg-slate-100 text-slate-700'
       }`}
@@ -113,7 +147,7 @@ function MessageBubble({ message }: { message: MessageResponse }) {
       <p className={`mb-1 text-xs font-bold ${user ? 'text-slate-300' : 'text-slate-500'}`}>
         {user ? '你' : '规划助手'}
       </p>
-      {message.content}
+      {content}
     </article>
   );
 }

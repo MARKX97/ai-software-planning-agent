@@ -1,6 +1,13 @@
 import { WorkflowClient } from '@/components/workflow/workflow-client';
 
-export default async function WorkflowPage({ params }: { params: Promise<{ projectId: string }> }) {
+export default async function WorkflowPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ start?: string }>;
+}) {
   const { projectId } = await params;
-  return <WorkflowClient projectId={projectId} />;
+  const query = await searchParams;
+  return <WorkflowClient autoStart={query.start === '1'} projectId={projectId} />;
 }

@@ -8,5 +8,4 @@ Checkpoint result:
 Conversation history:
 {{conversationHistory}}
 
-Return ONLY valid JSON:
-{ "reply": "your concise reply" }`;
+Reply directly in concise, natural Chinese. Acknowledge the trade-off and invite another message if needed. Do not return JSON or markdown fences.`;

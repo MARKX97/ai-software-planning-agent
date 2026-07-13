@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import type { LLMCallOptions, LLMResponse } from '@ai-planning/shared';
+import type { LLMCallOptions, LLMResponse, LLMStreamOptions } from '@ai-planning/shared';
 import { LLMTimeoutError, MockLLMProvider } from '@ai-planning/llm-core';
 import type { ILLMProvider } from '@ai-planning/llm-core';
 import { ProviderRegistry } from '@ai-planning/llm-providers';
@@ -34,6 +34,12 @@ class FlakyProvider implements ILLMProvider {
       timestamp: new Date().toISOString(),
     };
   }
+
+  async chatStream(prompt: string, options: LLMStreamOptions): Promise<LLMResponse> {
+    const response = await this.chat(prompt);
+    await options.onDelta(response.content);
+    return response;
+  }
 }
 
 /** Always-fail provider used to exercise retry-exhaustion + fallback. */
@@ -46,6 +52,26 @@ class AlwaysFailProvider implements ILLMProvider {
 
   async chat(): Promise<LLMResponse> {
     throw new Error('always fails');
+  }
+
+  async chatStream(): Promise<LLMResponse> {
+    return this.chat();
+  }
+}
+
+class BrokenStreamProvider extends MockLLMProvider {
+  attempts = 0;
+  constructor(private readonly emitBeforeFailure: boolean) {
+    super('glm');
+  }
+
+  override async chatStream(prompt: string, options: LLMStreamOptions): Promise<LLMResponse> {
+    this.attempts += 1;
+    if (this.attempts === 1) {
+      if (this.emitBeforeFailure) await options.onDelta('partial');
+      throw new LLMTimeoutError('stream failed');
+    }
+    return super.chatStream(prompt, options);
   }
 }
 
@@ -180,5 +206,25 @@ describe('retry behavior', () => {
     const res = await svc.callSingle('flaky', 'hello');
     assert.equal(res.retries, 1);
     assert.equal(provider.attempts, 2);
+  });
+
+  it('retries a stream only before the first delta', async () => {
+    const retryable = new BrokenStreamProvider(false);
+    const svc = new LlmOrchestratorService(makeRegistry(retryable));
+    const deltas: string[] = [];
+    const response = await svc.callSingleStream('glm', 'hello', {
+      onDelta: (content) => deltas.push(content),
+    });
+    assert.equal(retryable.attempts, 2);
+    assert.equal(response.retries, 1);
+    assert.ok(deltas.length > 0);
+
+    const started = new BrokenStreamProvider(true);
+    const noRetry = new LlmOrchestratorService(makeRegistry(started));
+    await assert.rejects(
+      () => noRetry.callSingleStream('glm', 'hello', { onDelta: () => {} }),
+      LLMTimeoutError,
+    );
+    assert.equal(started.attempts, 1);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { z } from 'zod';
+import type { LLMStreamOptions } from '@ai-planning/shared';
 import type { ILLMHttpClient } from '@ai-planning/llm-core';
 import { OpenAICompatibleAdapter } from '@ai-planning/llm-core';
 import { ProviderRegistry, DeepSeekProvider, GLMProvider, MiniMaxProvider } from '../src/index.js';
@@ -16,6 +17,15 @@ class StubClient implements ILLMHttpClient {
     usage: { inputTokens: number; outputTokens: number };
   }> {
     return { content: this.content, usage: { inputTokens: 5, outputTokens: 7 } };
+  }
+
+  async stream(
+    _request: unknown,
+    _timeoutMs: number,
+    options: Pick<LLMStreamOptions, 'onDelta'>,
+  ): Promise<{ content: string; usage: { inputTokens: number; outputTokens: number } }> {
+    await options.onDelta(this.content);
+    return this.complete();
   }
 }
 
@@ -60,6 +70,17 @@ describe('BaseProvider chat flow', () => {
     const provider = new DeepSeekProvider('deepseek-v4-pro', stub);
     const res = await provider.chat('hi');
     assert.equal(res.structuredOutput, null);
+  });
+
+  it('streams deltas and returns the normalized response with cost', async () => {
+    const provider = new GLMProvider('glm-5.1', new StubClient('实时回复'));
+    const deltas: string[] = [];
+    const res = await provider.chatStream('hi', {
+      onDelta: (content) => deltas.push(content),
+    });
+    assert.equal(deltas.join(''), res.content);
+    assert.equal(res.usage.totalTokens, 12);
+    assert.ok(res.cost.totalCost > 0);
   });
 });
 

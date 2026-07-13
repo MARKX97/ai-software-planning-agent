@@ -1,6 +1,6 @@
 # System Design
 
-> Version: 1.0.0
+> Version: 1.1.0
 > Status: Current
 
 ---
@@ -26,3 +26,16 @@
 ## 开发加载规则
 
 开发 Agent 不应从本文档提取实现细节。进入具体 Phase 时，按 `AGENTS.md` 的 Phase Loading 表加载对应 `specs/` 与 `.claude/skills/` 文件。
+
+## 实时对话数据流
+
+```text
+Browser fetch (POST SSE)
+  -> NestJS Workflow Controller
+  -> Workflow Service / Stage
+  -> LlmOrchestratorService.callSingleStream()
+  -> Provider.chatStream()
+  -> Baishan SSE
+```
+
+API Server 是唯一持有 Baishan Base URL 与 API Key 的边界。浏览器只访问 `/api/v1`；模型回复以 `delta` 实时代理，完成后以 `done` 返回持久化消息与最新工作流状态。内部结构化分析仍使用非流式调用。

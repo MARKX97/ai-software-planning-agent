@@ -10,13 +10,21 @@ export class ApiClientError extends Error {
   readonly code: string;
   readonly status: number;
   readonly details?: Record<string, unknown>;
+  readonly retryable?: boolean;
 
-  constructor(message: string, code: string, status: number, details?: Record<string, unknown>) {
+  constructor(
+    message: string,
+    code: string,
+    status: number,
+    details?: Record<string, unknown>,
+    retryable?: boolean,
+  ) {
     super(message);
     this.name = 'ApiClientError';
     this.code = code;
     this.status = status;
     this.details = details;
+    this.retryable = retryable;
   }
 }
 
@@ -170,6 +178,11 @@ export interface MessageListResponse {
   total: number;
   offset: number;
   limit: number;
+}
+
+export interface WorkflowStreamResponse {
+  assistant_message: MessageResponse;
+  status: WorkflowStatusResponse;
 }
 
 export interface TokenUsageDetailResponse {

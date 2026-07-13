@@ -1,6 +1,6 @@
 # Frontend — System Contract
 
-> Version: 1.0.0
+> Version: 1.1.0
 > Status: Contract
 > Owner: Frontend Lead
 > Tokens: ~7,000
@@ -104,7 +104,10 @@ API:
 
 - `GET /projects/{project_id}/workflow/status`
 - `GET /projects/{project_id}/workflow/states`
+- `POST /projects/{project_id}/run`
 - `POST /projects/{project_id}/workflow/continue`
+- `POST /projects/{project_id}/workflow/discuss`
+- `POST /projects/{project_id}/workflow/advance`
 - `POST /projects/{project_id}/conversations`
 - `POST /projects/{project_id}/conversations/{conversation_id}/messages`
 - `GET /projects/{project_id}/conversations/{conversation_id}/messages`
@@ -126,6 +129,14 @@ API:
 - 同一回复提交按钮在请求期间禁用，防重复提交
 - `waiting_for=review` 时展示“继续讨论”和“确认，继续下一环节”两个操作
 - 需求确认、MVP 取舍和技术方案确认均复用同一对话面板；内部分析阶段不单独打断用户
+
+流式回复:
+
+- 三个模型回复接口使用 `fetch` POST + `ReadableStream` 解析 SSE，不使用 EventSource。
+- 提交后立即显示本地用户消息和空助手气泡；delta 约每 50ms 合并刷新，避免逐 token 重渲染整页。
+- `done` 使用服务端 `assistant_message` 和 `status` 覆盖临时状态并刷新历史。
+- `error` 保留原输入与已展示片段，显示“重新生成”；重试替换临时助手回复。
+- 流式期间禁用重复提交和确认推进；组件卸载时通过 AbortController 取消请求。
 
 降级显示:
 
@@ -223,6 +234,7 @@ type ApiError = {
 - 所有请求带 `Authorization: Bearer <api_key>`，但 `/health` 和 `/models` 除外。
 - `API_KEY` 来源第一版使用环境变量或本地开发配置，不提供用户登录 UI。
 - 所有非 2xx 响应必须解析为 `ApiError`。
+- SSE Client 必须支持跨 chunk 事件拼接、comment heartbeat、JSON 流前错误、SSE 流后错误和 AbortSignal。
 - 不在组件中拼接 URL，使用 API Client 方法。
 
 ## 7. 状态管理
@@ -248,6 +260,7 @@ type ApiError = {
 - loading: 骨架屏或局部加载状态
 - empty: 明确的空态和下一步操作
 - error: 显示错误信息、错误码、重试入口
+- streaming error: 保留已生成片段，不把临时消息混入服务端历史；重新生成时替换该片段
 
 敏感操作:
 
@@ -258,6 +271,7 @@ type ApiError = {
 
 - 表单字段必须有 label。
 - 可点击元素必须使用 `button` 或 `a`。
+- 流式助手气泡使用 `aria-live`/`aria-busy` 表达生成状态，错误重试按钮可被键盘访问。
 - 轮询状态变化使用可读文本，不只依赖颜色。
 - 错误提示与对应字段通过 `aria-describedby` 关联。
 - 键盘可完成创建项目、提交澄清、打开产物详情、下载产物。
@@ -274,6 +288,7 @@ type ApiError = {
 单测:
 
 - API Client 错误解析
+- SSE 跨 chunk 解析、delta 增量渲染、done 对齐、error 重试与取消
 - 表单校验
 - Workflow 状态展示
 - Artifact 列表过滤

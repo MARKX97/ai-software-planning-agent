@@ -1,6 +1,6 @@
 # API — System Contract
 
-> Version: 1.1.0
+> Version: 1.2.0
 > Status: Contract Summary
 > Owner: Backend Lead + Frontend Lead
 > Machine Contract: `contracts/openapi.yaml`
@@ -25,7 +25,7 @@
 | 属性       | 值                                                          |
 | ---------- | ----------------------------------------------------------- |
 | Base URL   | `/api/v1`                                                   |
-| 数据格式   | JSON                                                        |
+| 数据格式   | JSON；模型可见回复使用 SSE                                  |
 | 认证方式   | Bearer Token                                                |
 | 免认证接口 | `GET /health`, `GET /models`, `GET /models/{provider_name}` |
 | 分页       | `offset` + `limit`，各接口默认 20 或 50，最大 100           |
@@ -79,7 +79,8 @@
 - 业务逻辑放在 service 层。
 - DB 访问通过 repository 或 Prisma service。
 - LLM 调用只允许白名单模块通过 `LlmOrchestratorService`。
-- 长耗时工作流接口返回 `202 Accepted`，前端通过状态接口轮询。
+- `run`、`workflow/continue`、`workflow/discuss` 返回 `200 text/event-stream`；`workflow/advance` 仍返回 `202 application/json`。
+- Controller 只绑定 SSE headers 和输出，模型调用与持久化仍由 Workflow Service/Stage 完成。
 
 ### 4.3 Error
 
@@ -104,6 +105,10 @@
 - `workflow/status` 是前端轮询的唯一状态入口。
 - `workflow/status.conversation_id` 指向当前检查点会话；`waiting_for=reply` 表示 Agent 需要补充信息，`waiting_for=review` 表示可讨论或确认推进。
 - `workflow/continue` 只用于需求澄清回复；其他检查点讨论使用 `workflow/discuss`，确认后使用 `workflow/advance`。
+- 三个流式接口使用 Fetch POST 读取 SSE。允许多个 `delta`，随后必须且只能有一个 `done` 或 `error`；服务端每 15 秒发送 comment heartbeat。
+- SSE 响应必须使用 `Content-Type: text/event-stream`、`Cache-Control: no-cache, no-transform` 和 `X-Accel-Buffering: no`，避免中间代理缓存或缓冲。
+- 流开始前的校验/权限/阶段错误返回标准 JSON HTTP Error；流开始后的模型错误通过 SSE `error` 返回。
+- `done` 携带已持久化的 `assistant_message` 和最新 `status`。浏览器不得接触 Baishan Base URL 或 API Key。
 - `artifacts` 列表接口不返回完整 `content`，详情接口才返回。
 - 导出接口创建任务后，前端轮询 `export/{export_id}`。
 
@@ -115,9 +120,10 @@
 - 28 个接口的 success response。
 - 参数错误、未认证、资源不存在、状态冲突。
 - 关键轮询接口: workflow status、export status。
+- SSE 分片解析、事件顺序、流前 JSON 错误、流后 error、取消和成功后原子持久化。
 
 ## 7. 版本兼容
 
-- v1.0.x: 不删除接口，不删除响应字段。
+- 当前为 pre-release；本次将三个工作流回复接口从 `202 JSON` 直接改为 `200 SSE`，属于已接受的破坏性变更，不保留旧响应。
 - v1.x.0: 可新增接口和可选字段。
 - v2.0.0: 允许破坏性变更。

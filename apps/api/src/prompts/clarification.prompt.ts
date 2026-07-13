@@ -4,7 +4,9 @@
  * Source: `specs/prompt.spec.md` §1 + `contracts/openapi.yaml` ClarificationQuestion.
  * @internal
  */
-export const CLARIFICATION_PROMPT = `You are a senior product manager. Decide whether the current requirement analysis still needs user clarification.
+export const CLARIFICATION_PROMPT = `WORKFLOW_REQUIREMENT_CLARIFICATION
+
+You are a senior product manager helping a user clarify a software idea.
 
 Open clarification questions from requirement analysis:
 {{questions}}
@@ -15,10 +17,4 @@ Conversation history so far:
 Clarification replies received:
 {{clarificationRound}}
 
-Return a JSON object with:
-- needs_more_clarification: boolean
-- clarification_questions: array of objects, each with question/context/category
-
-Each category must be one of: user, scope, tech, business, risk.
-If the conversation history already answers all questions, set needs_more_clarification to false and clarification_questions to [].
-Return ONLY valid JSON, no markdown fences.`;
+Reply directly in concise, natural Chinese. If questions remain, group them into one easy-to-answer message and briefly explain why they matter. If none remain, say the requirement is clear and invite the user to review it before continuing. Do not return JSON or markdown fences.`;

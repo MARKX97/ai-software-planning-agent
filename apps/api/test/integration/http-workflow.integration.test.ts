@@ -9,6 +9,12 @@ interface ApiResult {
   readonly body: Record<string, unknown> | null;
 }
 
+interface StreamResult {
+  readonly response: Response;
+  readonly deltas: string[];
+  readonly done: Record<string, unknown>;
+}
+
 async function request(path: string, options: RequestInit = {}): Promise<ApiResult> {
   const response = await fetch(`${base}${path}`, {
     ...options,
@@ -30,6 +36,51 @@ async function request(path: string, options: RequestInit = {}): Promise<ApiResu
 function bodyOf(result: ApiResult): Record<string, unknown> {
   assert.ok(result.body);
   return result.body;
+}
+
+async function requestStream(path: string, body: Record<string, unknown>): Promise<StreamResult> {
+  const response = await fetch(`${base}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  assert.match(response.headers.get('content-type') ?? '', /text\/event-stream/);
+  const events = parseSse(await response.text());
+  const done = events.find((event) => event.name === 'done');
+  assert.ok(done);
+  return {
+    response,
+    deltas: events
+      .filter((event) => event.name === 'delta')
+      .map((event) => String(event.data['content'] ?? '')),
+    done: done.data,
+  };
+}
+
+function parseSse(text: string): Array<{ name: string; data: Record<string, unknown> }> {
+  return text
+    .split(/\r?\n\r?\n/)
+    .map((block) => block.split(/\r?\n/))
+    .filter((lines) => lines.some((line) => line.startsWith('event:')))
+    .map((lines) => {
+      const name =
+        lines
+          .find((line) => line.startsWith('event:'))
+          ?.slice(6)
+          .trim() ?? '';
+      const raw =
+        lines
+          .find((line) => line.startsWith('data:'))
+          ?.slice(5)
+          .trim() ?? '{}';
+      return { name, data: JSON.parse(raw) as Record<string, unknown> };
+    });
+}
+
+function streamStatus(result: StreamResult): Record<string, unknown> {
+  const status = result.done['status'];
+  assert.ok(status && typeof status === 'object' && !Array.isArray(status));
+  return status as Record<string, unknown>;
 }
 
 describe('real HTTP + PostgreSQL workflow integration', () => {
@@ -71,12 +122,10 @@ describe('real HTTP + PostgreSQL workflow integration', () => {
           ),
         );
 
-        const run = await request(`/projects/${projectId}/run`, {
-          method: 'POST',
-          body: '{}',
-        });
-        assert.equal(run.response.status, 202);
-        const runBody = bodyOf(run);
+        const run = await requestStream(`/projects/${projectId}/run`, {});
+        assert.equal(run.response.status, 200);
+        assert.ok(run.deltas.join('').length > 0);
+        const runBody = streamStatus(run);
         assert.equal(runBody['current_stage'], 'requirement_clarification');
         assert.equal(typeof runBody['started_at'], 'string');
         assert.equal(typeof runBody['conversation_id'], 'string');
@@ -87,37 +136,33 @@ describe('real HTTP + PostgreSQL workflow integration', () => {
           `/projects/${projectId}/conversations/${conversationId}/messages?offset=0&limit=20`,
         );
         assert.equal(bodyOf(firstMessages)['total'], 1);
-        const continuedOnce = await request(`/projects/${projectId}/workflow/continue`, {
-          method: 'POST',
-          body: JSON.stringify({
-            conversation_id: conversationId,
-            message: 'The primary user is a product manager in Shanghai.',
-          }),
+        const continuedOnce = await requestStream(`/projects/${projectId}/workflow/continue`, {
+          conversation_id: conversationId,
+          message: 'The primary user is a product manager in Shanghai.',
         });
-        assert.equal(continuedOnce.response.status, 202);
-        assert.equal(bodyOf(continuedOnce)['current_stage'], 'requirement_clarification');
+        assert.equal(continuedOnce.response.status, 200);
+        assert.equal(streamStatus(continuedOnce)['current_stage'], 'requirement_clarification');
         const multiRoundMessages = await request(
           `/projects/${projectId}/conversations/${conversationId}/messages?offset=0&limit=20`,
         );
         assert.equal(bodyOf(multiRoundMessages)['total'], 3);
-        const continuedTwice = await request(`/projects/${projectId}/workflow/continue`, {
-          method: 'POST',
-          body: JSON.stringify({
-            conversation_id: conversationId,
-            message: 'Success means 40 percent of users choose one recommendation.',
-          }),
+        const continuedTwice = await requestStream(`/projects/${projectId}/workflow/continue`, {
+          conversation_id: conversationId,
+          message: 'Success means 40 percent of users choose one recommendation.',
         });
-        assert.equal(continuedTwice.response.status, 202);
-        assert.equal(bodyOf(continuedTwice)['waiting_for'], 'review');
-        const requirementsConversation = bodyOf(continuedTwice)['conversation_id'] as string;
-        const requirementDiscussion = await request(`/projects/${projectId}/workflow/discuss`, {
-          method: 'POST',
-          body: JSON.stringify({
+        assert.equal(continuedTwice.response.status, 200);
+        const continuedStatus = streamStatus(continuedTwice);
+        assert.equal(continuedStatus['waiting_for'], 'review');
+        const requirementsConversation = continuedStatus['conversation_id'] as string;
+        const requirementDiscussion = await requestStream(
+          `/projects/${projectId}/workflow/discuss`,
+          {
             conversation_id: requirementsConversation,
             message: '首版先保证推荐结果真实可执行，会员功能以后再说。',
-          }),
-        });
-        assert.equal(requirementDiscussion.response.status, 202);
+          },
+        );
+        assert.equal(requirementDiscussion.response.status, 200);
+        assert.ok(requirementDiscussion.deltas.join('').length > 0);
         const synthesis = await request(`/projects/${projectId}/workflow/advance`, {
           method: 'POST',
           body: JSON.stringify({ conversation_id: requirementsConversation }),

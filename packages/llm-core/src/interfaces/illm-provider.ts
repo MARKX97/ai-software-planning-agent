@@ -1,4 +1,9 @@
-import type { LLMCallOptions, LLMResponse, ModelPricing } from '@ai-planning/shared';
+import type {
+  LLMCallOptions,
+  LLMResponse,
+  LLMStreamOptions,
+  ModelPricing,
+} from '@ai-planning/shared';
 
 /**
  * A single provider's capabilities and lifecycle, as seen by the orchestrator.
@@ -17,6 +22,8 @@ export interface ILLMProvider {
   readonly pricing: ModelPricing;
   /** Invoke chat completion. */
   chat(prompt: string, options?: LLMCallOptions): Promise<LLMResponse>;
+  /** Invoke chat completion and forward text deltas as they arrive. */
+  chatStream(prompt: string, options: LLMStreamOptions): Promise<LLMResponse>;
   /**
    * Probe gateway reachability. Optional: the registry's `healthCheckAll`
    * returns a configured-provider snapshot without issuing completions, so

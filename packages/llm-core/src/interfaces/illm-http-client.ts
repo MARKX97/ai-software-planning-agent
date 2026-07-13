@@ -1,4 +1,4 @@
-import type { LLMRequest } from '@ai-planning/shared';
+import type { LLMRequest, LLMStreamOptions } from '@ai-planning/shared';
 
 /**
  * HTTP transport abstraction over an OpenAI-compatible gateway.
@@ -17,6 +17,12 @@ export interface ILLMHttpClient {
    * mapping to the {@link LLMError} hierarchy.
    */
   complete(request: LLMRequest, timeoutMs: number): Promise<LLMHttpClientResult>;
+  /** Stream a completion while also returning the aggregated final result. */
+  stream(
+    request: LLMRequest,
+    timeoutMs: number,
+    options: Pick<LLMStreamOptions, 'onDelta' | 'signal'>,
+  ): Promise<LLMHttpClientResult>;
 }
 
 /** Raw result from the HTTP transport before cost calculation. */

@@ -18,6 +18,6 @@ Return a JSON object matching the RequirementAnalysisResult schema:
 - core_problems: array of core problems the project solves
 - requirement_points: array of requirement points (each with id/title/description/priority/category)
 - assumptions: array of assumptions made during analysis
-- clarification_questions: array of questions needing user clarification (empty if none)
+- clarification_questions: array of objects with question, context, and category (user/scope/tech/business/risk); empty if none
 
 Return ONLY valid JSON, no markdown fences.`;

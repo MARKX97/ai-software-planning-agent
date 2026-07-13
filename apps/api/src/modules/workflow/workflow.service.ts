@@ -18,7 +18,6 @@ import {
   type ListExecutionsQuery,
   type RunWorkflowRequest,
 } from './workflow.dto.js';
-import { assertCanContinueWorkflow, assertWorkflowNotRunning } from './workflow-guards.js';
 import {
   getWorkflowExecution,
   listWorkflowExecutionLogs,
@@ -26,24 +25,13 @@ import {
   listWorkflowStates,
   type ExecutionLogsListResponse,
 } from './workflow-history.js';
-import {
-  appendAgentReply,
-  appendUserReply,
-  closeWorkflowConversation,
-  resolveWorkflowConversation,
-} from './workflow-conversation.js';
-import { CheckpointDiscussionStage } from './stages/checkpoint-discussion.stage.js';
+import { closeWorkflowConversation } from './workflow-conversation.js';
 import { markCheckpointConfirmed } from './workflow-state-persister.js';
-import { buildWorkflowContext, executeWorkflowPipeline } from './workflow-executor.js';
-import { assertWorkflowInteraction, nextCheckpointStage } from './workflow-interaction-guard.js';
-import {
-  buildWorkflowStatus,
-  createExecution,
-  markExecutionComplete,
-  markExecutionFailed,
-  markProjectStarted,
-  updateProjectStage,
-} from './workflow-store.js';
+import { executeWorkflowPipeline } from './workflow-executor.js';
+import { nextCheckpointStage } from './workflow-interaction-guard.js';
+import { buildWorkflowStatus, createExecution } from './workflow-store.js';
+import { streamContinue, streamDiscuss, streamRun } from './workflow-stream-actions.js';
+import type { WorkflowSse } from './workflow-sse.js';
 
 export type { ExecutionLogsListResponse } from './workflow-history.js';
 
@@ -55,22 +43,8 @@ export class WorkflowService {
     @Inject(LLM_ORCHESTRATOR) private readonly orchestrator: LlmOrchestratorService,
   ) {}
 
-  async run(projectId: string, input: RunWorkflowRequest): Promise<WorkflowStatusResponse> {
-    const project = await this.projects.findOrFail(projectId);
-    assertWorkflowNotRunning(project);
-    const conversationId = await resolveWorkflowConversation(
-      this.db,
-      projectId,
-      input.conversation_id,
-    );
-    const execution = await createExecution(this.db, projectId);
-    await markProjectStarted(this.db, projectId);
-    return executeWorkflowPipeline(this.deps(), {
-      projectId,
-      executionId: execution.id,
-      originalIdea: project.original_idea,
-      conversationId,
-    });
+  async run(projectId: string, input: RunWorkflowRequest, stream: WorkflowSse): Promise<void> {
+    return streamRun(this.deps(), { projectId, body: input, stream });
   }
 
   async getStatus(projectId: string): Promise<WorkflowStatusResponse> {
@@ -80,59 +54,17 @@ export class WorkflowService {
   async continue(
     projectId: string,
     input: ContinueWorkflowRequest,
-  ): Promise<WorkflowStatusResponse> {
-    const project = await this.projects.findOrFail(projectId);
-    const status = await this.getStatus(projectId);
-    await resolveWorkflowConversation(this.db, projectId, input.conversation_id);
-    assertCanContinueWorkflow(project);
-    assertWorkflowInteraction(status, input.conversation_id, 'reply');
-    await appendUserReply(this.db, input.conversation_id, input.message);
-    const execution = await createExecution(this.db, projectId);
-    await updateProjectStage(this.db, projectId, WorkflowStage.REQUIREMENT_ANALYSIS);
-    return executeWorkflowPipeline(this.deps(), {
-      projectId,
-      executionId: execution.id,
-      originalIdea: project.original_idea,
-      conversationId: input.conversation_id,
-      startStage: WorkflowStage.REQUIREMENT_ANALYSIS,
-    });
+    stream: WorkflowSse,
+  ): Promise<void> {
+    return streamContinue(this.deps(), { projectId, body: input, stream });
   }
 
-  async discuss(projectId: string, input: DiscussWorkflowRequest): Promise<WorkflowStatusResponse> {
-    const project = await this.projects.findOrFail(projectId);
-    const status = await this.getStatus(projectId);
-    await resolveWorkflowConversation(this.db, projectId, input.conversation_id);
-    assertWorkflowInteraction(status, input.conversation_id);
-    await appendUserReply(this.db, input.conversation_id, input.message);
-    const execution = await createExecution(
-      this.db,
-      projectId,
-      project.current_stage as WorkflowStage,
-    );
-    try {
-      const ctx = await buildWorkflowContext(this.db, {
-        projectId,
-        executionId: execution.id,
-        originalIdea: project.original_idea,
-        conversationId: input.conversation_id,
-      });
-      const reply = await new CheckpointDiscussionStage({
-        db: this.db,
-        orchestrator: this.orchestrator,
-        dataDir: this.projects.dataDir(),
-      }).execute(ctx, project.current_stage as WorkflowStage);
-      await appendAgentReply(
-        this.db,
-        input.conversation_id,
-        reply,
-        project.current_stage as WorkflowStage,
-      );
-      await markExecutionComplete(this.db, execution.id);
-    } catch (error) {
-      await markExecutionFailed(this.db, execution.id, error);
-      throw error;
-    }
-    return this.getStatus(projectId);
+  async discuss(
+    projectId: string,
+    input: DiscussWorkflowRequest,
+    stream: WorkflowSse,
+  ): Promise<void> {
+    return streamDiscuss(this.deps(), { projectId, body: input, stream });
   }
 
   async advance(projectId: string, input: AdvanceWorkflowRequest): Promise<WorkflowStatusResponse> {
@@ -146,13 +78,14 @@ export class WorkflowService {
     await markCheckpointConfirmed(this.db, projectId, project.current_stage as WorkflowStage);
     await closeWorkflowConversation(this.db, input.conversation_id);
     const execution = await createExecution(this.db, projectId, nextStage);
-    return executeWorkflowPipeline(this.deps(), {
+    const result = await executeWorkflowPipeline(this.deps(), {
       projectId,
       executionId: execution.id,
       originalIdea: project.original_idea,
       conversationId: input.conversation_id,
       startStage: nextStage,
     });
+    return result.status;
   }
 
   async listStates(projectId: string): Promise<WorkflowStateListResponse> {

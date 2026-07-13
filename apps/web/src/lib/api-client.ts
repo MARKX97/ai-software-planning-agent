@@ -17,6 +17,8 @@ const USER_ERROR_MESSAGES: Record<string, string> = {
   WORKFLOW_NOT_RUNNING: '工作流尚未启动，请先启动后再操作。',
   WORKFLOW_STAGE_NOT_CLARIFICATION: '当前阶段不需要补充信息，请刷新页面查看最新状态。',
   LLM_TIMEOUT: '模型响应超时，请稍后重试。',
+  LLM_NETWORK_ERROR: '暂时无法连接模型服务，请稍后重试。',
+  LLM_CANCELLED: '回复已取消。',
   LLM_ERROR: '模型服务暂时不可用，请稍后重试。',
   ALL_MODELS_FAILED: '所有模型服务当前均不可用，请稍后重试。',
   COST_LIMIT_EXCEEDED: '本项目已达到成本上限，请调整预算后重试。',
@@ -58,6 +60,7 @@ export interface RequestOptions {
   method?: 'GET' | 'POST' | 'DELETE';
   query?: Record<string, QueryValue>;
   body?: unknown;
+  signal?: AbortSignal;
 }
 
 function apiBaseUrl(): string {
@@ -101,12 +104,13 @@ export function getUserErrorMessage(error: unknown, fallback = DEFAULT_USER_ERRO
 async function fetchApi(url: string, init: RequestInit): Promise<Response> {
   try {
     return await fetch(url, init);
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error;
     throw new ApiClientError(USER_ERROR_MESSAGES['NETWORK_ERROR'], 'NETWORK_ERROR', 0);
   }
 }
 
-async function parseError(response: Response): Promise<ApiClientError> {
+export async function parseApiError(response: Response): Promise<ApiClientError> {
   let parsed: ApiErrorBody | null = null;
   try {
     parsed = (await response.json()) as ApiErrorBody;
@@ -123,17 +127,22 @@ async function parseError(response: Response): Promise<ApiClientError> {
   );
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function apiFetch(path: string, options: RequestOptions = {}): Promise<Response> {
   const method = options.method ?? 'GET';
   const hasBody = options.body !== undefined;
-  const response = await fetchApi(buildUrl(path, options.query), {
+  return fetchApi(buildUrl(path, options.query), {
     method,
     headers: headers(hasBody),
     body: hasBody ? JSON.stringify(options.body) : undefined,
     cache: 'no-store',
+    signal: options.signal,
   });
+}
+
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const response = await apiFetch(path, options);
   if (!response.ok) {
-    throw await parseError(response);
+    throw await parseApiError(response);
   }
   if (response.status === 204) {
     return undefined as T;
@@ -156,7 +165,7 @@ export async function apiDownload(path: string, query?: Record<string, QueryValu
     cache: 'no-store',
   });
   if (!response.ok) {
-    throw await parseError(response);
+    throw await parseApiError(response);
   }
   return response.blob();
 }

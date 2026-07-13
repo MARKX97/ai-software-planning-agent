@@ -1,7 +1,7 @@
 import type { ILLMProvider } from '@ai-planning/llm-core';
-import type { LLMCallOptions, LLMResponse } from '@ai-planning/shared';
+import type { LLMCallOptions, LLMResponse, LLMStreamOptions } from '@ai-planning/shared';
 import type { ProviderRegistry } from '@ai-planning/llm-providers';
-import { callWithRetry } from './strategies/retry-strategy.js';
+import { callStreamWithRetry, callWithRetry } from './strategies/retry-strategy.js';
 import { AllModelsFailedError } from './errors/all-models-failed.error.js';
 import { CallTracker } from './monitoring/call-tracker.js';
 import { CostController } from './monitoring/cost-controller.js';
@@ -37,6 +37,24 @@ export class LlmOrchestratorService {
     const startedAt = Date.now();
     try {
       const { response, retries } = await callWithRetry(provider, prompt, options);
+      return this.finalize(response, provider, retries, options);
+    } catch (error) {
+      this.recordFailure(provider, startedAt);
+      throw error;
+    }
+  }
+
+  /** Single-model streamed call with safe pre-delta retry and cost tracking. */
+  async callSingleStream(
+    providerName: string,
+    prompt: string,
+    options: LLMStreamOptions,
+  ): Promise<LLMResponse> {
+    this.checkBudget(options);
+    const provider = this.registry.get(providerName);
+    const startedAt = Date.now();
+    try {
+      const { response, retries } = await callStreamWithRetry(provider, prompt, options);
       return this.finalize(response, provider, retries, options);
     } catch (error) {
       this.recordFailure(provider, startedAt);

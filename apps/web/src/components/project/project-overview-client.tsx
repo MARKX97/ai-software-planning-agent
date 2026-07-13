@@ -1,19 +1,17 @@
 'use client';
 
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { Button, ButtonLink } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
+import { ButtonLink } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/feedback';
 import { ListSkeleton } from '@/components/ui/skeleton';
 import { PageFrame } from '@/components/layout/app-shell';
 import { ProjectStatus, StageName } from '@/components/project/project-status';
 import { getProject } from '@/features/projects/api';
-import { getWorkflowStatus, runWorkflow } from '@/features/workflow/api';
+import { getWorkflowStatus } from '@/features/workflow/api';
 import { formatDateTime } from '@/lib/format';
 
 export function ProjectOverviewClient({ projectId }: { projectId: string }) {
-  const router = useRouter();
   const projectQuery = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => getProject(projectId),
@@ -21,12 +19,6 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
   const workflowQuery = useQuery({
     queryKey: ['workflow-status', projectId],
     queryFn: () => getWorkflowStatus(projectId),
-  });
-  const runMutation = useMutation({
-    mutationFn: () => runWorkflow(projectId),
-    onSuccess: () => {
-      router.push(`/projects/${projectId}/workflow`);
-    },
   });
   const project = projectQuery.data;
   const workflow = workflowQuery.data;
@@ -50,13 +42,6 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
       {projectQuery.isLoading ? <ListSkeleton rows={3} /> : null}
       {projectQuery.error ? (
         <ErrorState error={projectQuery.error} onRetry={() => void projectQuery.refetch()} />
-      ) : null}
-      {runMutation.error ? (
-        <ErrorState
-          error={runMutation.error}
-          onRetry={() => runMutation.mutate()}
-          title="启动工作流失败"
-        />
       ) : null}
       {workflowQuery.error ? (
         <ErrorState
@@ -88,9 +73,9 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
               </CardHeader>
               <CardBody className="flex flex-col gap-3 sm:flex-row">
                 {project.current_stage === 'init' ? (
-                  <Button disabled={runMutation.isPending} onClick={() => runMutation.mutate()}>
-                    {runMutation.isPending ? '正在开始' : '开始把它想清楚'}
-                  </Button>
+                  <ButtonLink href={`/projects/${projectId}/workflow?start=1`}>
+                    开始把它想清楚
+                  </ButtonLink>
                 ) : (
                   <ButtonLink href={`/projects/${projectId}/workflow`}>继续看看</ButtonLink>
                 )}

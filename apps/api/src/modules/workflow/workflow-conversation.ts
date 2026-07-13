@@ -1,4 +1,5 @@
 import type { PrismaService } from '../../database/database.module.js';
+import type { Message } from '@ai-planning/database';
 import { WorkflowStage } from '@ai-planning/shared';
 import { AppException } from '../../common/exception/app-exception.js';
 import { ErrorCode } from '../../common/exception/error-code.js';
@@ -49,50 +50,45 @@ export async function loadWorkflowConversationContext(
   };
 }
 
-export async function appendUserReply(
-  db: PrismaService,
-  conversationId: string,
-  content: string,
-): Promise<void> {
-  const now = new Date();
-  await db.client.$transaction([
-    db.client.message.create({ data: { conversation_id: conversationId, role: 'user', content } }),
-    db.client.conversation.update({
-      where: { id: conversationId },
-      data: { status: 'active', updated_at: now },
-    }),
-  ]);
+export interface WorkflowInteractionInput {
+  readonly conversationId: string;
+  readonly userContent?: string;
+  readonly assistantContent: string;
+  readonly stage: WorkflowStage;
+  readonly kind?: string;
+  readonly questions?: unknown[] | null;
 }
 
-export async function appendClarificationQuestions(
+/** Persist a completed user/assistant interaction atomically. */
+export async function appendWorkflowInteraction(
   db: PrismaService,
-  conversationId: string,
-  questions: unknown[] | null,
-): Promise<void> {
-  if (!questions?.length) return;
-  const content = questions
-    .map((question, index) => `${index + 1}. ${questionText(question)}`)
-    .join('\n');
-  const now = new Date();
-  await db.client.$transaction([
-    db.client.message.create({
+  input: WorkflowInteractionInput,
+): Promise<Message> {
+  return db.client.$transaction(async (tx) => {
+    if (input.userContent) {
+      await tx.message.create({
+        data: { conversation_id: input.conversationId, role: 'user', content: input.userContent },
+      });
+    }
+    const assistant = await tx.message.create({
       data: {
-        conversation_id: conversationId,
+        conversation_id: input.conversationId,
         role: 'assistant',
-        content,
+        content: input.assistantContent,
         metadata: {
           workflow: true,
-          kind: 'clarification_questions',
-          checkpoint_stage: WorkflowStage.REQUIREMENT_CLARIFICATION,
-          questions,
+          kind: input.kind ?? 'workflow_discussion',
+          checkpoint_stage: input.stage,
+          ...(input.questions ? { questions: input.questions } : {}),
         } as never,
       },
-    }),
-    db.client.conversation.update({
-      where: { id: conversationId },
-      data: { status: 'active', updated_at: now },
-    }),
-  ]);
+    });
+    await tx.conversation.update({
+      where: { id: input.conversationId },
+      data: { status: 'active', updated_at: new Date() },
+    });
+    return assistant;
+  });
 }
 
 export async function openCheckpointConversation(
@@ -110,8 +106,8 @@ export async function appendCheckpointIntroduction(
   db: PrismaService,
   conversationId: string,
   stage: WorkflowStage,
-): Promise<void> {
-  await appendAgentReply(
+): Promise<Message> {
+  return appendAgentReply(
     db,
     conversationId,
     checkpointIntroduction(stage),
@@ -126,22 +122,13 @@ export async function appendAgentReply(
   content: string,
   stage: WorkflowStage,
   kind = 'workflow_discussion',
-): Promise<void> {
-  const now = new Date();
-  await db.client.$transaction([
-    db.client.message.create({
-      data: {
-        conversation_id: conversationId,
-        role: 'assistant',
-        content,
-        metadata: { workflow: true, kind, checkpoint_stage: stage } as never,
-      },
-    }),
-    db.client.conversation.update({
-      where: { id: conversationId },
-      data: { status: 'active', updated_at: now },
-    }),
-  ]);
+): Promise<Message> {
+  return appendWorkflowInteraction(db, {
+    conversationId,
+    assistantContent: content,
+    stage,
+    kind,
+  });
 }
 
 export async function closeWorkflowConversation(
@@ -170,16 +157,6 @@ function throwConversationNotFound(projectId: string, conversationId: string): n
     ErrorCode.CONVERSATION_NOT_FOUND,
     `Conversation '${conversationId}' not found in project '${projectId}'`,
   );
-}
-
-function questionText(question: unknown): string {
-  if (typeof question === 'string') return question;
-  if (question && typeof question === 'object') {
-    const record = question as Record<string, unknown>;
-    const text = record['question'] ?? record['content'] ?? record['text'];
-    if (typeof text === 'string') return text;
-  }
-  return '请补充更多信息';
 }
 
 function isWorkflowMessage(message: { role: string; metadata: unknown }): boolean {

@@ -1,6 +1,6 @@
 # AI Software Planning Agent
 
-帮助用户将模糊的软件想法逐步收敛为可执行的软件项目方案。
+帮助用户将模糊的软件想法逐步收敛为可执行的软件项目方案。需求澄清、范围取舍、MVP 和技术方案都可以与 Agent 多轮讨论，回复会实时出现，确认后再进入下一环节。
 
 ## Prerequisites（前置依赖 · 本地验证）
 
@@ -86,6 +86,8 @@ pnpm dev
 | 语言     | TypeScript 5.5+               |
 | AI 接入  | Baishan OpenAI-compatible API |
 
+用户可见的模型回复由 NestJS API 通过 SSE 代理到浏览器。`BAISHAN_BASE_URL` 与 `BAISHAN_API_KEY` 只配置在 API Server 的 `.env`，不会下发到前端；内部分析与产物生成仍使用结构化非流式调用。
+
 ## Agent 使用说明（Codex / Claude）
 
 本项目采用“一套通用规则 + 工具专用入口”的方式，避免 Codex 和 Claude Code 各维护一份规范导致漂移。
@@ -150,7 +152,13 @@ pnpm --filter @ai-planning/web exec playwright install
 
 单元测试和集成测试都用 `MockLLMProvider`，**不需要真实 API Key**。只有本地手动跑一遍端到端真实工作流时，才需要在 `.env` 里填 `BAISHAN_BASE_URL` 和 `BAISHAN_API_KEY`。
 
-本地体验完整流程时，将 `BAISHAN_API_KEY` 留空。系统会使用一套连贯的演示数据：先通过多轮需求澄清收集信息，再依次停在需求范围、MVP 取舍和技术方案三个检查点。每个检查点都可继续与 Agent 讨论；点击“确认，继续下一环节”后才会进入后续分析，最终生成 11 类产物和用量日志。
+验证真实 Baishan SSE 时，先在 `.env` 配置上述两项，再显式运行付费测试。该测试默认跳过，不进入 CI：
+
+```bash
+RUN_REAL_BAISHAN_STREAM=1 pnpm exec dotenv -e .env -- pnpm --filter @ai-planning/llm-core test
+```
+
+本地体验完整流程时，将 `BAISHAN_API_KEY` 留空。系统会使用一套连贯且固定分片输出的演示数据：先通过多轮需求澄清收集信息，再依次停在需求范围、MVP 取舍和技术方案三个检查点。每个检查点都可继续与 Agent 实时讨论，模拟回复会根据预算、范围、数据可信度和平台取舍给出不同回应；点击“确认，继续下一环节”后才会进入后续分析，最终生成 11 类产物和用量日志。
 
 ## Project Structure
 

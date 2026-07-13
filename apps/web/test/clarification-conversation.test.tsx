@@ -52,7 +52,9 @@ describe('ClarificationConversation', () => {
         onAdvance={onAdvance}
         onRetryHistory={vi.fn()}
         onSubmit={onSubmit}
+        pendingUserMessage={null}
         stageName="需求澄清"
+        streamingReply={null}
       />,
     );
 
@@ -66,5 +68,30 @@ describe('ClarificationConversation', () => {
     await userEvent.click(screen.getByRole('button', { name: '确认，继续下一环节' }));
     expect(onSubmit).toHaveBeenCalledOnce();
     expect(onAdvance).toHaveBeenCalledOnce();
+  });
+
+  it('renders the pending user message and streaming reply', () => {
+    render(
+      <ClarificationConversation
+        actionError={null}
+        answer="补充内容"
+        busy
+        canAdvance={false}
+        canReply
+        currentQuestions={[]}
+        historyError={null}
+        isLoading={false}
+        messages={[]}
+        onAnswerChange={vi.fn()}
+        onAdvance={vi.fn()}
+        onRetryHistory={vi.fn()}
+        onSubmit={vi.fn()}
+        pendingUserMessage="补充内容"
+        stageName="需求澄清"
+        streamingReply="我先确认一下"
+      />,
+    );
+    expect(screen.getAllByText('补充内容')).toHaveLength(2);
+    expect(screen.getByText('我先确认一下')).toHaveAttribute('aria-busy', 'true');
   });
 });

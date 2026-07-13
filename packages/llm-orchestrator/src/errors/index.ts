@@ -15,5 +15,6 @@ export {
   LLMAuthError,
   LLMSchemaValidationError,
   LLMNetworkError,
+  LLMCancelledError,
   isRetryable,
 } from '@ai-planning/llm-core';

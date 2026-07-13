@@ -5,13 +5,19 @@
 import { z } from 'zod';
 import { requirementPointSchema } from './requirement-point.schema.js';
 
+export const clarificationQuestionSchema = z.object({
+  question: z.string(),
+  context: z.string(),
+  category: z.enum(['user', 'scope', 'tech', 'business', 'risk']),
+});
+
 export const requirementAnalysisSchema = z.object({
   project_summary: z.string(),
   target_users: z.array(z.string()),
   core_problems: z.array(z.string()),
   requirement_points: z.array(requirementPointSchema),
   assumptions: z.array(z.string()),
-  clarification_questions: z.array(z.string()),
+  clarification_questions: z.array(clarificationQuestionSchema),
 });
 
 export type RequirementAnalysisResult = z.infer<typeof requirementAnalysisSchema>;

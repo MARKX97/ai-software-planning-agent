@@ -1,8 +1,14 @@
-import type { LLMCallOptions, LLMResponse, ModelPricing } from '@ai-planning/shared';
+import type {
+  LLMCallOptions,
+  LLMResponse,
+  LLMStreamOptions,
+  ModelPricing,
+} from '@ai-planning/shared';
 import type { ILLMProvider } from '../interfaces/illm-provider.js';
 import { calculateCost } from '../utils/calculate-cost.js';
 import { validateSchema } from '../utils/parse-structured-output.js';
 import { mockContent } from './mock-demo-content.js';
+import { LLMCancelledError } from '../errors/llm-errors.js';
 
 /**
  * Deterministic mock provider used when no real Baishan key is configured
@@ -49,6 +55,16 @@ export class MockLLMProvider implements ILLMProvider {
       retries: 0,
       timestamp: new Date().toISOString(),
     };
+  }
+
+  async chatStream(prompt: string, options: LLMStreamOptions): Promise<LLMResponse> {
+    if (options.signal?.aborted) throw new LLMCancelledError();
+    const response = await this.chat(prompt, options);
+    for (const chunk of response.content.match(/.{1,12}/gs) ?? []) {
+      if (options.signal?.aborted) throw new LLMCancelledError();
+      await options.onDelta(chunk);
+    }
+    return response;
   }
 }
 

@@ -1,6 +1,6 @@
 # State Machine — System Contract
 
-> Version: 1.0.0
+> Version: 1.1.0
 > Status: Contract
 > Owner: Backend Lead
 > Tokens: ~2,000
@@ -93,3 +93,10 @@ FAILED                      → { }
 | `on_exit_stage`     | 保存 `analysis_results` 记录                       |
 | `on_exit_synthesis` | 更新 `project.requirement_text`                    |
 | `on_exit_planning`  | 保存所有产物到 `artifacts` 表 + 文件系统           |
+
+## 8. 流式交互状态
+
+- SSE 连接存续期间，项目保持在当前检查点；只有完整回复成功后才更新可见消息与状态响应。
+- `done` 是本轮成功提交点：用户消息和完整助手消息原子写入，随后返回最新状态。
+- `error` 或客户端断开不会产生半条持久化消息。`continue/discuss` 保持原检查点，可重新生成。
+- 首次 `run` 取消或失败后项目进入可重启的 failed 状态；取消对应的 execution 状态必须为 `cancelled`。

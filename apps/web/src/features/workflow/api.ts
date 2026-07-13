@@ -1,15 +1,31 @@
 import { apiRequest } from '@/lib/api-client';
+import { apiEventStream } from '@/lib/sse-client';
 import type {
   ConversationResponse,
   MessageListResponse,
   WorkflowStateListResponse,
   WorkflowStatusResponse,
+  WorkflowStreamResponse,
 } from '@/types/api';
 
-export function runWorkflow(projectId: string): Promise<WorkflowStatusResponse> {
-  return apiRequest<WorkflowStatusResponse>(`/projects/${projectId}/run`, {
+export interface WorkflowStreamCallbacks {
+  readonly onDelta: (content: string) => void;
+  readonly signal?: AbortSignal;
+}
+
+export interface WorkflowMessageStreamInput extends WorkflowStreamCallbacks {
+  readonly conversationId: string;
+  readonly message: string;
+}
+
+export function runWorkflow(
+  projectId: string,
+  callbacks: WorkflowStreamCallbacks,
+): Promise<WorkflowStreamResponse> {
+  return apiEventStream<WorkflowStreamResponse>(`/projects/${projectId}/run`, {
     method: 'POST',
     body: {},
+    ...callbacks,
   });
 }
 
@@ -40,23 +56,25 @@ export function listConversationMessages(
 
 export function continueWorkflow(
   projectId: string,
-  conversationId: string,
-  message: string,
-): Promise<WorkflowStatusResponse> {
-  return apiRequest<WorkflowStatusResponse>(`/projects/${projectId}/workflow/continue`, {
+  input: WorkflowMessageStreamInput,
+): Promise<WorkflowStreamResponse> {
+  return apiEventStream<WorkflowStreamResponse>(`/projects/${projectId}/workflow/continue`, {
     method: 'POST',
-    body: { conversation_id: conversationId, message },
+    body: { conversation_id: input.conversationId, message: input.message },
+    onDelta: input.onDelta,
+    signal: input.signal,
   });
 }
 
 export function discussWorkflow(
   projectId: string,
-  conversationId: string,
-  message: string,
-): Promise<WorkflowStatusResponse> {
-  return apiRequest<WorkflowStatusResponse>(`/projects/${projectId}/workflow/discuss`, {
+  input: WorkflowMessageStreamInput,
+): Promise<WorkflowStreamResponse> {
+  return apiEventStream<WorkflowStreamResponse>(`/projects/${projectId}/workflow/discuss`, {
     method: 'POST',
-    body: { conversation_id: conversationId, message },
+    body: { conversation_id: input.conversationId, message: input.message },
+    onDelta: input.onDelta,
+    signal: input.signal,
   });
 }
 
