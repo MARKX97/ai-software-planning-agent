@@ -21,7 +21,7 @@ export class PlanningGenerationStage implements StageProcessor {
   constructor(private readonly deps: StageDeps) {}
 
   async execute(ctx: WorkflowContext): Promise<StageResult> {
-    const store = new ArtifactFileStore(this.deps.db);
+    const store = new ArtifactFileStore(this.deps.db, this.deps.dataDir);
     const generator = new ArtifactGenerator(this.deps.orchestrator, store);
     const result = await generator.generateAll(ctx);
     for (const item of result.successes) {

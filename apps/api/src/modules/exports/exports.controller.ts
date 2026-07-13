@@ -7,10 +7,13 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UsePipes,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { UUID_V4_PIPE } from '../../common/pipes/uuid-validation.pipe.js';
 import { AppException } from '../../common/exception/app-exception.js';
 import { ErrorCode } from '../../common/exception/error-code.js';
 import { ExportsService } from './exports.service.js';
@@ -25,7 +28,7 @@ const downloadQuerySchema = (v: unknown): string => {
 };
 
 /**
- * Export endpoints — PRD export + status + (stub) download.
+ * Export endpoints — PRD export task, status, and token-protected download.
  * @internal
  */
 @ApiTags('Export')
@@ -38,7 +41,7 @@ export class ExportsController {
   @ApiOperation({ summary: '导出 PRD 文档' })
   @UsePipes(new ZodValidationPipe(exportRequestSchema))
   async createExport(
-    @Param('project_id') projectId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
     @Body() body: ExportRequest,
   ): Promise<ExportResponse> {
     return this.exports.createExport(projectId, body);
@@ -47,8 +50,8 @@ export class ExportsController {
   @Get(':export_id')
   @ApiOperation({ summary: '获取导出任务状态' })
   async getExport(
-    @Param('project_id') projectId: string,
-    @Param('export_id') exportId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
+    @Param('export_id', UUID_V4_PIPE) exportId: string,
   ): Promise<ExportResponse> {
     return this.exports.getExport(projectId, exportId);
   }
@@ -56,11 +59,14 @@ export class ExportsController {
   @Get(':export_id/download')
   @ApiOperation({ summary: '下载导出文件' })
   async download(
-    @Param('project_id') projectId: string,
-    @Param('export_id') exportId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
+    @Param('export_id', UUID_V4_PIPE) exportId: string,
     @Query('token') token: string,
-  ): Promise<ExportResponse> {
-    downloadQuerySchema(token);
-    return this.exports.getDownload(projectId, exportId);
+    @Res() response: Response,
+  ): Promise<void> {
+    const file = await this.exports.getDownload(projectId, exportId, downloadQuerySchema(token));
+    response.setHeader('Content-Type', file.contentType);
+    response.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
+    response.send(file.content);
   }
 }

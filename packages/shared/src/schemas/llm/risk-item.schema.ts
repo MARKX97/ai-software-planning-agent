@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 export const riskItemSchema = z.object({
   id: z.string(),
-  category: z.string(),
+  category: z.enum(['technical', 'market', 'resource', 'schedule']),
   description: z.string(),
   probability: z.enum(['high', 'medium', 'low']),
   impact: z.enum(['high', 'medium', 'low']),

@@ -26,7 +26,7 @@ triggers:
 ```
 L1: packages/llm-core/          核心抽象层
     ├── interfaces/              ILLMProvider, ILLMHttpClient, IRetryPolicy
-    ├── types/                   LLMResponse, LLMCallOptions, TokenUsage, CostInfo
+    ├── shared types             packages/shared/src/types/llm.ts
     ├── adapters/                OpenAICompatibleAdapter (连接 Baishan)
     ├── utils/                   calculateCost, validateSchema, createRetryPolicy
     └── errors/                  LLMTimeoutError, LLMRateLimitError, LLMAuthError
@@ -48,9 +48,9 @@ L3: packages/llm-orchestrator/  编排层（业务唯一入口）
 
 1. 创建 packages/llm-core/ 包
 2. 定义接口: ILLMProvider, ILLMHttpClient, IRetryPolicy
-3. 定义类型: LLMResponse, LLMCallOptions, TokenUsage, CostInfo, ModelPricing
+3. 在 `packages/shared/src/types/llm.ts` 定义 LLMResponse、LLMCallOptions 等共享类型
 4. 实现适配器: OpenAICompatibleAdapter
-5. 实现工具: calculateCost, validateSchema (Ajv), createRetryPolicy, parseStructuredOutput
+5. 实现工具: calculateCost, validateSchema (Zod 3), createRetryPolicy, parseStructuredOutput
 6. 实现错误: LLMTimeoutError, LLMRateLimitError, LLMAuthError, LLMSchemaValidationError
 
 验收: `pnpm --filter llm-core test`
@@ -70,10 +70,10 @@ L3: packages/llm-orchestrator/  编排层（业务唯一入口）
 1. 创建 packages/llm-orchestrator/ 包
 2. 重试策略（指数退避: 1s→2s→4s，最多 3 次）
 3. 降级策略（部分失败继续，全失败抛异常）
-4. 超时控制（Promise.race，默认 60s）
+4. 超时控制（Adapter AbortController，默认 60s）
 5. LlmOrchestratorService（callSingle/callMulti/callWithFallback）
 6. CallTracker + CostController（80% 告警）
-7. 在 apps/api/src/main.ts 中初始化
+7. 在 `apps/api/src/llm/orchestrator.module.ts` 中初始化
 
 验收: `pnpm --filter llm-orchestrator test`
 
@@ -123,8 +123,8 @@ LLM 返回 JSON
 ```
 1. 创建 providers/<name>.provider.ts（继承 BaseProvider，~10 行）
 2. 在 config/provider-config.factory.ts 添加环境变量
-3. 在 main.ts 中注册到 ProviderRegistry
-4. 更新 packages/shared/src/enums/llm-provider.ts
+3. 在 llm-orchestrator factory 中注册到 ProviderRegistry
+4. 更新 `packages/shared` 与 Prisma 中的 LLMProvider 枚举
 
 无需修改: llm-core, llm-orchestrator, 业务代码
 ```

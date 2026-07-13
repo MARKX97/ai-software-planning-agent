@@ -149,8 +149,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 }
 
-export async function apiDownload(path: string): Promise<Blob> {
-  const response = await fetchApi(buildUrl(path), {
+export async function apiDownload(path: string, query?: Record<string, QueryValue>): Promise<Blob> {
+  const response = await fetchApi(buildUrl(path, query), {
     method: 'GET',
     headers: headers(false),
     cache: 'no-store',

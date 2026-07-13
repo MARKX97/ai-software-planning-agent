@@ -51,7 +51,7 @@ Idea → Requirement Analysis → Requirement Clarification
 
 ## 多模型分析
 
-需求分析阶段使用 GLM-5.1 / DeepSeek-V4-Pro / MiniMax-M2.5 三个模型并行分析。
+多模型分析阶段使用 GLM-5.1 / DeepSeek-V4-Pro / MiniMax-M2.5 三个模型并行分析。
 
 ## 输出内容
 

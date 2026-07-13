@@ -12,7 +12,7 @@
 确定性有限状态机 (Deterministic Finite State Machine)
 
 - 状态数: 12
-- 转换边: 17
+- 转换边: 20
 - 循环: 1（澄清对话循环）
 - 终态: 2（COMPLETED, FAILED）
 

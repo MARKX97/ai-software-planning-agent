@@ -15,6 +15,7 @@ import { MULTI_MODEL_ANALYSIS_PROMPT } from '../../../prompts/multi-model-analys
 import type { StageDeps } from './stage-deps.js';
 import type { StageProcessor } from './stage-processor.js';
 import { logModelCall } from './model-call-log.js';
+import { STAGE_TIMEOUT_MS } from './model-routing.js';
 
 export interface MultiModelResult extends StageResult {
   readonly byProvider: Record<string, LLMResponse | null>;
@@ -35,6 +36,7 @@ export class MultiModelAnalysisStage implements StageProcessor {
     const byProvider = await this.deps.orchestrator.callMulti(prompt, {
       outputSchema: multiModelAnalysisSchema,
       projectId: ctx.projectId,
+      timeout: STAGE_TIMEOUT_MS[this.stage],
     });
     const entries = Object.entries(byProvider);
     const successCount = entries.filter(([, r]) => r !== null).length;

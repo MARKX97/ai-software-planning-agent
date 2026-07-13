@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { UUID_V4_PIPE } from '../../common/pipes/uuid-validation.pipe.js';
 import { ConversationsService } from './conversations.service.js';
 import {
   listMessagesQuerySchema,
@@ -34,7 +35,9 @@ export class ConversationsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: '创建对话' })
-  async create(@Param('project_id') projectId: string): Promise<ConversationResponse> {
+  async create(
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
+  ): Promise<ConversationResponse> {
     return this.conversations.create(projectId);
   }
 
@@ -43,8 +46,8 @@ export class ConversationsController {
   @ApiOperation({ summary: '发送消息' })
   @UsePipes(new ZodValidationPipe(sendMessageSchema))
   async sendMessage(
-    @Param('project_id') projectId: string,
-    @Param('conversation_id') conversationId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
+    @Param('conversation_id', UUID_V4_PIPE) conversationId: string,
     @Body() body: SendMessageRequest,
   ): Promise<MessageResponse> {
     return this.conversations.sendMessage(projectId, conversationId, body);
@@ -54,8 +57,8 @@ export class ConversationsController {
   @ApiOperation({ summary: '获取消息历史' })
   @UsePipes(new ZodValidationPipe(listMessagesQuerySchema))
   async listMessages(
-    @Param('project_id') projectId: string,
-    @Param('conversation_id') conversationId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
+    @Param('conversation_id', UUID_V4_PIPE) conversationId: string,
     @Query() query: ListMessagesQuery,
   ): Promise<MessageListResponse> {
     return this.conversations.listMessages(projectId, conversationId, query);

@@ -19,6 +19,8 @@ triggers:
 # Deployment Guide
 
 > Load: 部署时
+>
+> 当前状态: CI 已落地；Docker/Compose、生产监控、备份与灾备仍是计划，不应视为仓库现有能力。
 
 ## 1. 环境对比
 
@@ -36,16 +38,16 @@ triggers:
 ```bash
 pnpm install
 cp .env.example .env
-docker compose -f docker/docker-compose.dev.yml up -d postgres
+# 启动本地 PostgreSQL 16，并确认 .env 中 DATABASE_URL 可用
 pnpm db:migrate
 pnpm db:seed
 pnpm dev
 # Web: http://localhost:3000, API: http://localhost:3001
 ```
 
-前置: Node.js 18+, pnpm 9, PostgreSQL 16, Docker Desktop 26+
+前置: Node.js 18+, pnpm 10, PostgreSQL 16；Docker 仅在后续容器化时需要。
 
-## 3. Docker 设计
+## 3. Docker 设计（计划，当前未落地）
 
 原则: 多阶段构建、Alpine 基础镜像、非 root 用户、HEALTHCHECK
 
@@ -59,7 +61,7 @@ docker/
 └── nginx.conf
 ```
 
-## 4. Docker Compose
+## 4. Docker Compose（计划，当前未落地）
 
 ### 卷
 
@@ -78,13 +80,14 @@ docker/
 
 ## 5. 环境变量
 
-| 分类    | 变量                                                       | 必须 |
-| ------- | ---------------------------------------------------------- | ---- |
-| 数据库  | `DATABASE_URL`                                             | 是   |
-| LLM API | `BAISHAN_BASE_URL`, `BAISHAN_API_KEY`                      | 是   |
-| LLM API | `BAISHAN_MODEL_DEEPSEEK/GLM/MINIMAX`                       | 否   |
-| 应用    | `API_PORT`, `WEB_PORT`, `API_KEY`, `DATA_DIR`, `LOG_LEVEL` | 否   |
-| 成本    | `COST_MAX_TOKENS_PER_PROJECT`, `COST_MAX_COST_PER_PROJECT` | 否   |
+| 分类    | 变量                                                                     | 必须 |
+| ------- | ------------------------------------------------------------------------ | ---- |
+| 数据库  | `DATABASE_URL`                                                           | 是   |
+| LLM API | `BAISHAN_BASE_URL`, `BAISHAN_API_KEY`                                    | 是   |
+| LLM API | `BAISHAN_MODEL_DEEPSEEK/GLM/MINIMAX`                                     | 否   |
+| 应用    | `API_PORT`, `WEB_PORT`, `API_KEY`, `DATA_DIR`, `LOG_LEVEL`               | 否   |
+| 下载    | `DOWNLOAD_TOKEN_SECRET`（默认复用 API_KEY；本地无 Key 时进程内临时生成） | 否   |
+| 成本    | `COST_MAX_COST_PER_PROJECT`                                              | 否   |
 
 安全: .env 加入 .gitignore、生产 API Key 90 天轮换、不记录 API Key 到日志、数据库密码 > 16 位、生产端口仅绑定 127.0.0.1
 
@@ -115,8 +118,8 @@ Push/PR → Lint & Type Check → Test → Build → Deploy
 
 ## 8. 日志与监控
 
-- 框架: pino（结构化 JSON）
-- 存储: stdout → Docker logs → 日志文件，每天轮转，保留 30 天
+- 当前框架: Nest `Logger` → stdout。
+- pino、日志轮转与生产监控尚未落地，属于容器化后的计划项。
 
 | 级别  | 场景         |
 | ----- | ------------ |

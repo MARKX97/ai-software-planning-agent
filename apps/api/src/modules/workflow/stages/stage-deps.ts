@@ -10,4 +10,5 @@ import type { PrismaService } from '../../../database/database.module.js';
 export interface StageDeps {
   readonly orchestrator: LlmOrchestratorService;
   readonly db: PrismaService;
+  readonly dataDir: string;
 }

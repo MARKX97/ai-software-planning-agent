@@ -20,29 +20,29 @@ triggers:
 
 ```
          ┌───────┐
-         │  E2E  │  ← 10 tests (Playwright)
+         │  E2E  │  ← Playwright 关键路径
          ├───────┤
-         │  API  │  ← 26 tests (Supertest + OpenAPI)
+         │  API  │  ← 28 路由反射契约 + 真实 HTTP 集成
          ├───────┤
-         │  Int  │  ← 20 tests (Jest + PostgreSQL)
+         │  Int  │  ← node:test + PostgreSQL（按环境启用）
          ├───────┤
-         │ Unit  │  ← 100+ tests (Jest/Vitest)
+         │ Unit  │  ← node:test / Vitest
          └───────┘
 ```
 
 ## 2. 测试框架
 
-| 层           | 工具                   |
-| ------------ | ---------------------- |
-| 后端单元测试 | Jest 30                |
-| 后端集成测试 | Jest + Supertest       |
-| 前端单元测试 | Vitest                 |
-| 前端组件测试 | @testing-library/react |
-| E2E          | Playwright             |
-| API 契约测试 | OpenAPI Validator      |
-| LLM Mock     | MockLLMProvider        |
+| 层           | 工具                                       |
+| ------------ | ------------------------------------------ |
+| 后端单元测试 | Node.js `node:test` + `tsx`                |
+| 后端集成测试 | `node:test` + Fetch + PostgreSQL           |
+| 前端单元测试 | Vitest                                     |
+| 前端组件测试 | @testing-library/react                     |
+| E2E          | Playwright                                 |
+| API 契约测试 | Controller 路由反射 + OpenAPI 人工/CI 核对 |
+| LLM Mock     | MockLLMProvider                            |
 
-## 3. 覆盖率目标
+## 3. 覆盖率目标（尚未接入 CI 门禁）
 
 | 包                               | 目标 |
 | -------------------------------- | ---- |
@@ -67,15 +67,15 @@ triggers:
 
 ### API Test
 
-26 个接口，每个 ≥ 3 个用例（正常/异常/边界）。Supertest + OpenAPI 契约校验
+28 个接口。快速契约测试校验 Controller 路由与公开路由；设置 `RUN_REAL_INTEGRATION=1` 后通过 Fetch + PostgreSQL 覆盖完整 HTTP 工作流。
 
 ### Workflow Test
 
-状态机（17 条合法 + 非法转换）、9 个阶段（Mock LLM）、澄清循环（多轮 + 上限）、降级路径（1/2/3 模型失败）、错误恢复
+状态机（20 条合法 + 非法转换）、9 个阶段（Mock LLM）、澄清循环（多轮 + 上限）、降级路径（1/2/3 模型失败）、错误恢复
 
 ### LLM Mock Test
 
-`MockLLMProvider` 支持 fail/timeout/delay 控制，覆盖: 正常/超时/单模型失败/全模型失败/Schema 校验失败/高延迟/成本超限
+`MockLLMProvider` 提供确定性正常响应；失败、超时和重试场景通过测试内的专用 Provider stub 覆盖。
 
 ### Prompt Regression Test
 
@@ -100,7 +100,7 @@ class MockLLMProvider implements ILLMProvider {
 }
 ```
 
-## 6. Golden Dataset
+## 6. Golden Dataset（计划项，当前未落地）
 
 3 个标准测试用例:
 
@@ -114,11 +114,7 @@ class MockLLMProvider implements ILLMProvider {
 
 ```yaml
 jobs:
-  unit-test: # 6 个包并行
-  integration-test: # PostgreSQL Service Container
-  api-contract-test: # OpenAPI 契约校验
-  prompt-regression: # Prompt 快照
-  architecture-check: # 禁止技术检查
+  test: # PostgreSQL Service Container + format/lint/typecheck/test/build + HTTP/E2E
 ```
 
 ## 8. Release 验证
@@ -143,9 +139,9 @@ apps/web/src/components/card.tsx   → tests/card.test.tsx
 
 ```bash
 pnpm test                     # 全量
-pnpm test -- --coverage       # 覆盖率
-pnpm test -- --watch          # 监听
-pnpm test:e2e                 # E2E
-pnpm test:api                 # API 契约
-pnpm test -- --updateSnapshot # 更新快照
+pnpm test                                      # 全量单元/契约测试
+pnpm --filter @ai-planning/api test            # 后端测试
+pnpm --filter @ai-planning/web test            # 前端 Vitest
+pnpm --filter @ai-planning/web test:e2e        # Playwright E2E
+RUN_REAL_INTEGRATION=1 pnpm --filter @ai-planning/api test
 ```

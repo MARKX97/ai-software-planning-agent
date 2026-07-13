@@ -1,5 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { LlmOrchestratorService } from '@ai-planning/llm-orchestrator';
 import type { ArtifactType } from '@ai-planning/database';
 import {
@@ -38,24 +41,27 @@ describe('ArtifactGenerator', () => {
     const calls: Array<{ provider: string; prompt: string }> = [];
     const saved: Array<{ type: ArtifactType; content: string }> = [];
     const orchestrator = mockOrchestrator(calls, 'backend_spec');
-    const store = new ArtifactFileStore(mockDb(saved) as never);
-    const generator = new ArtifactGenerator(orchestrator, store);
-
-    const result = await generator.generateAll(context());
-
-    assert.equal(result.successes.length, ARTIFACT_TYPES.length - 1);
-    assert.equal(result.failures.length, 1);
-    assert.equal(result.failures[0]?.type, 'backend_spec');
-    assert.equal(saved.length, ARTIFACT_TYPES.length - 1);
-    assert.equal(calls.find((c) => hasArtifactType(c.prompt, 'prd'))?.provider, 'deepseek');
-    assert.equal(
-      calls.find((c) => hasArtifactType(c.prompt, 'architecture'))?.provider,
-      'deepseek',
-    );
-    assert.equal(
-      calls.find((c) => hasArtifactType(c.prompt, 'requirement_report'))?.provider,
-      'glm',
-    );
+    const dataDir = await mkdtemp(join(tmpdir(), 'artifact-generator-'));
+    try {
+      const store = new ArtifactFileStore(mockDb(saved) as never, dataDir);
+      const generator = new ArtifactGenerator(orchestrator, store);
+      const result = await generator.generateAll(context());
+      assert.equal(result.successes.length, ARTIFACT_TYPES.length - 1);
+      assert.equal(result.failures.length, 1);
+      assert.equal(result.failures[0]?.type, 'backend_spec');
+      assert.equal(saved.length, ARTIFACT_TYPES.length - 1);
+      assert.equal(calls.find((c) => hasArtifactType(c.prompt, 'prd'))?.provider, 'deepseek');
+      assert.equal(
+        calls.find((c) => hasArtifactType(c.prompt, 'architecture'))?.provider,
+        'deepseek',
+      );
+      assert.equal(
+        calls.find((c) => hasArtifactType(c.prompt, 'requirement_report'))?.provider,
+        'glm',
+      );
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -73,7 +79,7 @@ function analysis(
         id: `${model}-${title}`,
         title,
         description: title,
-        priority: 'high',
+        priority: 'P0',
         category: 'functional',
       },
     ],

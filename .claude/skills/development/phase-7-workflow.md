@@ -16,7 +16,7 @@ triggers:
 
 ## 核心交付
 
-1. WorkflowStateMachine（17 条合法转换 + 非法转换拒绝）
+1. WorkflowStateMachine（20 条合法转换 + 非法转换拒绝）
 2. 9 个 Stage 处理器（按 `specs/workflow.spec.md` 定义）
 3. 澄清循环（多轮 + 上限）
 4. 降级路径（1/2/3 模型失败）

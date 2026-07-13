@@ -31,7 +31,7 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      'no-console': 'off',
+      'no-console': 'error',
     },
   },
   // Must be last — turns off eslint rules that conflict with prettier formatting.

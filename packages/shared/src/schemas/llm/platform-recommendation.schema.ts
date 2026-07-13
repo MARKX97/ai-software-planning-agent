@@ -5,8 +5,8 @@
 import { z } from 'zod';
 
 export const platformRecommendationSchema = z.object({
-  recommended_platform: z.string(),
-  tech_stack: z.array(z.string()),
+  recommended_platform: z.enum(['web', 'mobile', 'desktop', 'cli', 'api']),
+  tech_stack: z.record(z.string()),
   rationale: z.string(),
   alternatives: z.array(z.string()),
   trade_offs: z.string(),

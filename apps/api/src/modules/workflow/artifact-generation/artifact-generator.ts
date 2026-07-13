@@ -3,7 +3,7 @@ import type { ArtifactType } from '@ai-planning/database';
 import type { LLMResponse, WorkflowContext } from '@ai-planning/shared';
 import { renderPrompt } from '../../../prompts/prompt-template.js';
 import { PLANNING_GENERATION_PROMPT } from '../../../prompts/planning-generation.prompt.js';
-import { ARTIFACT_PROVIDER, ARTIFACT_TYPES } from '../stages/model-routing.js';
+import { ARTIFACT_PROVIDER, ARTIFACT_TYPES, STAGE_TIMEOUT_MS } from '../stages/model-routing.js';
 import { ArtifactFileStore } from './artifact-file-store.js';
 
 export interface ArtifactGenerationSuccess {
@@ -53,6 +53,7 @@ export class ArtifactGenerator {
     try {
       const response = await this.orchestrator.callSingle(provider, prompt, {
         projectId: ctx.projectId,
+        timeout: STAGE_TIMEOUT_MS.planning_generation,
       });
       const content = response.content.trim();
       if (!content) throw new Error(`Artifact '${type}' content is empty`);

@@ -19,8 +19,8 @@ Confirmed discussion and feedback:
 {{conversationHistory}}
 
 Return a JSON object matching the MVPPlan schema:
-- mvp_scope: array of features included in MVP
-- deferred_scope: array of features deferred to later phases
+- mvp_scope: array of RequirementPoint objects included in MVP
+- deferred_scope: array of RequirementPoint objects deferred to later phases
 - mvp_goal: single-sentence MVP goal
 - success_metrics: array of measurable success metrics
 - timeline: MVP timeline estimate

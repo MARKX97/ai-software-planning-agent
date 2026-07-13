@@ -20,7 +20,7 @@ triggers:
 1. `pnpm-workspace.yaml` + `turbo.json` + `tsconfig` 基础配置
 2. `apps/api/` (NestJS 11) + `apps/web/` (Next.js 15) 骨架
 3. `packages/{llm-core,llm-providers,llm-orchestrator,shared,database,config}/` 空包
-4. `apps/api` health endpoint: `GET /api/v1/health` → `{"status":"ok"}`
+4. `apps/api` health endpoint: `GET /api/v1/health` → OpenAPI `HealthResponse`
 5. ESLint + Prettier 基础配置
 
 ## 目录结构
@@ -53,5 +53,5 @@ apps/web → apps/api (HTTP)
 
 ```bash
 pnpm install && pnpm dev
-curl localhost:3001/api/v1/health  # {"status":"ok"}
+curl localhost:3001/api/v1/health  # status/database/llm_providers/timestamp
 ```

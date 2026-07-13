@@ -28,7 +28,7 @@
 | 数据格式   | JSON                                                        |
 | 认证方式   | Bearer Token                                                |
 | 免认证接口 | `GET /health`, `GET /models`, `GET /models/{provider_name}` |
-| 分页       | `offset` + `limit`，默认 20，最大 100                       |
+| 分页       | `offset` + `limit`，各接口默认 20 或 50，最大 100           |
 | 时间格式   | ISO 8601 UTC                                                |
 | 错误格式   | `{ error: { code, message, details? } }`                    |
 

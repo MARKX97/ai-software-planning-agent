@@ -1,4 +1,4 @@
-import { type INestApplication } from '@nestjs/common';
+import { Logger, type INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import 'reflect-metadata';
@@ -13,6 +13,7 @@ import { HttpExceptionFilter } from './common/exception/http-exception.filter.js
  * @internal
  */
 async function bootstrap(): Promise<void> {
+  const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(AppConfigService);
 
@@ -25,8 +26,8 @@ async function bootstrap(): Promise<void> {
   await setupSwagger(app);
 
   await app.listen(config.port);
-  console.log(`API listening on http://localhost:${config.port}/api/v1`);
-  console.log(`Swagger UI at  http://localhost:${config.port}/api/docs`);
+  logger.log(`API listening on http://localhost:${config.port}/api/v1`);
+  logger.log(`Swagger UI at http://localhost:${config.port}/api/docs`);
 }
 
 function setupSwagger(app: INestApplication): void {

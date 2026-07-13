@@ -18,12 +18,13 @@ async function main(): Promise<void> {
       create: { ...item },
     });
   }
-  console.info(`Seeded ${promptVersionSeed.length} prompt version(s).`);
+  process.stdout.write(`Seeded ${promptVersionSeed.length} prompt version(s).\n`);
 }
 
 main()
   .catch((err: unknown) => {
-    console.error('Seed failed:', err);
+    const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
+    process.stderr.write(`Seed failed: ${message}\n`);
     throw err;
   })
   .finally(async () => {

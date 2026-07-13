@@ -78,6 +78,7 @@ describe('real HTTP + PostgreSQL workflow integration', () => {
         assert.equal(run.response.status, 202);
         const runBody = bodyOf(run);
         assert.equal(runBody['current_stage'], 'requirement_clarification');
+        assert.equal(typeof runBody['started_at'], 'string');
         assert.equal(typeof runBody['conversation_id'], 'string');
         const conversationId = runBody['conversation_id'] as string;
         const waiting = await request(`/projects/${projectId}/workflow/status`);
@@ -206,11 +207,12 @@ describe('real HTTP + PostgreSQL workflow integration', () => {
         const exportId = bodyOf(exportTask)['id'];
         assert.equal(typeof exportId, 'string');
         const exportStatus = await request(`/projects/${projectId}/export/${exportId}`);
-        assert.equal(bodyOf(exportStatus)['status'], 'processing');
-        const exportDownload = await request(
-          `/projects/${projectId}/export/${exportId}/download?token=test-token`,
-        );
-        assert.equal(exportDownload.response.status, 404);
+        assert.equal(bodyOf(exportStatus)['status'], 'completed');
+        const downloadUrl = bodyOf(exportStatus)['download_url'];
+        assert.equal(typeof downloadUrl, 'string');
+        const exportDownload = await fetch(`${base}${downloadUrl}`);
+        assert.equal(exportDownload.status, 200);
+        assert.match(exportDownload.headers.get('content-type') ?? '', /text\/markdown/);
 
         const usage = await request(`/usage/tokens?project_id=${projectId}`);
         const usageBody = bodyOf(usage);

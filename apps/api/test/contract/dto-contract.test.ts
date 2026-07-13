@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { type ArgumentMetadata } from '@nestjs/common';
+import { BadRequestException, type ArgumentMetadata } from '@nestjs/common';
 import { AppException } from '../../src/common/exception/app-exception.js';
 import { ErrorCode } from '../../src/common/exception/error-code.js';
 import { HttpExceptionFilter } from '../../src/common/exception/http-exception.filter.js';
@@ -111,6 +111,20 @@ describe('API error and auth contracts', () => {
     new HttpExceptionFilter().catch(new Error('database password leaked'), host);
     assert.deepEqual(payload, {
       error: { code: ErrorCode.INTERNAL_ERROR, message: 'Internal server error' },
+    });
+  });
+
+  it('maps framework validation errors to INVALID_INPUT', () => {
+    let payload: unknown;
+    const response = {
+      status() {
+        return { json: (value: unknown) => (payload = value) };
+      },
+    };
+    const host = { switchToHttp: () => ({ getResponse: () => response }) } as never;
+    new HttpExceptionFilter().catch(new BadRequestException('invalid uuid'), host);
+    assert.deepEqual(payload, {
+      error: { code: ErrorCode.INVALID_INPUT, message: 'invalid uuid' },
     });
   });
 

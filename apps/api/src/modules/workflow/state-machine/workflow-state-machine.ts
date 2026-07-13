@@ -3,7 +3,7 @@
  *
  * Source: `specs/state-machine.spec.md` §1-5 + `specs/workflow.spec.md` §3.
  *
- * 12 states, 17 transitions, 1 loop edge (clarification → requirement_analysis),
+ * 12 states, 20 transitions, 1 loop edge (clarification → requirement_analysis),
  * 2 terminal states (completed, failed).
  *
  * @internal

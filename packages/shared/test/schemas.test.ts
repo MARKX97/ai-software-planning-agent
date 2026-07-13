@@ -15,8 +15,8 @@ const validRequirementPoint = {
   id: 'R1',
   title: 'Login',
   description: 'Users can log in',
-  priority: 'high',
-  category: 'auth',
+  priority: 'P0',
+  category: 'functional',
 };
 
 describe('llm schemas', () => {
@@ -97,7 +97,7 @@ describe('llm schemas', () => {
       risks: [
         {
           id: 'RISK-1',
-          category: 'tech',
+          category: 'technical',
           description: 'db down',
           probability: 'low',
           impact: 'high',
@@ -113,8 +113,8 @@ describe('llm schemas', () => {
 
   it('accepts valid mvp-plan payload', () => {
     const r = mvpPlanSchema.safeParse({
-      mvp_scope: ['login'],
-      deferred_scope: ['billing'],
+      mvp_scope: [validRequirementPoint],
+      deferred_scope: [{ ...validRequirementPoint, id: 'R2', priority: 'P3' }],
       mvp_goal: 'login works',
       success_metrics: ['retention'],
       timeline: '2 weeks',
@@ -125,8 +125,8 @@ describe('llm schemas', () => {
 
   it('accepts valid platform-recommendation payload', () => {
     const r = platformRecommendationSchema.safeParse({
-      recommended_platform: 'Next.js',
-      tech_stack: ['next', 'nest'],
+      recommended_platform: 'web',
+      tech_stack: { frontend: 'next', backend: 'nest' },
       rationale: 'fast',
       alternatives: ['remix'],
       trade_offs: 'less',
@@ -136,11 +136,11 @@ describe('llm schemas', () => {
 
   it('accepts valid project-plan payload', () => {
     const r = projectPlanSchema.safeParse({
-      phases: ['mvp'],
+      phases: [{ name: 'mvp', duration: '2 weeks', tasks: ['login'] }],
       architecture_overview: 'monorepo',
-      component_tree: 'tree',
-      data_model: 'prisma',
-      api_endpoints: ['/api/v1'],
+      component_tree: [{ name: 'web' }],
+      data_model: [{ name: 'user' }],
+      api_endpoints: [{ method: 'GET', path: '/api/v1' }],
       development_guide: 'guide',
       ai_coding_prompt: 'prompt',
     });

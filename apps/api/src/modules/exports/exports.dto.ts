@@ -44,7 +44,7 @@ export interface ExportResponse {
 }
 
 /** Convert a Prisma Export row to the API response shape. */
-export function toExportResponse(e: Export): ExportResponse {
+export function toExportResponse(e: Export, downloadToken?: string): ExportResponse {
   return {
     id: e.id,
     project_id: e.project_id,
@@ -53,7 +53,9 @@ export function toExportResponse(e: Export): ExportResponse {
     artifact_count: e.artifact_count,
     file_path: e.file_path,
     file_size_bytes: e.file_size_bytes,
-    download_url: null,
+    download_url: downloadToken
+      ? `/projects/${e.project_id}/export/${e.id}/download?token=${downloadToken}`
+      : null,
     error_message: e.error_message,
     created_at: e.created_at.toISOString(),
     completed_at: e.completed_at?.toISOString() ?? null,

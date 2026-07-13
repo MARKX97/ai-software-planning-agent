@@ -41,7 +41,10 @@ function response(provider: string, structuredOutput: unknown): LLMResponse {
 function db(logs: unknown[]) {
   return {
     client: {
-      modelExecutionLog: { create: async (entry: unknown) => logs.push(entry) },
+      modelExecutionLog: {
+        create: async (entry: unknown) => logs.push(entry),
+        aggregate: async () => ({ _avg: { latency_ms: 1 } }),
+      },
       tokenUsage: { upsert: async () => undefined },
     },
   };
@@ -67,6 +70,7 @@ describe('workflow stage processors', () => {
         needsMore,
       );
       assert.equal(logs.length, 1);
+      assert.equal((logs[0] as { data: { attempt_number: number } }).data.attempt_number, 1);
     }
   });
 
@@ -118,6 +122,7 @@ describe('workflow stage processors', () => {
         runPipeline(failingContext, {
           db: failingDb as never,
           orchestrator: orchestrator as never,
+          dataDir: '/tmp',
         }),
       (error: unknown) =>
         error instanceof AppException &&

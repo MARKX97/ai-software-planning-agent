@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { UUID_V4_PIPE } from '../../common/pipes/uuid-validation.pipe.js';
 import { ProjectsService } from './projects.service.js';
 import {
   createProjectSchema,
@@ -49,14 +50,14 @@ export class ProjectsController {
 
   @Get(':project_id')
   @ApiOperation({ summary: '获取项目详情' })
-  async get(@Param('project_id') id: string): Promise<ProjectResponse> {
+  async get(@Param('project_id', UUID_V4_PIPE) id: string): Promise<ProjectResponse> {
     return this.projects.get(id);
   }
 
   @Delete(':project_id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '软删除项目' })
-  async remove(@Param('project_id') id: string): Promise<void> {
+  async remove(@Param('project_id', UUID_V4_PIPE) id: string): Promise<void> {
     await this.projects.softDelete(id);
   }
 }

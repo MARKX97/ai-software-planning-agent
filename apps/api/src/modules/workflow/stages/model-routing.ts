@@ -18,6 +18,19 @@ export const STAGE_PROVIDER: Record<string, string> = {
   planning_generation: 'mixed', // special: per-artifact routing below
 };
 
+/** Per-stage timeout contract in milliseconds. */
+export const STAGE_TIMEOUT_MS: Record<string, number> = {
+  requirement_analysis: 60_000,
+  requirement_clarification: 60_000,
+  multi_model_analysis: 90_000,
+  requirement_synthesis: 60_000,
+  feasibility_analysis: 60_000,
+  risk_analysis: 60_000,
+  mvp_compression: 60_000,
+  platform_recommendation: 60_000,
+  planning_generation: 120_000,
+};
+
 /** Maps each artifact type to its provider name per spec §2. */
 export const ARTIFACT_PROVIDER: Record<string, string> = {
   requirement_report: 'glm',

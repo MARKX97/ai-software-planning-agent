@@ -41,6 +41,7 @@ import {
   createExecution,
   markExecutionComplete,
   markExecutionFailed,
+  markProjectStarted,
   updateProjectStage,
 } from './workflow-store.js';
 
@@ -63,7 +64,7 @@ export class WorkflowService {
       input.conversation_id,
     );
     const execution = await createExecution(this.db, projectId);
-    await updateProjectStage(this.db, projectId, WorkflowStage.REQUIREMENT_ANALYSIS);
+    await markProjectStarted(this.db, projectId);
     return executeWorkflowPipeline(this.deps(), {
       projectId,
       executionId: execution.id,
@@ -118,6 +119,7 @@ export class WorkflowService {
       const reply = await new CheckpointDiscussionStage({
         db: this.db,
         orchestrator: this.orchestrator,
+        dataDir: this.projects.dataDir(),
       }).execute(ctx, project.current_stage as WorkflowStage);
       await appendAgentReply(
         this.db,

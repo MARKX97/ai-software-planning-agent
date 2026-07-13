@@ -1,6 +1,7 @@
 import { Controller, Get, HttpCode, HttpStatus, Param, Query, UsePipes } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { UUID_V4_PIPE } from '../../common/pipes/uuid-validation.pipe.js';
 import { UsageService } from './usage.service.js';
 import {
   listLogsQuerySchema,
@@ -32,7 +33,7 @@ export class UsageController {
   @ApiOperation({ summary: '获取模型调用日志' })
   @UsePipes(new ZodValidationPipe(listLogsQuerySchema))
   async listLogs(
-    @Param('project_id') projectId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
     @Query() query: ListLogsQuery,
   ): Promise<ModelExecutionLogListResponse> {
     return this.usage.listLogs(projectId, query);
@@ -42,8 +43,8 @@ export class UsageController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '获取单条模型调用日志详情' })
   async getLog(
-    @Param('project_id') projectId: string,
-    @Param('log_id') logId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
+    @Param('log_id', UUID_V4_PIPE) logId: string,
   ): Promise<ModelExecutionLogDetailResponse> {
     return this.usage.getLog(projectId, logId);
   }

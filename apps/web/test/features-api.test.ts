@@ -8,9 +8,9 @@ import {
   runWorkflow,
 } from '@/features/workflow/api';
 import { getTokenUsage, listModelLogs } from '@/features/usage/api';
-import { apiRequest } from '@/lib/api-client';
+import { apiDownload, apiRequest } from '@/lib/api-client';
 
-vi.mock('@/lib/api-client', () => ({ apiRequest: vi.fn() }));
+vi.mock('@/lib/api-client', () => ({ apiDownload: vi.fn(), apiRequest: vi.fn() }));
 
 describe('feature API clients', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -33,7 +33,11 @@ describe('feature API clients', () => {
     await listConversationMessages('project-1', 'conversation-1');
     await getTokenUsage('project-1');
     await listModelLogs('project-1', 10, 5);
-    await getExportDownload('project-1', 'export-1', 'token');
+    await getExportDownload(
+      'project-1',
+      'export-1',
+      '/projects/project-1/export/export-1/download?token=token',
+    );
     expect(apiRequest).toHaveBeenNthCalledWith(1, '/projects/project-1/run', {
       method: 'POST',
       body: {},
@@ -61,8 +65,8 @@ describe('feature API clients', () => {
     expect(apiRequest).toHaveBeenNthCalledWith(7, '/projects/project-1/usage/logs', {
       query: { offset: 10, limit: 5 },
     });
-    expect(apiRequest).toHaveBeenNthCalledWith(8, '/projects/project-1/export/export-1/download', {
-      query: { token: 'token' },
-    });
+    expect(apiDownload).toHaveBeenCalledWith(
+      '/projects/project-1/export/export-1/download?token=token',
+    );
   });
 });

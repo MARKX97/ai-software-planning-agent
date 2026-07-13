@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 
 /**
  * Reads app-level configuration from environment variables.
@@ -32,6 +33,8 @@ export class AppConfigService {
   readonly costLimitPerProject: number;
   /** API version surfaced in health/payloads. */
   readonly version: string;
+  /** Secret used to derive short-lived export download tokens. */
+  readonly downloadTokenSecret: string;
 
   constructor() {
     this.port = this.parsePort(process.env['API_PORT'], 3001);
@@ -44,8 +47,10 @@ export class AppConfigService {
     this.modelDeepseek = process.env['BAISHAN_MODEL_DEEPSEEK'] ?? 'deepseek-v4-pro';
     this.modelGlm = process.env['BAISHAN_MODEL_GLM'] ?? 'glm-5.1';
     this.modelMinimax = process.env['BAISHAN_MODEL_MINIMAX'] ?? 'minimax-m2.5';
-    this.costLimitPerProject = this.parseNumber(process.env['COST_LIMIT_PER_PROJECT'], 5);
+    this.costLimitPerProject = this.parseNumber(process.env['COST_MAX_COST_PER_PROJECT'], 5);
     this.version = process.env['API_VERSION'] ?? '1.0.0';
+    this.downloadTokenSecret =
+      process.env['DOWNLOAD_TOKEN_SECRET'] || this.apiKey || randomBytes(32).toString('hex');
   }
 
   private parsePort(value: string | undefined, fallback: number): number {

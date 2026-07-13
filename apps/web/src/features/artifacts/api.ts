@@ -45,9 +45,8 @@ export function getExport(projectId: string, exportId: string): Promise<ExportRe
 export function getExportDownload(
   projectId: string,
   exportId: string,
-  token: string,
-): Promise<ExportResponse> {
-  return apiRequest<ExportResponse>(`/projects/${projectId}/export/${exportId}/download`, {
-    query: { token },
-  });
+  downloadUrl: string,
+): Promise<Blob> {
+  if (downloadUrl) return apiDownload(downloadUrl);
+  return apiDownload(`/projects/${projectId}/export/${exportId}/download`);
 }

@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/database.module.js';
 import { AppException } from '../../common/exception/app-exception.js';
 import { ErrorCode } from '../../common/exception/error-code.js';
 import { ProjectsService } from '../projects/projects.service.js';
+import { ArtifactFileStore } from '../workflow/artifact-generation/artifact-file-store.js';
 import {
   toArtifactListItem,
   toArtifactResponse,
@@ -53,8 +54,18 @@ export class ArtifactsService {
     projectId: string,
     artifactId: string,
   ): Promise<{ content: string; filename: string }> {
-    const artifact = await this.get(projectId, artifactId);
+    await this.projects.findOrFail(projectId);
+    const artifact = await this.db.client.artifact.findUnique({ where: { id: artifactId } });
+    if (!artifact || artifact.project_id !== projectId || artifact.deleted_at) {
+      throw AppException.notFound(
+        ErrorCode.ARTIFACT_NOT_FOUND,
+        `Artifact '${artifactId}' not found`,
+      );
+    }
+    const content = await new ArtifactFileStore(this.db, this.projects.dataDir()).readContent(
+      artifact,
+    );
     const safeName = (artifact.title || artifact.type).replace(/[^a-zA-Z0-9-_]/g, '_');
-    return { content: artifact.content ?? '', filename: `${safeName}.md` };
+    return { content, filename: `${safeName}.md` };
   }
 }

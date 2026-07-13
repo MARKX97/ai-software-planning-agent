@@ -15,7 +15,7 @@
 callSingle(providerName: string, prompt: string, options?: LLMCallOptions): Promise<LLMResponse>
 ```
 
-单模型调用。内置: 重试（指数退避）+ 超时（Promise.race）+ Schema 校验 + Token 追踪。
+单模型调用。内置: 重试（指数退避）+ AbortController 超时 + Schema 校验 + Token 追踪。
 
 ### 1.2 callMulti
 
@@ -39,7 +39,7 @@ callWithFallback(providerNames: string[], prompt: string, options?: LLMCallOptio
 healthCheck(): Promise<Record<string, boolean>>
 ```
 
-检查所有 Provider 可用性。
+检查所有 Provider 的配置就绪状态；MVP 不通过 Completion 做计费式探活。
 
 ## 2. 重试策略
 
@@ -117,6 +117,8 @@ apps/api 只依赖 llm-orchestrator
 | Workflow Stages | `modules/workflow/stages/*.stage.ts`                   |
 | Synthesis       | `modules/synthesis/requirement-synthesizer.service.ts` |
 | Artifact        | `modules/artifact/artifact-generator.service.ts`       |
+| Health          | `health/health.service.ts`（仅配置就绪检查）           |
+| Models          | `modules/models/models.service.ts`（仅模型目录状态）   |
 
 禁止调用 Orchestrator 的模块:
 

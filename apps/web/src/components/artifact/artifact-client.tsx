@@ -58,8 +58,15 @@ export function ArtifactsClient({ projectId }: { projectId: string }) {
     },
   });
   const downloadExportMutation = useMutation({
-    mutationFn: () => getExportDownload(projectId, exportId ?? '', exportId ?? ''),
-    onSuccess: () => {
+    mutationFn: () =>
+      getExportDownload(projectId, exportId ?? '', exportQuery.data?.download_url ?? ''),
+    onSuccess: (blob) => {
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'planning-export.md';
+      link.click();
+      window.URL.revokeObjectURL(url);
       setExportMessage('文件已经准备好了，可以下载。');
     },
   });

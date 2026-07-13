@@ -1,5 +1,5 @@
 /**
- * VALID_TRANSITIONS — adjacency matrix of the 17 legal transitions defined in
+ * VALID_TRANSITIONS — adjacency matrix of the 20 legal transitions defined in
  * `specs/state-machine.spec.md` §4 and `specs/workflow.spec.md` §5.1.
  *
  * Keys are source stages; values are the set of legal target stages. Used by

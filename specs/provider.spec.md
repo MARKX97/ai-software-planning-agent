@@ -15,7 +15,7 @@ interface ILLMProvider {
   readonly modelId: string; // API 模型 ID: 'deepseek-v4-pro' | 'glm-5.1' | 'minimax-m2.5'
   readonly pricing: ModelPricing; // 定价信息
   chat(prompt: string, options?: LLMCallOptions): Promise<LLMResponse>;
-  healthCheck(): Promise<boolean>;
+  healthCheck?(): Promise<boolean>;
 }
 ```
 
@@ -64,12 +64,14 @@ chat() 流程:
 ## 4. ProviderRegistry
 
 ```
-register(name: string, provider: ILLMProvider): void
+register(provider: ILLMProvider): void
 get(name: string): ILLMProvider
 getAll(): ILLMProvider[]
 list(): string[]
 healthCheckAll(): Promise<Record<string, boolean>>
 ```
+
+`healthCheckAll()` 在 MVP 返回已注册 Provider 的配置就绪状态，不发起会计费的 Completion。
 
 ## 5. Baishan 配置
 
@@ -97,19 +99,19 @@ BAISHAN_MODEL_MINIMAX=minimax-m2.5
 
 ## 7. LLMCallOptions
 
-| 字段           | 类型   | 默认值 | 说明             |
-| -------------- | ------ | ------ | ---------------- |
-| `outputSchema` | object | —      | JSON Schema 约束 |
-| `temperature`  | number | 0.7    | 温度             |
-| `maxTokens`    | number | 4096   | 最大输出 token   |
-| `timeout`      | number | 60000  | 超时 (ms)        |
+| 字段           | 类型      | 默认值 | 说明           |
+| -------------- | --------- | ------ | -------------- |
+| `outputSchema` | ZodSchema | —      | 结构化输出约束 |
+| `temperature`  | number    | 0.7    | 温度           |
+| `maxTokens`    | number    | 4096   | 最大输出 token |
+| `timeout`      | number    | 60000  | 超时 (ms)      |
 
 ## 8. 新增 Provider 步骤
 
 ```
 1. 创建 providers/<name>.provider.ts（继承 BaseProvider，~10 行）
 2. 添加环境变量 BAISHAN_MODEL_<NAME>
-3. 在 main.ts 启动时注册到 ProviderRegistry
+3. 在 `llm-orchestrator` factory 中注册到 ProviderRegistry
 4. 更新 LLMProvider 枚举
 
 无需修改: llm-core, llm-orchestrator, 业务代码

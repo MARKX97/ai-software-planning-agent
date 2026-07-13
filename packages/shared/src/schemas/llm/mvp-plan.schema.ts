@@ -3,10 +3,11 @@
  * @internal
  */
 import { z } from 'zod';
+import { requirementPointSchema } from './requirement-point.schema.js';
 
 export const mvpPlanSchema = z.object({
-  mvp_scope: z.array(z.string()),
-  deferred_scope: z.array(z.string()),
+  mvp_scope: z.array(requirementPointSchema),
+  deferred_scope: z.array(requirementPointSchema),
   mvp_goal: z.string(),
   success_metrics: z.array(z.string()),
   timeline: z.string(),

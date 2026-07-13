@@ -9,7 +9,7 @@
 | 工具                      | 用途                                 | 安装命令                          | 验证方式       |
 | ------------------------- | ------------------------------------ | --------------------------------- | -------------- |
 | Node.js ≥18               | 运行时                               | `brew install node@20` 或官网下载 | `node -v`      |
-| pnpm ≥9                   | 包管理                               | `npm i -g pnpm@10`                | `pnpm -v`      |
+| pnpm 10                   | 包管理                               | `npm i -g pnpm@10`                | `pnpm -v`      |
 | git ≥2.39                 | 版本控制                             | `brew install git`                | `git -v`       |
 | curl                      | API 健康检查                         | macOS 自带                        | `curl -V`      |
 | jq                        | 解析 JSON 输出                       | `brew install jq`                 | `jq --version` |
@@ -111,11 +111,11 @@ pnpm dev
         ┌───────┐
         │  E2E  │  ← ~10 个（Playwright）· 仅 Phase 10
         ├───────┤
-        │  API  │  ← 26 个接口契约（Supertest + OpenAPI）
+        │  API  │  ← 28 个 OpenAPI operation 契约
         ├───────┤
-        │  Int  │  ← ~20 个集成（Jest + 真实 PostgreSQL）
+        │  Int  │  ← node:test + 真实 PostgreSQL
         ├───────┤
-        │ Unit  │  ← 100+ 单元（Jest/Vitest）
+        │ Unit  │  ← node:test / Vitest
         └───────┘
 ```
 

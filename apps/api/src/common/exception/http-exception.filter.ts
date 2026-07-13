@@ -65,8 +65,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const res = err.getResponse();
       const message =
         typeof res === 'string' ? res : ((res as { message?: string }).message ?? err.message);
-      return { code: ErrorCode.INTERNAL_ERROR, message };
+      return { code: this.httpErrorCode(err.getStatus()), message };
     }
     return { code: ErrorCode.INTERNAL_ERROR, message: 'Internal server error' };
+  }
+
+  private httpErrorCode(status: number): string {
+    if (status === HttpStatus.BAD_REQUEST) return ErrorCode.INVALID_INPUT;
+    if (status === HttpStatus.UNAUTHORIZED) return ErrorCode.UNAUTHORIZED;
+    if (status === HttpStatus.FORBIDDEN) return ErrorCode.FORBIDDEN;
+    if (status === HttpStatus.TOO_MANY_REQUESTS) return ErrorCode.RATE_LIMITED;
+    return ErrorCode.INTERNAL_ERROR;
   }
 }

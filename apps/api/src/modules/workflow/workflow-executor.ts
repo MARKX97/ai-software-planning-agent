@@ -41,7 +41,7 @@ export async function executeWorkflowPipeline(
   try {
     const finalStage = await runPipeline(
       ctx,
-      { db: deps.db, orchestrator: deps.orchestrator },
+      { db: deps.db, orchestrator: deps.orchestrator, dataDir: deps.projects.dataDir() },
       { startStage: input.startStage },
     );
     if (finalStage === WorkflowStage.COMPLETED) {

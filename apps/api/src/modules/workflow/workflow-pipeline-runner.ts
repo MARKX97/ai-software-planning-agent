@@ -37,6 +37,7 @@ import type { MultiModelResult } from './stages/multi-model-analysis.stage.js';
 export interface PipelineRunDeps {
   readonly db: PrismaService;
   readonly orchestrator: LlmOrchestratorService;
+  readonly dataDir: string;
 }
 
 export interface PipelineRunOptions {
@@ -50,7 +51,11 @@ export async function runPipeline(
   options: PipelineRunOptions = {},
 ): Promise<WorkflowStage> {
   const stateMachine = new WorkflowStateMachine();
-  const stageDeps: StageDeps = { orchestrator: deps.orchestrator, db: deps.db };
+  const stageDeps: StageDeps = {
+    orchestrator: deps.orchestrator,
+    db: deps.db,
+    dataDir: deps.dataDir,
+  };
   const registry = createStageRegistry(stageDeps);
   let currentStage = options.startStage ?? pickStartingStage(ctx);
   while (!stateMachine.isTerminal(currentStage)) {

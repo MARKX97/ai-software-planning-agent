@@ -31,6 +31,21 @@ export async function updateProjectStage(
   });
 }
 
+export async function markProjectStarted(db: PrismaService, projectId: string): Promise<void> {
+  const now = new Date();
+  await db.client.project.update({
+    where: { id: projectId },
+    data: {
+      status: 'active',
+      current_stage: WorkflowStage.REQUIREMENT_ANALYSIS,
+      error_message: null,
+      started_at: now,
+      completed_at: null,
+      updated_at: now,
+    },
+  });
+}
+
 export async function markExecutionComplete(db: PrismaService, executionId: string): Promise<void> {
   await db.client.workflowExecution.update({
     where: { id: executionId },

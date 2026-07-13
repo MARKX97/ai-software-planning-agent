@@ -2,8 +2,8 @@ const requirementPoint = {
   id: 'REQ-1',
   title: '按真实约束推荐晚餐',
   description: '根据人数、预算、忌口和可用时间，给出三种可以马上执行的方案。',
-  priority: 'high',
-  category: 'recommendation',
+  priority: 'P0',
+  category: 'functional',
   user_story: '作为忙碌的上班族，我想快速得到靠谱的晚餐选择，不再反复纠结。',
 };
 
@@ -21,8 +21,8 @@ const demoResponses: Array<[string, (provider: string) => unknown]> = [
           id: 'REQ-2',
           title: '解释为什么推荐',
           description: '每个方案都说明预计时间、花费和适合它的理由。',
-          priority: 'medium',
-          category: 'explanation',
+          priority: 'P1',
+          category: 'ux',
         },
       ],
       assumptions: ['首版服务一个城市', '首版不直接下单或支付'],
@@ -56,7 +56,7 @@ const demoResponses: Array<[string, (provider: string) => unknown]> = [
           id: 'NFR-1',
           title: '快速得到结果',
           description: '提交条件后 3 秒内展示首屏方案。',
-          category: 'performance',
+          category: 'non_functional',
         },
       ],
       conflicts_resolved: [
@@ -86,7 +86,7 @@ const demoResponses: Array<[string, (provider: string) => unknown]> = [
       risks: [
         {
           id: 'RISK-1',
-          category: 'data',
+          category: 'technical',
           description: '推荐的餐厅可能已经关门或价格变化。',
           probability: 'medium',
           impact: 'high',
@@ -101,13 +101,17 @@ const demoResponses: Array<[string, (provider: string) => unknown]> = [
   [
     'MVPPlan schema',
     () => ({
-      mvp_scope: [
-        '输入人数、预算、忌口和时间',
-        '生成三种晚餐方案',
-        '展示时间、价格和推荐理由',
-        '收藏与不喜欢反馈',
+      mvp_scope: [requirementPoint],
+      deferred_scope: [
+        {
+          ...requirementPoint,
+          id: 'REQ-3',
+          title: '用户账号与长期偏好',
+          description: '登录后保存跨设备的长期饮食偏好。',
+          priority: 'P3',
+          category: 'functional',
+        },
       ],
-      deferred_scope: ['用户账号', '外卖下单', '多人协作投票', '个性化长期记忆'],
       mvp_goal: '验证用户是否愿意用不到一分钟的信息换取一个可执行的晚餐决定。',
       success_metrics: ['一周内完成 50 次真实推荐', '方案点击率达到 40%', '30% 用户提交结果反馈'],
       timeline: '4 周',
@@ -122,8 +126,12 @@ const demoResponses: Array<[string, (provider: string) => unknown]> = [
   [
     'PlatformRecommendation schema',
     () => ({
-      recommended_platform: '响应式 Web 应用',
-      tech_stack: ['Next.js', 'NestJS', 'PostgreSQL', 'Prisma'],
+      recommended_platform: 'web',
+      tech_stack: {
+        frontend: 'Next.js',
+        backend: 'NestJS',
+        database: 'PostgreSQL + Prisma',
+      },
       rationale: '无需安装，适合通过链接快速验证；现有技术栈可以直接复用。',
       alternatives: ['微信小程序', 'React Native 应用'],
       trade_offs: 'Web 上线最快，但系统级通知和原生定位体验弱于移动应用。',

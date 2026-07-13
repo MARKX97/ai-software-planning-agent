@@ -5,11 +5,17 @@
 import { z } from 'zod';
 
 export const projectPlanSchema = z.object({
-  phases: z.array(z.string()),
+  phases: z.array(
+    z.object({
+      name: z.string(),
+      duration: z.string(),
+      tasks: z.array(z.string()),
+    }),
+  ),
   architecture_overview: z.string(),
-  component_tree: z.string(),
-  data_model: z.string(),
-  api_endpoints: z.array(z.string()),
+  component_tree: z.array(z.record(z.unknown())),
+  data_model: z.array(z.record(z.unknown())),
+  api_endpoints: z.array(z.record(z.unknown())),
   development_guide: z.string(),
   ai_coding_prompt: z.string(),
 });

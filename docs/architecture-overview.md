@@ -16,7 +16,7 @@
 | 语言     | TypeScript                    | 5.5+   |
 | 样式     | Tailwind CSS                  | 4.x    |
 | UI       | shadcn/ui                     | latest |
-| 包管理   | pnpm                          | 9      |
+| 包管理   | pnpm                          | 10     |
 | Monorepo | Turborepo                     | latest |
 | AI 接入  | Baishan OpenAI Compatible API | —      |
 
@@ -24,7 +24,7 @@
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                   CLI / HTTP API                          │
+│                  Web UI / HTTP API                        │
 ├──────────────────────────────────────────────────────────┤
 │               API Layer (NestJS 11)                       │
 │  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐  │
@@ -52,9 +52,10 @@
 ## AI 三层架构
 
 ```
-L1: packages/llm-core/          核心抽象（接口、类型、适配器）
+L1: packages/llm-core/          核心抽象（接口、适配器、错误与工具）
 L2: packages/llm-providers/     Provider 实现（DeepSeek/GLM/MiniMax）
 L3: packages/llm-orchestrator/  编排层（业务代码唯一入口）
+Shared: packages/shared/        跨层 LLM 类型、枚举与 Zod Schema
 ```
 
 ## AI 调用铁律

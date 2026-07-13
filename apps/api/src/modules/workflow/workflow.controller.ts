@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { UUID_V4_PIPE } from '../../common/pipes/uuid-validation.pipe.js';
 import { WorkflowService, type ExecutionLogsListResponse } from './workflow.service.js';
 import {
   continueWorkflowSchema,
@@ -50,7 +51,7 @@ export class WorkflowController {
   @ApiOperation({ summary: '启动工作流' })
   @UsePipes(new ZodValidationPipe(runWorkflowSchema))
   async run(
-    @Param('project_id') projectId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
     @Body() body: RunWorkflowRequest,
   ): Promise<WorkflowStatusResponse> {
     return this.workflow.run(projectId, body);
@@ -58,7 +59,9 @@ export class WorkflowController {
 
   @Get('projects/:project_id/workflow/status')
   @ApiOperation({ summary: '获取工作流状态' })
-  async getStatus(@Param('project_id') projectId: string): Promise<WorkflowStatusResponse> {
+  async getStatus(
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
+  ): Promise<WorkflowStatusResponse> {
     return this.workflow.getStatus(projectId);
   }
 
@@ -67,7 +70,7 @@ export class WorkflowController {
   @ApiOperation({ summary: '继续工作流' })
   @UsePipes(new ZodValidationPipe(continueWorkflowSchema))
   async continue(
-    @Param('project_id') projectId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
     @Body() body: ContinueWorkflowRequest,
   ): Promise<WorkflowStatusResponse> {
     return this.workflow.continue(projectId, body);
@@ -78,7 +81,7 @@ export class WorkflowController {
   @ApiOperation({ summary: '讨论当前检查点' })
   @UsePipes(new ZodValidationPipe(discussWorkflowSchema))
   async discuss(
-    @Param('project_id') projectId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
     @Body() body: DiscussWorkflowRequest,
   ): Promise<WorkflowStatusResponse> {
     return this.workflow.discuss(projectId, body);
@@ -89,7 +92,7 @@ export class WorkflowController {
   @ApiOperation({ summary: '确认并进入下一环节' })
   @UsePipes(new ZodValidationPipe(advanceWorkflowSchema))
   async advance(
-    @Param('project_id') projectId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
     @Body() body: AdvanceWorkflowRequest,
   ): Promise<WorkflowStatusResponse> {
     return this.workflow.advance(projectId, body);
@@ -97,7 +100,9 @@ export class WorkflowController {
 
   @Get('projects/:project_id/workflow/states')
   @ApiOperation({ summary: '获取工作流各阶段状态' })
-  async listStates(@Param('project_id') projectId: string): Promise<WorkflowStateListResponse> {
+  async listStates(
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
+  ): Promise<WorkflowStateListResponse> {
     return this.workflow.listStates(projectId);
   }
 
@@ -105,7 +110,7 @@ export class WorkflowController {
   @ApiOperation({ summary: '获取工作流执行历史' })
   @UsePipes(new ZodValidationPipe(listExecutionsQuerySchema))
   async listExecutions(
-    @Param('project_id') projectId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
     @Query() query: ListExecutionsQuery,
   ): Promise<WorkflowExecutionListResponse> {
     return this.workflow.listExecutions(projectId, query);
@@ -114,8 +119,8 @@ export class WorkflowController {
   @Get('projects/:project_id/workflow/executions/:execution_id')
   @ApiOperation({ summary: '获取执行详情' })
   async getExecution(
-    @Param('project_id') projectId: string,
-    @Param('execution_id') executionId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
+    @Param('execution_id', UUID_V4_PIPE) executionId: string,
   ): Promise<WorkflowExecutionDetailResponse> {
     return this.workflow.getExecution(projectId, executionId);
   }
@@ -124,8 +129,8 @@ export class WorkflowController {
   @ApiOperation({ summary: '获取执行关联的模型调用日志' })
   @UsePipes(new ZodValidationPipe(listExecutionLogsQuerySchema))
   async listExecutionLogs(
-    @Param('project_id') projectId: string,
-    @Param('execution_id') executionId: string,
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
+    @Param('execution_id', UUID_V4_PIPE) executionId: string,
     @Query() query: ListExecutionLogsQuery,
   ): Promise<ExecutionLogsListResponse> {
     return this.workflow.listExecutionLogs(projectId, executionId, query);

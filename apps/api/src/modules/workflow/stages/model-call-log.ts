@@ -23,7 +23,7 @@ export interface ModelCallLogEntry {
 
 /** Persist a single model call (success or failure) to the execution log. */
 export async function logModelCall(db: PrismaService, entry: ModelCallLogEntry): Promise<void> {
-  const status = entry.response ? CallStatus.SUCCESS : CallStatus.FAILED;
+  const status = callStatus(entry);
   const provider = entry.provider as 'deepseek' | 'glm' | 'minimax';
   const usage = entry.response?.usage;
   const cost = entry.response?.cost;
@@ -36,7 +36,7 @@ export async function logModelCall(db: PrismaService, entry: ModelCallLogEntry):
       provider_name: provider,
       model_id: entry.response?.model ?? entry.provider,
       status,
-      attempt_number: entry.response?.retries ?? 0,
+      attempt_number: (entry.response?.retries ?? 0) + 1,
       prompt_text: entry.promptText,
       response_text: entry.response?.content ?? null,
       structured_output: (entry.response?.structuredOutput ?? null) as never,
@@ -46,9 +46,27 @@ export async function logModelCall(db: PrismaService, entry: ModelCallLogEntry):
       cost_output: cost?.outputCost ?? 0,
       cost_total: cost?.totalCost ?? 0,
       latency_ms: entry.response?.latencyMs ?? null,
+      error_code: entry.response ? null : status.toUpperCase(),
       error_message: entry.error ?? null,
     },
   });
+  await updateTokenUsage(db, entry, now);
+}
+
+async function updateTokenUsage(
+  db: PrismaService,
+  entry: ModelCallLogEntry,
+  now: Date,
+): Promise<void> {
+  const status = callStatus(entry);
+  const usage = entry.response?.usage;
+  const cost = entry.response?.cost;
+  const latency = await db.client.modelExecutionLog.aggregate({
+    where: { project_id: entry.projectId, latency_ms: { not: null } },
+    _avg: { latency_ms: true },
+  });
+  const averageLatency = latency._avg.latency_ms;
+  const avgLatencyMs = averageLatency === null ? null : Math.round(averageLatency);
   await db.client.tokenUsage.upsert({
     where: { project_id: entry.projectId },
     create: {
@@ -58,11 +76,11 @@ export async function logModelCall(db: PrismaService, entry: ModelCallLogEntry):
       total_tokens: usage?.totalTokens ?? 0,
       total_cost: cost?.totalCost ?? 0,
       call_count: 1,
-      success_count: entry.response ? 1 : 0,
-      failed_count: entry.response ? 0 : 1,
-      timeout_count: 0,
-      rate_limited_count: 0,
-      avg_latency_ms: entry.response?.latencyMs ?? null,
+      success_count: status === CallStatus.SUCCESS ? 1 : 0,
+      failed_count: status === CallStatus.FAILED ? 1 : 0,
+      timeout_count: status === CallStatus.TIMEOUT ? 1 : 0,
+      rate_limited_count: status === CallStatus.RATE_LIMITED ? 1 : 0,
+      avg_latency_ms: avgLatencyMs,
       updated_at: now,
     },
     update: {
@@ -71,10 +89,21 @@ export async function logModelCall(db: PrismaService, entry: ModelCallLogEntry):
       total_tokens: { increment: usage?.totalTokens ?? 0 },
       total_cost: { increment: cost?.totalCost ?? 0 },
       call_count: { increment: 1 },
-      success_count: { increment: entry.response ? 1 : 0 },
-      failed_count: { increment: entry.response ? 0 : 1 },
-      avg_latency_ms: entry.response?.latencyMs ?? null,
+      success_count: { increment: status === CallStatus.SUCCESS ? 1 : 0 },
+      failed_count: { increment: status === CallStatus.FAILED ? 1 : 0 },
+      timeout_count: { increment: status === CallStatus.TIMEOUT ? 1 : 0 },
+      rate_limited_count: { increment: status === CallStatus.RATE_LIMITED ? 1 : 0 },
+      avg_latency_ms: avgLatencyMs,
       updated_at: now,
     },
   });
+}
+
+function callStatus(entry: ModelCallLogEntry): CallStatus {
+  if (entry.response) return CallStatus.SUCCESS;
+  if (/timeout|timed out|aborted/i.test(entry.error ?? '')) return CallStatus.TIMEOUT;
+  if (/rate.?limit|too many requests|429/i.test(entry.error ?? '')) {
+    return CallStatus.RATE_LIMITED;
+  }
+  return CallStatus.FAILED;
 }

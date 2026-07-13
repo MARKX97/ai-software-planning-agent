@@ -1,5 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { ArtifactsService } from '../../src/modules/artifacts/artifacts.service.js';
 import { ArtifactFileStore } from '../../src/modules/workflow/artifact-generation/artifact-file-store.js';
 import { ErrorCode } from '../../src/common/exception/error-code.js';
@@ -33,7 +36,10 @@ describe('ArtifactsService', () => {
         },
       },
     };
-    const service = new ArtifactsService(db as never, { findOrFail: async () => row } as never);
+    const service = new ArtifactsService(
+      db as never,
+      { findOrFail: async () => row, dataDir: () => tmpdir() } as never,
+    );
     const result = await service.list('project-1', { type: 'prd' });
     assert.deepEqual(where, { project_id: 'project-1', deleted_at: null, type: 'prd' });
     assert.equal(result.total, 1);
@@ -42,7 +48,10 @@ describe('ArtifactsService', () => {
 
   it('returns full content and a safe markdown filename for downloads', async () => {
     const db = { client: { artifact: { findUnique: async () => row } } };
-    const service = new ArtifactsService(db as never, { findOrFail: async () => row } as never);
+    const service = new ArtifactsService(
+      db as never,
+      { findOrFail: async () => row, dataDir: () => tmpdir() } as never,
+    );
     const detail = await service.get('project-1', 'artifact-1');
     assert.equal(detail.content, '# PRD');
     const download = await service.getDownload('project-1', 'artifact-1');
@@ -52,7 +61,10 @@ describe('ArtifactsService', () => {
   it('rejects an artifact from another project as not found', async () => {
     const foreign = { ...row, project_id: 'other-project' };
     const db = { client: { artifact: { findUnique: async () => foreign } } };
-    const service = new ArtifactsService(db as never, { findOrFail: async () => row } as never);
+    const service = new ArtifactsService(
+      db as never,
+      { findOrFail: async () => row, dataDir: () => tmpdir() } as never,
+    );
     await assert.rejects(
       () => service.get('project-1', 'artifact-1'),
       (error: unknown) =>
@@ -77,12 +89,18 @@ describe('ArtifactsService', () => {
         },
       },
     };
-    await new ArtifactFileStore(db as never).save({
-      projectId: 'project-1',
-      type: 'prd',
-      content: '# New PRD',
-    });
-    assert.deepEqual(archivedWhere, { project_id: 'project-1', type: 'prd', deleted_at: null });
-    assert.equal(createdData?.content, '# New PRD');
+    const dataDir = await mkdtemp(join(tmpdir(), 'artifact-store-'));
+    try {
+      await new ArtifactFileStore(db as never, dataDir).save({
+        projectId: 'project-1',
+        type: 'prd',
+        content: '# New PRD',
+      });
+      assert.deepEqual(archivedWhere, { project_id: 'project-1', type: 'prd', deleted_at: null });
+      assert.equal(createdData?.content, '# New PRD');
+      assert.equal(typeof createdData?.file_path, 'string');
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
   });
 });

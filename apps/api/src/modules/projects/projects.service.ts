@@ -81,4 +81,9 @@ export class ProjectsService {
   costLimitPerProject(): number {
     return this.config.costLimitPerProject;
   }
+
+  /** Base directory for generated artifacts and exports. */
+  dataDir(): string {
+    return this.config.dataDir;
+  }
 }

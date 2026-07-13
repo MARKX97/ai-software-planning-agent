@@ -2,12 +2,16 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { WorkflowStage } from '@ai-planning/shared';
 import { createStageRegistry } from '../../src/modules/workflow/stages/stage-registry.js';
-import { STAGE_PROVIDER } from '../../src/modules/workflow/stages/model-routing.js';
+import {
+  STAGE_PROVIDER,
+  STAGE_TIMEOUT_MS,
+} from '../../src/modules/workflow/stages/model-routing.js';
 
 // Minimal mock deps — registry only needs the shape, not real behavior.
 const mockDeps = {
   orchestrator: {} as never,
   db: { client: {} } as never,
+  dataDir: '/tmp',
 };
 
 const registry = createStageRegistry(mockDeps);
@@ -77,5 +81,10 @@ describe('model routing config', () => {
 
   it('marks planning_generation as "mixed"', () => {
     assert.equal(STAGE_PROVIDER.planning_generation, 'mixed');
+  });
+
+  it('keeps extended timeouts for multi-model analysis and planning', () => {
+    assert.equal(STAGE_TIMEOUT_MS.multi_model_analysis, 90_000);
+    assert.equal(STAGE_TIMEOUT_MS.planning_generation, 120_000);
   });
 });

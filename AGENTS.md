@@ -26,9 +26,9 @@
 
 ### 1.2 Tech Stack
 
-| 允许                                                                                                             | 禁止                                                                                                                                     |
-| ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Next.js 15, NestJS 11, PostgreSQL 16, Prisma 6, TypeScript 5.5+, Tailwind 4, shadcn/ui, Zod 3, pnpm 9, Turborepo | Redis, Kafka, Elasticsearch, K8s, 微服务, GraphQL, WebSocket, MongoDB, 向量数据库, gRPC, LangChain/LlamaIndex/CrewAI, Prometheus/Grafana |
+| 允许                                                                                                              | 禁止                                                                                                                                     |
+| ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Next.js 15, NestJS 11, PostgreSQL 16, Prisma 6, TypeScript 5.5+, Tailwind 4, shadcn/ui, Zod 3, pnpm 10, Turborepo | Redis, Kafka, Elasticsearch, K8s, 微服务, GraphQL, WebSocket, MongoDB, 向量数据库, gRPC, LangChain/LlamaIndex/CrewAI, Prometheus/Grafana |
 
 ### 1.3 LLM Call Chain
 

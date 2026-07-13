@@ -180,8 +180,8 @@ MULTI_MODEL_ANALYSIS:
   0/3 成功 → FAILED
 
 Schema 校验失败:
-  第 1 次 → 重试
-  第 2 次 → 降级为自由文本，继续
+  structuredOutput = null
+  保留自由文本并继续，由后续阶段按可用上下文降级处理
 
 LLM 超时:
   1s → 2s → 4s 退避，3 次后 FAILED
