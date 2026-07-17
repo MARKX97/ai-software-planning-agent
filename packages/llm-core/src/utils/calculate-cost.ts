@@ -8,7 +8,14 @@ import type { CostInfo, ModelPricing, TokenUsage } from '@ai-planning/shared';
  * @param pricing Model pricing (CNY per 1K tokens).
  */
 export function calculateCost(usage: TokenUsage, pricing: ModelPricing): CostInfo {
-  const inputCost = (usage.inputTokens / 1000) * pricing.inputPer1k;
+  const cachedTokens = Math.min(usage.inputTokens, usage.cachedTokens);
+  const inputCost = ((usage.inputTokens - cachedTokens) / 1000) * pricing.inputPer1k;
+  const cachedInputCost = (cachedTokens / 1000) * (pricing.cachedInputPer1k ?? pricing.inputPer1k);
   const outputCost = (usage.outputTokens / 1000) * pricing.outputPer1k;
-  return { inputCost, outputCost, totalCost: inputCost + outputCost };
+  return {
+    inputCost,
+    outputCost,
+    cachedInputCost,
+    totalCost: inputCost + cachedInputCost + outputCost,
+  };
 }

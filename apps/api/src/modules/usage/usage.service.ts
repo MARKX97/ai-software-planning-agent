@@ -24,6 +24,7 @@ interface ProviderAgg {
   failed_count: number;
   total_input_tokens: number;
   total_output_tokens: number;
+  total_cached_tokens: number;
   total_cost: number;
   latency_sum: number;
   latency_count: number;
@@ -112,6 +113,7 @@ export class UsageService {
       p.call_count += 1;
       p.total_input_tokens += log.input_tokens;
       p.total_output_tokens += log.output_tokens;
+      p.total_cached_tokens += log.cached_tokens;
       p.total_cost += Number(log.cost_total);
       if (log.status === 'success') p.success_count += 1;
       if (log.status === 'failed') p.failed_count += 1;
@@ -145,6 +147,7 @@ export class UsageService {
       failed_count: 0,
       total_input_tokens: 0,
       total_output_tokens: 0,
+      total_cached_tokens: 0,
       total_cost: 0,
       latency_sum: 0,
       latency_count: 0,
@@ -164,6 +167,7 @@ export class UsageService {
       failed_count: agg.failed_count,
       total_input_tokens: agg.total_input_tokens,
       total_output_tokens: agg.total_output_tokens,
+      total_cached_tokens: agg.total_cached_tokens,
       total_cost: rounded,
       avg_latency_ms:
         agg.latency_count > 0 ? Math.round(agg.latency_sum / agg.latency_count) : null,

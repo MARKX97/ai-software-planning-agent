@@ -39,3 +39,5 @@ Browser fetch (POST SSE)
 ```
 
 API Server 是唯一持有 Baishan Base URL 与 API Key 的边界。浏览器只访问 `/api/v1`；模型回复以 `delta` 实时代理，完成后以 `done` 返回持久化消息与最新工作流状态。内部结构化分析仍使用非流式调用。
+
+白山传输细节、模型配置、错误映射与缓存计费规则见 [`docs/baishan-integration.md`](./baishan-integration.md)。

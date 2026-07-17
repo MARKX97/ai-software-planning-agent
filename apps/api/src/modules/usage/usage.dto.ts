@@ -57,8 +57,10 @@ export interface ModelExecutionLogResponse {
   prompt_version_id: string | null;
   input_tokens: number;
   output_tokens: number;
+  cached_tokens: number;
   cost_input: number;
   cost_output: number;
+  cost_cached: number;
   cost_total: number;
   latency_ms: number | null;
   error_code: string | null;
@@ -86,6 +88,7 @@ export interface ProviderBreakdown {
   failed_count: number;
   total_input_tokens: number;
   total_output_tokens: number;
+  total_cached_tokens: number;
   total_cost: number;
   avg_latency_ms: number | null;
 }
@@ -101,6 +104,7 @@ export interface TokenUsageResponse {
   project_id: string;
   total_input_tokens: number;
   total_output_tokens: number;
+  total_cached_tokens: number;
   total_tokens: number;
   total_cost: number;
   call_count: number;
@@ -139,8 +143,10 @@ export function toModelExecutionLogResponse(log: ModelExecutionLog): ModelExecut
     prompt_version_id: log.prompt_version_id,
     input_tokens: log.input_tokens,
     output_tokens: log.output_tokens,
+    cached_tokens: log.cached_tokens,
     cost_input: Number(log.cost_input),
     cost_output: Number(log.cost_output),
+    cost_cached: Number(log.cost_cached),
     cost_total: Number(log.cost_total),
     latency_ms: log.latency_ms,
     error_code: log.error_code,
@@ -171,6 +177,7 @@ export function toTokenUsageResponse(
     project_id: projectId,
     total_input_tokens: usage?.total_input_tokens ?? 0,
     total_output_tokens: usage?.total_output_tokens ?? 0,
+    total_cached_tokens: usage?.total_cached_tokens ?? 0,
     total_tokens: usage?.total_tokens ?? 0,
     total_cost: usage ? Number(usage.total_cost) : 0,
     call_count: callCount,

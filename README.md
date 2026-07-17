@@ -88,6 +88,10 @@ pnpm dev
 
 用户可见的模型回复由 NestJS API 通过 SSE 代理到浏览器。`BAISHAN_BASE_URL` 与 `BAISHAN_API_KEY` 只配置在 API Server 的 `.env`，不会下发到前端；内部分析与产物生成仍使用结构化非流式调用。
 
+白山接入使用官方 OpenAI-compatible 地址 `https://api.edgefn.net/v1/chat/completions` 和 Bearer Token。模型 ID 区分大小写，`.env.example` 提供的是公开文档可验证的默认值；部署前应在白山控制台核对账号实际可用模型与价格。平台缓存自动生效，项目会记录响应中的 `cached_tokens` 并纳入本地成本估算。
+
+完整接入约束见 [`docs/baishan-integration.md`](docs/baishan-integration.md)。
+
 ## Agent 使用说明（Codex / Claude）
 
 本项目采用“一套通用规则 + 工具专用入口”的方式，避免 Codex 和 Claude Code 各维护一份规范导致漂移。

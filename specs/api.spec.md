@@ -109,6 +109,7 @@
 - SSE 响应必须使用 `Content-Type: text/event-stream`、`Cache-Control: no-cache, no-transform` 和 `X-Accel-Buffering: no`，避免中间代理缓存或缓冲。
 - 流开始前的校验/权限/阶段错误返回标准 JSON HTTP Error；流开始后的模型错误通过 SSE `error` 返回。
 - `done` 携带已持久化的 `assistant_message` 和最新 `status`。浏览器不得接触 Baishan Base URL 或 API Key。
+- Usage 与调用日志响应包含白山返回的 `cached_tokens` / `total_cached_tokens` 和 `cost_cached`；这些字段用于解释本地成本估算，不替代白山控制台账单。
 - `artifacts` 列表接口不返回完整 `content`，详情接口才返回。
 - 导出接口创建任务后，前端轮询 `export/{export_id}`。
 

@@ -190,8 +190,10 @@
 | `structured_output` | JSONB         | NULL                                                  |
 | `input_tokens`      | INTEGER       | NOT NULL, DEFAULT 0                                   |
 | `output_tokens`     | INTEGER       | NOT NULL, DEFAULT 0                                   |
+| `cached_tokens`     | INTEGER       | NOT NULL, DEFAULT 0                                   |
 | `cost_input`        | NUMERIC(10,6) | NOT NULL, DEFAULT 0                                   |
 | `cost_output`       | NUMERIC(10,6) | NOT NULL, DEFAULT 0                                   |
+| `cost_cached`       | NUMERIC(10,6) | NOT NULL, DEFAULT 0                                   |
 | `cost_total`        | NUMERIC(10,6) | NOT NULL, DEFAULT 0                                   |
 | `latency_ms`        | INTEGER       | NULL                                                  |
 | `error_code`        | VARCHAR(50)   | NULL                                                  |
@@ -219,6 +221,7 @@
 | `project_id`          | UUID          | UNIQUE FK -> projects, NOT NULL |
 | `total_input_tokens`  | INTEGER       | NOT NULL, DEFAULT 0             |
 | `total_output_tokens` | INTEGER       | NOT NULL, DEFAULT 0             |
+| `total_cached_tokens` | INTEGER       | NOT NULL, DEFAULT 0             |
 | `total_tokens`        | INTEGER       | NOT NULL, DEFAULT 0             |
 | `total_cost`          | NUMERIC(12,6) | NOT NULL, DEFAULT 0             |
 | `call_count`          | INTEGER       | NOT NULL, DEFAULT 0             |

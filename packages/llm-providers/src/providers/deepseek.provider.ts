@@ -3,7 +3,7 @@ import type { ModelPricing } from '@ai-planning/shared';
 import { BaseProvider } from './base.provider.js';
 
 /**
- * DeepSeek V4 Pro provider. Pricing: ¥0.002/1K input, ¥0.008/1K output.
+ * DeepSeek provider with Baishan's documented reference pricing.
  *
  * @internal
  */
@@ -12,7 +12,11 @@ export class DeepSeekProvider extends BaseProvider {
   constructor(
     modelId: string,
     httpClient: ILLMHttpClient,
-    pricing: ModelPricing = { inputPer1k: 0.002, outputPer1k: 0.008 },
+    pricing: ModelPricing = {
+      inputPer1k: 0.004,
+      outputPer1k: 0.016,
+      cachedInputPer1k: 0.0008,
+    },
   ) {
     super();
     this.modelId = modelId;

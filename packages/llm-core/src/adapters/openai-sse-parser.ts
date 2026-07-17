@@ -3,7 +3,7 @@ import { LLMNetworkError } from '../errors/llm-errors.js';
 
 interface StreamChunk {
   choices?: Array<{ delta?: { content?: unknown } }>;
-  usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
+  usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; cached_tokens?: unknown };
 }
 
 /** Parse an OpenAI-compatible SSE response and aggregate its final result. */
@@ -29,8 +29,7 @@ export async function parseOpenAiSse(
     if (next.done) break;
   }
   if (!sawDone) throw new LLMNetworkError('Gateway stream ended before [DONE]');
-  if (!usage) throw new LLMNetworkError('Gateway stream missing token usage');
-  return { content, usage };
+  return { content, usage: usage ?? { inputTokens: 0, outputTokens: 0, cachedTokens: 0 } };
 }
 
 async function consumeFrames(
@@ -77,8 +76,9 @@ function parseUsage(chunk: StreamChunk): LLMHttpClientResult['usage'] | null {
   if (!chunk.usage) return null;
   const inputTokens = Number(chunk.usage.prompt_tokens);
   const outputTokens = Number(chunk.usage.completion_tokens);
-  if (!Number.isFinite(inputTokens) || !Number.isFinite(outputTokens)) {
+  const cachedTokens = Number(chunk.usage.cached_tokens ?? 0);
+  if (![inputTokens, outputTokens, cachedTokens].every(Number.isFinite)) {
     throw new LLMNetworkError('Gateway stream contains invalid token usage');
   }
-  return { inputTokens, outputTokens };
+  return { inputTokens, outputTokens, cachedTokens };
 }

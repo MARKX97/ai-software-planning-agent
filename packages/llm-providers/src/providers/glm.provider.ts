@@ -3,7 +3,7 @@ import type { ModelPricing } from '@ai-planning/shared';
 import { BaseProvider } from './base.provider.js';
 
 /**
- * GLM 5.1 provider. Pricing: ¥0.001/1K input, ¥0.001/1K output.
+ * GLM provider with Baishan's documented reference pricing.
  *
  * @internal
  */
@@ -12,7 +12,11 @@ export class GLMProvider extends BaseProvider {
   constructor(
     modelId: string,
     httpClient: ILLMHttpClient,
-    pricing: ModelPricing = { inputPer1k: 0.001, outputPer1k: 0.001 },
+    pricing: ModelPricing = {
+      inputPer1k: 0.002,
+      outputPer1k: 0.006,
+      cachedInputPer1k: 0.0004,
+    },
   ) {
     super();
     this.modelId = modelId;

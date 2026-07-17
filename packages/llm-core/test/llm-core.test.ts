@@ -18,6 +18,7 @@ import {
   LLMTimeoutError,
   LLMRateLimitError,
   LLMAuthError,
+  LLMInvalidRequestError,
   LLMNetworkError,
 } from '../src/errors/llm-errors.js';
 import { OpenAICompatibleAdapter } from '../src/adapters/openai-compatible.adapter.js';
@@ -25,12 +26,13 @@ import { MockLLMProvider } from '../src/mock/mock-llm-provider.js';
 
 describe('calculateCost', () => {
   it('computes cost from token usage and pricing', () => {
-    const usage = { inputTokens: 1000, outputTokens: 500, totalTokens: 1500 };
-    const pricing = { inputPer1k: 0.002, outputPer1k: 0.008 };
+    const usage = { inputTokens: 1000, outputTokens: 500, cachedTokens: 200, totalTokens: 1500 };
+    const pricing = { inputPer1k: 0.002, outputPer1k: 0.008, cachedInputPer1k: 0.0004 };
     const cost = calculateCost(usage, pricing);
-    assert.ok(Math.abs(cost.inputCost - 0.002) < 1e-6);
+    assert.ok(Math.abs(cost.inputCost - 0.0016) < 1e-6);
+    assert.ok(Math.abs(cost.cachedInputCost - 0.00008) < 1e-6);
     assert.ok(Math.abs(cost.outputCost - 0.004) < 1e-6);
-    assert.ok(Math.abs(cost.totalCost - 0.006) < 1e-6);
+    assert.ok(Math.abs(cost.totalCost - 0.00568) < 1e-6);
   });
 });
 
@@ -104,6 +106,19 @@ describe('OpenAICompatibleAdapter', () => {
       () => adapter.complete({ model: 'm', messages: [{ role: 'user', content: 'hi' }] }, 1000),
       LLMRateLimitError,
     );
+  });
+  it('maps 400 to non-retryable LLMInvalidRequestError', async () => {
+    const fetch = async () => new Response('{}', { status: 400 });
+    const adapter = new OpenAICompatibleAdapter(
+      'test',
+      'https://x',
+      'k',
+      fetch as unknown as typeof fetch,
+    );
+    const call = () =>
+      adapter.complete({ model: 'm', messages: [{ role: 'user', content: 'hi' }] }, 1000);
+    await assert.rejects(call, LLMInvalidRequestError);
+    await call().catch((error: unknown) => assert.equal(isRetryable(error), false));
   });
   it('rejects malformed success responses', async () => {
     const fetch = async () => new Response('{}', { status: 200 });

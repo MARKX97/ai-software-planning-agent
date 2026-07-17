@@ -18,6 +18,8 @@ export interface ModelPricing {
   readonly inputPer1k: number;
   /** Output price per 1K tokens (CNY). */
   readonly outputPer1k: number;
+  /** Cached-input price per 1K tokens; defaults to input price when unknown. */
+  readonly cachedInputPer1k?: number;
 }
 
 /** Token usage reported by the provider. */
@@ -26,6 +28,8 @@ export interface TokenUsage {
   readonly inputTokens: number;
   /** Completion tokens produced. */
   readonly outputTokens: number;
+  /** Input tokens served from Baishan's automatic cache. */
+  readonly cachedTokens: number;
   /** Total tokens (input + output). */
   readonly totalTokens: number;
 }
@@ -36,6 +40,8 @@ export interface CostInfo {
   readonly inputCost: number;
   /** Output token cost (CNY). */
   readonly outputCost: number;
+  /** Cached-input token cost (CNY). */
+  readonly cachedInputCost: number;
   /** Total cost (CNY). */
   readonly totalCost: number;
 }
@@ -46,7 +52,7 @@ export interface LLMRequest {
   readonly model: string;
   /** Prompt text or messages array. */
   readonly messages: ReadonlyArray<{ role: 'system' | 'user' | 'assistant'; content: string }>;
-  /** Sampling temperature (default 0.7). */
+  /** Sampling temperature (default 1, range 0-2). */
   readonly temperature?: number;
   /** Max output tokens (default 4096). */
   readonly maxTokens?: number;
@@ -61,7 +67,7 @@ export interface LLMCallOptions {
    * throwing (per specs/provider.spec.md §2).
    */
   readonly outputSchema?: z.ZodSchema;
-  /** Sampling temperature (default 0.7). */
+  /** Sampling temperature (default 1, range 0-2). */
   readonly temperature?: number;
   /** Max output tokens (default 4096). */
   readonly maxTokens?: number;

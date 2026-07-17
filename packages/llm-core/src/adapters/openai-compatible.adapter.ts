@@ -4,6 +4,7 @@ import {
   LLMAuthError,
   LLMCancelledError,
   LLMError,
+  LLMInvalidRequestError,
   LLMNetworkError,
   LLMRateLimitError,
   LLMTimeoutError,
@@ -81,9 +82,9 @@ export class OpenAICompatibleAdapter implements ILLMHttpClient {
         body: JSON.stringify({
           model: request.model,
           messages: request.messages,
-          temperature: request.temperature ?? 0.7,
+          temperature: request.temperature ?? 1,
           max_tokens: request.maxTokens ?? 4096,
-          ...(options.stream ? { stream: true, stream_options: { include_usage: true } } : {}),
+          ...(options.stream ? { stream: true } : {}),
         }),
         signal: controller.signal,
       });
@@ -113,6 +114,9 @@ export class OpenAICompatibleAdapter implements ILLMHttpClient {
   }
 
   private assertResponseOk(response: Response): void {
+    if (response.status === 400) {
+      throw new LLMInvalidRequestError('Gateway rejected the request');
+    }
     if (response.status === 401 || response.status === 403) {
       throw new LLMAuthError(`Gateway returned ${response.status}`);
     }
@@ -130,7 +134,7 @@ export class OpenAICompatibleAdapter implements ILLMHttpClient {
   private responseBody(data: unknown): LLMHttpClientResult {
     const body = data as {
       choices?: Array<{ message?: { content?: unknown } }>;
-      usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
+      usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; cached_tokens?: unknown };
     };
     const content = body.choices?.[0]?.message?.content;
     if (typeof content !== 'string') {
@@ -138,7 +142,8 @@ export class OpenAICompatibleAdapter implements ILLMHttpClient {
     }
     const inputTokens = Number(body.usage?.prompt_tokens ?? 0);
     const outputTokens = Number(body.usage?.completion_tokens ?? 0);
-    if (!Number.isFinite(inputTokens) || !Number.isFinite(outputTokens)) {
+    const cachedTokens = Number(body.usage?.cached_tokens ?? 0);
+    if (![inputTokens, outputTokens, cachedTokens].every(Number.isFinite)) {
       throw new LLMNetworkError('Gateway response contains invalid token usage');
     }
     return {
@@ -146,6 +151,7 @@ export class OpenAICompatibleAdapter implements ILLMHttpClient {
       usage: {
         inputTokens,
         outputTokens,
+        cachedTokens,
       },
     };
   }

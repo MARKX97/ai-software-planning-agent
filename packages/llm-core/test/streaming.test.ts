@@ -12,7 +12,7 @@ describe('OpenAICompatibleAdapter.stream', () => {
     const parts = [
       'data: {"choices":[{"delta":{"content":"你',
       '好"}}]}\r\n\r\ndata: {"choices":[{"delta":{}}],"usage":{"prompt_tokens":3,',
-      '"completion_tokens":2}}\n\ndata: [DONE]\n\n',
+      '"completion_tokens":2,"cached_tokens":1}}\n\ndata: [DONE]\n\n',
     ];
     let requestBody: Record<string, unknown> | null = null;
     const fetch = async (_url: unknown, init?: RequestInit) => {
@@ -39,9 +39,9 @@ describe('OpenAICompatibleAdapter.stream', () => {
     });
     assert.deepEqual(deltas, ['你好']);
     assert.equal(result.content, '你好');
-    assert.deepEqual(result.usage, { inputTokens: 3, outputTokens: 2 });
+    assert.deepEqual(result.usage, { inputTokens: 3, outputTokens: 2, cachedTokens: 1 });
     assert.equal(requestBody?.['stream'], true);
-    assert.deepEqual(requestBody?.['stream_options'], { include_usage: true });
+    assert.equal(requestBody?.['stream_options'], undefined);
   });
 
   it('rejects malformed SSE data', async () => {
@@ -58,7 +58,7 @@ describe('OpenAICompatibleAdapter.stream', () => {
     );
   });
 
-  it('requires final usage before DONE', async () => {
+  it('accepts the documented delta plus DONE stream without usage', async () => {
     const fetch = async () =>
       new Response('data: {"choices":[{"delta":{"content":"hi"}}]}\n\ndata: [DONE]\n\n', {
         status: 200,
@@ -69,10 +69,9 @@ describe('OpenAICompatibleAdapter.stream', () => {
       'k',
       fetch as unknown as typeof globalThis.fetch,
     );
-    await assert.rejects(
-      () => adapter.stream(request, 1000, { onDelta: () => {} }),
-      /missing token usage/,
-    );
+    const result = await adapter.stream(request, 1000, { onDelta: () => {} });
+    assert.equal(result.content, 'hi');
+    assert.deepEqual(result.usage, { inputTokens: 0, outputTokens: 0, cachedTokens: 0 });
   });
 
   it('maps stream timeout and caller cancellation separately', async () => {
@@ -122,7 +121,7 @@ describe('OpenAICompatibleAdapter.stream', () => {
     const deltas: string[] = [];
     const result = await adapter.stream(
       {
-        model: process.env['BAISHAN_MODEL_GLM'] ?? 'glm-5.1',
+        model: process.env['BAISHAN_MODEL_GLM'] ?? 'GLM-4.5',
         messages: [{ role: 'user', content: '只回复“流式测试通过”。' }],
       },
       60_000,

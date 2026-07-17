@@ -3,7 +3,7 @@ import type { ModelPricing } from '@ai-planning/shared';
 import { BaseProvider } from './base.provider.js';
 
 /**
- * MiniMax M2.5 provider. Pricing: ¥0.001/1K input, ¥0.001/1K output.
+ * MiniMax provider with Baishan's public reference pricing.
  *
  * @internal
  */
@@ -12,7 +12,7 @@ export class MiniMaxProvider extends BaseProvider {
   constructor(
     modelId: string,
     httpClient: ILLMHttpClient,
-    pricing: ModelPricing = { inputPer1k: 0.001, outputPer1k: 0.001 },
+    pricing: ModelPricing = { inputPer1k: 0.0021, outputPer1k: 0.0084 },
   ) {
     super();
     this.modelId = modelId;

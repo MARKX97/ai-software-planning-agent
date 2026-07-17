@@ -27,8 +27,8 @@ class FlakyProvider implements ILLMProvider {
       model: this.modelId,
       content: prompt,
       structuredOutput: null,
-      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-      cost: { inputCost: 0.001, outputCost: 0.001, totalCost: 0.002 },
+      usage: { inputTokens: 1, outputTokens: 1, cachedTokens: 0, totalTokens: 2 },
+      cost: { inputCost: 0.001, outputCost: 0.001, cachedInputCost: 0, totalCost: 0.002 },
       latencyMs: 10,
       retries: 0,
       timestamp: new Date().toISOString(),
@@ -146,7 +146,7 @@ describe('callMulti', () => {
 
   it('checks project budget before dispatching providers', async () => {
     const ctrl = new CostController(0.001);
-    ctrl.track('p1', { inputCost: 0, outputCost: 0, totalCost: 0.002 });
+    ctrl.track('p1', { inputCost: 0, outputCost: 0, cachedInputCost: 0, totalCost: 0.002 });
     const svc = new LlmOrchestratorService(makeRegistry(new MockLLMProvider('glm')), ctrl);
     await assert.rejects(() => svc.callMulti('hello', { projectId: 'p1' }));
   });
@@ -158,7 +158,7 @@ describe('CostController', () => {
     const opts: LLMCallOptions = {};
     assert.equal(opts.projectId, undefined);
     // spend ¥4 → 80% threshold reached
-    const cost = { inputCost: 2, outputCost: 2, totalCost: 4 };
+    const cost = { inputCost: 2, outputCost: 2, cachedInputCost: 0, totalCost: 4 };
     ctrl.track('p1', cost);
     const stats = ctrl.getStats('p1');
     assert.equal(stats.totalCost, 4);
@@ -168,9 +168,9 @@ describe('CostController', () => {
 
   it('detects over-budget', () => {
     const ctrl = new CostController(1.0);
-    ctrl.track('p1', { inputCost: 0.5, outputCost: 0.5, totalCost: 1.0 });
+    ctrl.track('p1', { inputCost: 0.5, outputCost: 0.5, cachedInputCost: 0, totalCost: 1.0 });
     assert.equal(ctrl.isOverBudget('p1'), false);
-    ctrl.track('p1', { inputCost: 0.5, outputCost: 0.5, totalCost: 1.0 });
+    ctrl.track('p1', { inputCost: 0.5, outputCost: 0.5, cachedInputCost: 0, totalCost: 1.0 });
     assert.equal(ctrl.isOverBudget('p1'), true);
   });
 

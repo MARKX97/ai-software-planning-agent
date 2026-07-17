@@ -30,5 +30,5 @@ export interface LLMHttpClientResult {
   /** Raw text content from the model. */
   readonly content: string;
   /** Token usage reported by the gateway. */
-  readonly usage: { inputTokens: number; outputTokens: number };
+  readonly usage: { inputTokens: number; outputTokens: number; cachedTokens: number };
 }

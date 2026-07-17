@@ -14,16 +14,19 @@ class StubClient implements ILLMHttpClient {
 
   async complete(): Promise<{
     content: string;
-    usage: { inputTokens: number; outputTokens: number };
+    usage: { inputTokens: number; outputTokens: number; cachedTokens: number };
   }> {
-    return { content: this.content, usage: { inputTokens: 5, outputTokens: 7 } };
+    return { content: this.content, usage: { inputTokens: 5, outputTokens: 7, cachedTokens: 0 } };
   }
 
   async stream(
     _request: unknown,
     _timeoutMs: number,
     options: Pick<LLMStreamOptions, 'onDelta'>,
-  ): Promise<{ content: string; usage: { inputTokens: number; outputTokens: number } }> {
+  ): Promise<{
+    content: string;
+    usage: { inputTokens: number; outputTokens: number; cachedTokens: number };
+  }> {
     await options.onDelta(this.content);
     return this.complete();
   }
@@ -32,11 +35,11 @@ class StubClient implements ILLMHttpClient {
 describe('createProviderConfigs', () => {
   it('builds three configs from model ids', () => {
     const configs = createProviderConfigs.build({
-      modelIds: { deepseek: 'deepseek-v4-pro', glm: 'glm-5.1', minimax: 'minimax-m2.5' },
+      modelIds: { deepseek: 'DeepSeek-R1-0528', glm: 'GLM-4.5', minimax: 'MiniMax-M2.5' },
     });
     assert.equal(configs.length, 3);
     assert.equal(configs[0].name, 'deepseek');
-    assert.equal(configs[0].pricing.inputPer1k, 0.002);
+    assert.equal(configs[0].pricing.inputPer1k, 0.004);
   });
 });
 

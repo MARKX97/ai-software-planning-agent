@@ -41,6 +41,13 @@ export class LLMAuthError extends LLMError {
   }
 }
 
+/** Raised on HTTP 400 — invalid request parameters. Not retryable. */
+export class LLMInvalidRequestError extends LLMError {
+  constructor(message = 'LLM request is invalid') {
+    super('LLM_INVALID_REQUEST', message);
+  }
+}
+
 /**
  * Raised when the model output cannot be parsed as JSON or fails the provided
  * zod schema. Per specs/provider.spec.md §2 the provider degrades to

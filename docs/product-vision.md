@@ -51,7 +51,7 @@ Idea → Requirement Analysis → Requirement Clarification
 
 ## 多模型分析
 
-多模型分析阶段使用 GLM-5.1 / DeepSeek-V4-Pro / MiniMax-M2.5 三个模型并行分析。
+多模型分析阶段默认使用 GLM-4.5 / DeepSeek-R1-0528 / MiniMax-M2.5 三个模型并行分析；具体模型 ID 由环境变量配置，并以白山控制台可用列表为准。
 
 ## 输出内容
 

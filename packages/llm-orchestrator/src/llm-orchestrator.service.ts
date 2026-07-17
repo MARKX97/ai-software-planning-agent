@@ -164,7 +164,7 @@ export class LlmOrchestratorService {
       provider: provider.name,
       latencyMs: Date.now() - startedAt,
       totalTokens: 0,
-      cost: { inputCost: 0, outputCost: 0, totalCost: 0 },
+      cost: { inputCost: 0, outputCost: 0, cachedInputCost: 0, totalCost: 0 },
       success: false,
     });
   }

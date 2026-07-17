@@ -42,11 +42,11 @@ export class AppConfigService {
     this.dataDir = process.env['DATA_DIR'] ?? './data';
     this.logLevel = process.env['LOG_LEVEL'] ?? 'DEBUG';
     this.databaseUrl = process.env['DATABASE_URL'] ?? '';
-    this.baishanBaseUrl = process.env['BAISHAN_BASE_URL'] ?? '';
+    this.baishanBaseUrl = process.env['BAISHAN_BASE_URL'] ?? 'https://api.edgefn.net/v1';
     this.baishanApiKey = process.env['BAISHAN_API_KEY'] ?? '';
-    this.modelDeepseek = process.env['BAISHAN_MODEL_DEEPSEEK'] ?? 'deepseek-v4-pro';
-    this.modelGlm = process.env['BAISHAN_MODEL_GLM'] ?? 'glm-5.1';
-    this.modelMinimax = process.env['BAISHAN_MODEL_MINIMAX'] ?? 'minimax-m2.5';
+    this.modelDeepseek = process.env['BAISHAN_MODEL_DEEPSEEK'] ?? 'DeepSeek-R1-0528';
+    this.modelGlm = process.env['BAISHAN_MODEL_GLM'] ?? 'GLM-4.5';
+    this.modelMinimax = process.env['BAISHAN_MODEL_MINIMAX'] ?? 'MiniMax-M2.5';
     this.costLimitPerProject = this.parseNumber(process.env['COST_MAX_COST_PER_PROJECT'], 5);
     this.version = process.env['API_VERSION'] ?? '1.0.0';
     this.downloadTokenSecret =

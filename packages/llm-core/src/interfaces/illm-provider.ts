@@ -16,7 +16,7 @@ import type {
 export interface ILLMProvider {
   /** Logical name: 'deepseek' | 'glm' | 'minimax'. */
   readonly name: string;
-  /** Model ID sent to the gateway (e.g. 'deepseek-v4-pro'). */
+  /** Model ID sent to the gateway (e.g. 'DeepSeek-R1-0528'). */
   readonly modelId: string;
   /** Pricing info for cost calculation. */
   readonly pricing: ModelPricing;

@@ -35,7 +35,7 @@ export class MockLLMProvider implements ILLMProvider {
   async chat(prompt: string, options?: LLMCallOptions): Promise<LLMResponse> {
     const start = Date.now();
     const content = mockContent(this.name, prompt);
-    const usage = { inputTokens: 10, outputTokens: 20, totalTokens: 30 };
+    const usage = { inputTokens: 10, outputTokens: 20, cachedTokens: 0, totalTokens: 30 };
     let structuredOutput: unknown = null;
     if (options?.outputSchema) {
       const parsed = safeParse(content);

@@ -139,6 +139,8 @@ RiskItem: `{id, category, description, probability, impact, mitigation, continge
 | ArtifactType        | requirement_report, feasibility_report, risk_report, mvp_plan, platform_recommendation, project_plan, prd, architecture, frontend_spec, backend_spec, ai_coding_rules                                                     |
 | LLMProvider         | deepseek, glm, minimax                                                                                                                                                                                                    |
 
+`model_execution_logs` 额外记录 `cached_tokens` 与 `cost_cached`，`token_usage` 记录 `total_cached_tokens`，用于对齐白山 Usage 返回和缓存计费。
+
 ## 4. 版本兼容
 
 - 字段不可删除（标记 deprecated）

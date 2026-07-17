@@ -1,6 +1,6 @@
 # LLM Provider Layer — System Contract
 
-> Version: 1.1.0
+> Version: 1.2.0
 > Status: Contract
 > Owner: AI Infrastructure Lead
 > Tokens: ~4,000
@@ -12,7 +12,7 @@
 ```typescript
 interface ILLMProvider {
   readonly name: string; // 逻辑名称: 'deepseek' | 'glm' | 'minimax'
-  readonly modelId: string; // API 模型 ID: 'deepseek-v4-pro' | 'glm-5.1' | 'minimax-m2.5'
+  readonly modelId: string; // API 模型 ID，由 BAISHAN_MODEL_* 配置
   readonly pricing: ModelPricing; // 定价信息
   chat(prompt: string, options?: LLMCallOptions): Promise<LLMResponse>;
   chatStream(prompt: string, options: LLMStreamOptions): Promise<LLMResponse>;
@@ -42,27 +42,27 @@ chat() 流程:
 | 属性           | 值                 |
 | -------------- | ------------------ |
 | name           | `deepseek`         |
-| modelId        | `deepseek-v4-pro`  |
-| pricing.input  | ¥0.002 / 1K tokens |
-| pricing.output | ¥0.008 / 1K tokens |
+| modelId        | `DeepSeek-R1-0528` |
+| pricing.input  | ¥0.004 / 1K tokens |
+| pricing.output | ¥0.016 / 1K tokens |
 
 ### 3.2 GLMProvider
 
 | 属性           | 值                 |
 | -------------- | ------------------ |
 | name           | `glm`              |
-| modelId        | `glm-5.1`          |
-| pricing.input  | ¥0.001 / 1K tokens |
-| pricing.output | ¥0.001 / 1K tokens |
+| modelId        | `GLM-4.5`          |
+| pricing.input  | ¥0.002 / 1K tokens |
+| pricing.output | ¥0.006 / 1K tokens |
 
 ### 3.3 MiniMaxProvider
 
-| 属性           | 值                 |
-| -------------- | ------------------ |
-| name           | `minimax`          |
-| modelId        | `minimax-m2.5`     |
-| pricing.input  | ¥0.001 / 1K tokens |
-| pricing.output | ¥0.001 / 1K tokens |
+| 属性           | 值                  |
+| -------------- | ------------------- |
+| name           | `minimax`           |
+| modelId        | `MiniMax-M2.5`      |
+| pricing.input  | ¥0.0021 / 1K tokens |
+| pricing.output | ¥0.0084 / 1K tokens |
 
 ## 4. ProviderRegistry
 
@@ -79,12 +79,14 @@ healthCheckAll(): Promise<Record<string, boolean>>
 ## 5. Baishan 配置
 
 ```bash
-BAISHAN_BASE_URL=https://api.baishan.com/v1
+BAISHAN_BASE_URL=https://api.edgefn.net/v1
 BAISHAN_API_KEY=sk-xxx
-BAISHAN_MODEL_DEEPSEEK=deepseek-v4-pro
-BAISHAN_MODEL_GLM=glm-5.1
-BAISHAN_MODEL_MINIMAX=minimax-m2.5
+BAISHAN_MODEL_DEEPSEEK=DeepSeek-R1-0528
+BAISHAN_MODEL_GLM=GLM-4.5
+BAISHAN_MODEL_MINIMAX=MiniMax-M2.5
 ```
+
+模型 ID 区分大小写。默认值只选择白山公开文档可验证的模型；上线前必须在控制台确认账号可用模型和实时价格。API Key 仅保存在 API Server 环境变量中，并通过 `Authorization: Bearer` 发送。
 
 ## 6. LLMResponse 类型
 
@@ -102,21 +104,23 @@ BAISHAN_MODEL_MINIMAX=minimax-m2.5
 
 ## 7. LLMCallOptions
 
-| 字段           | 类型      | 默认值 | 说明           |
-| -------------- | --------- | ------ | -------------- |
-| `outputSchema` | ZodSchema | —      | 结构化输出约束 |
-| `temperature`  | number    | 0.7    | 温度           |
-| `maxTokens`    | number    | 4096   | 最大输出 token |
-| `timeout`      | number    | 60000  | 超时 (ms)      |
+| 字段           | 类型      | 默认值 | 说明                 |
+| -------------- | --------- | ------ | -------------------- |
+| `outputSchema` | ZodSchema | —      | 结构化输出约束       |
+| `temperature`  | number    | 1      | 温度（白山范围 0-2） |
+| `maxTokens`    | number    | 4096   | 最大输出 token       |
+| `timeout`      | number    | 60000  | 超时 (ms)            |
 
 `LLMStreamOptions` 在以上字段基础上增加必填 `onDelta(content)` 和可选 `signal: AbortSignal`。
 
 ## 8. Baishan SSE Adapter
 
 - 使用原生 `fetch`、`ReadableStream`、`TextDecoder`，不引入 SSE 依赖。
-- 请求设置 `stream: true` 与 `stream_options.include_usage: true`。
+- 请求设置 `stream: true`；使用 POST Fetch 读取 SSE，不使用仅支持 GET 的 EventSource。
+- 不发送公开白山协议未声明的 `stream_options`；解析器兼容仅返回 delta + `[DONE]`、不返回最终 usage 的流。
 - 解析器必须处理跨网络 chunk 拆行、CRLF、空 delta、非法 JSON、`[DONE]`、HTTP 错误与取消。
-- 最终 usage 必须存在；Provider 用完整文本和 usage 计算成本、延迟并生成 `LLMResponse`。
+- 有 usage 时读取 `prompt_tokens`、`completion_tokens`、`cached_tokens`；无 usage 时保留 0，不把成功流判为失败。
+- 成本公式为：`(input - cached) × inputPrice + cached × cachedPrice + output × outputPrice`。缓存由白山自动处理，无需请求参数；价格仅用于本地预算估算，账单以控制台为准。
 - Mock Provider 按固定片段输出，保证测试与本地演示可重复。
 - 真实 Baishan SSE smoke test 仅在 `RUN_REAL_BAISHAN_STREAM=1` 时运行，会产生实际调用费用；默认 CI 跳过，执行命令见 `README.md`。
 

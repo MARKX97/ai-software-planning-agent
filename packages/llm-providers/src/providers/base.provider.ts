@@ -49,7 +49,7 @@ export abstract class BaseProvider implements ILLMProvider {
     return {
       model: this.modelId,
       messages: [{ role: 'user', content: prompt }],
-      temperature: options?.temperature ?? 0.7,
+      temperature: options?.temperature ?? 1,
       maxTokens: options?.maxTokens ?? 4096,
     };
   }
@@ -62,6 +62,7 @@ export abstract class BaseProvider implements ILLMProvider {
     const usage = {
       inputTokens: result.usage.inputTokens,
       outputTokens: result.usage.outputTokens,
+      cachedTokens: result.usage.cachedTokens,
       totalTokens: result.usage.inputTokens + result.usage.outputTokens,
     };
     let structuredOutput: unknown = null;
