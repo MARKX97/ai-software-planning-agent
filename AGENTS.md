@@ -1,159 +1,75 @@
-# AI Software Planning Agent — Agent Rules
+# AI Software Planning Agent - Agent Rules
 
-> This file is the single source of truth for agent-facing project rules.
-> Codex reads this file directly. Claude Code should enter through `CLAUDE.md`,
-> which points back to this file. Tool-specific settings stay in their own
-> directories such as `.claude/`.
+> Codex 直接读取本文件；Claude Code 通过 `CLAUDE.md` 进入。本文件只做地图，详细规则以链接文档为准。
 
-## 0. Communication
+## 1. Mission
 
-- 默认使用中文交流，保留技术名词、库名、协议名和错误原文。
-- 先给简短 plan，再执行代码修改。
-- 不确定接口、业务或运行环境时，先说明假设与风险，不猜测实现。
-- 如果本文件规则与框架社区惯例或项目现状冲突，先提醒并解释原因。
+- 默认使用中文交流，保留技术名词和错误原文。
+- 先理解现有架构和契约，再做最小改动；文档先于代码更新。
+- 不猜业务逻辑，不为了迎合用户接受有明显风险的方案。
+- MVP 优先：未进入产品范围或 spec 的功能默认不做。
 
-## 1. Core Constraints
+## 2. Sources Of Truth
 
-### 1.1 MVP First
+| 主题                           | 权威来源                                       |
+| ------------------------------ | ---------------------------------------------- |
+| 文档地图与加载规则             | `docs/README.md`                               |
+| 产品定位与范围                 | `docs/product-vision.md`                       |
+| 架构与依赖方向                 | `docs/architecture-overview.md`                |
+| 行为契约                       | `specs/*.spec.md`                              |
+| 机器契约                       | `contracts/openapi.yaml`, `contracts/schemas/` |
+| 开发、测试、部署、LLM playbook | `docs/playbooks/`                              |
+| 复杂任务计划与技术债           | `docs/exec-plans/`, `docs/tech-debt.md`        |
 
-不做未在 spec/PRD 中定义的功能。实现前自检：
+具体任务只加载相关 spec，不批量加载所有文档。
 
-- 没有这个功能，核心流程是否仍可跑通？
-- 用户是否明确需要？
-- 是否在 MVP 范围列表中？
+## 3. Immutable Boundaries
 
-任一答案为否时，默认不做。
+- 技术栈：Next.js 15、NestJS 11、PostgreSQL 16、Prisma 6、TypeScript、Tailwind 4、pnpm、Turborepo。
+- 禁止引入微服务、Multi-Agent、RAG、运行时 MCP、Redis、Kafka、WebSocket、GraphQL、向量数据库和 Agent 框架，除非先修改架构并获得确认。
+- 唯一 LLM 调用链：`API workflow -> llm-orchestrator -> llm-providers -> llm-core adapter -> Baishan`。
+- Controller 不调用模型；业务代码不直接 import Provider、Adapter 或 OpenAI SDK。
+- API Key 只存在 API Server 环境，禁止进入浏览器、日志、仓库和产物。
+- 公共类型、枚举、Schema 分别放在 `packages/shared/src/{types,enums,schemas}`；Prompt 放在 `apps/api/src/prompts`。
+- Controller 只做 HTTP 绑定，业务放 Service，外部输入必须校验，数据库只通过 Prisma。
+- Web API 调用集中在 feature API 层；UI 必须处理 loading、empty、error 和 retry。
 
-### 1.2 Tech Stack
+完整依赖矩阵和允许的 LLM 白名单见 `docs/architecture-overview.md`，由 `pnpm harness:check` 强制执行。
 
-| 允许                                                                                                              | 禁止                                                                                                                                     |
-| ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Next.js 15, NestJS 11, PostgreSQL 16, Prisma 6, TypeScript 5.5+, Tailwind 4, shadcn/ui, Zod 3, pnpm 10, Turborepo | Redis, Kafka, Elasticsearch, K8s, 微服务, GraphQL, WebSocket, MongoDB, 向量数据库, gRPC, LangChain/LlamaIndex/CrewAI, Prometheus/Grafana |
+## 4. Work Protocol
 
-### 1.3 LLM Call Chain
+1. 读取 `docs/README.md` 和任务相关 spec。
+2. 检查工作树，保留用户已有修改。
+3. 复杂改动先在 `docs/exec-plans/active/` 建计划；小修复可直接处理。
+4. 先更新契约/文档，再实现代码和测试。
+5. 运行与改动范围相称的验证，最后执行 `pnpm verify:fast`。
+6. 完成复杂计划后移入 `docs/exec-plans/completed/` 并记录验证结果。
 
-唯一合法调用链：
+复杂改动指 API、Schema、数据库、架构边界或跨多个 package 的变更。
 
-```text
-Stage/Synthesis/Artifact -> LlmOrchestratorService.callSingle()/callMulti()
-```
-
-禁止：
-
-- Controller 直接调 LLM
-- 非白名单 Service 直接调 LLM
-- 直接 import Provider/OpenAI SDK/BaishanAdapter
-
-### 1.4 Directory Boundaries
-
-- 业务代码只放在 `apps/{web,api}/src/` 和 `packages/{llm-core,llm-providers,llm-orchestrator,shared,database,config}/`。
-- 类型放 `packages/shared/src/types/`。
-- 枚举放 `packages/shared/src/enums/`。
-- Schema 放 `packages/shared/src/schemas/`。
-- Prompt 模板放 `apps/api/src/prompts/`。
-- AI 接口放 `packages/llm-core/src/`。
-- 禁止在根目录创建 `/services/`、`/utils/`、`/lib/`。
-- 禁止创建未定义的 packages，除非先更新设计/契约并得到确认。
-
-### 1.5 Code Rules
-
-- 函数 < 50 行，文件 < 200 行，参数 < 4 个，继承深度 < 2 层。
-- import 使用绝对路径或 `workspace:*`。
-- 函数标注返回类型，public 方法写 JSDoc。
-- Prisma 查询和 LLM 调用必须有明确错误处理。
-- 数据库表名使用 snake_case 复数，主键 UUID，时间使用 TIMESTAMPTZ。
-- API 路径使用 `/api/v1/`，REST/JSON。
-- 统一错误结构：`{ error: { code, message, details } }`。
-- 禁止 `console.log`、`any`、`@ts-ignore`、`eval`、硬编码配置。
-
-### 1.6 Forbidden Scope
-
-禁止在未明确批准时引入：
-
-- 微服务
-- Multi-Agent
-- RAG
-- MCP
-- Auto Coding
-- Auto Deploy
-- 可并行场景中的循环 `await`
-
-这里的 MCP 禁止项仅指不要把 MCP 作为本项目运行时技术栈引入；不限制 Codex/Claude 等开发工具自身使用 connector/MCP 能力。
-
-## 2. Frontend Rules
-
-- API 调用集中在 `api/` 或 `services/` 层，不散落在组件里。
-- 每个接口定义请求类型、响应类型和错误类型。
-- UI 必须处理 loading、empty、error 和 retry/降级。
-- 默认就近状态，跨页面必需共享时才放 global store。
-- 禁止 `dangerouslySetInnerHTML`，除非用户确认且做 sanitize。
-- 表单元素必须有 label/aria，可点击元素使用 `button`/`a`。
-- 大列表默认分页或虚拟化，优先分页。
-- 修 bug 必须补回归用例。
-
-## 3. Backend Rules
-
-- 路由只做 HTTP 绑定，controller 只做 request/response 组装。
-- 业务逻辑放 services，I/O 放 repositories/data 或专门 service。
-- 所有外部输入必须用 schema validator 校验和白名单化。
-- 禁止拼接 SQL/NoSQL 查询字符串，只用参数化查询或 ORM。
-- 永远不要把内部异常栈或敏感信息直接返回给前端。
-- 重要接口必须维护 OpenAPI/Swagger 注释或等价文档。
-- 配置来自环境变量或 config 文件，不硬编码。
-
-## 4. Context Strategy
-
-- 每次对话只聚焦一个任务。
-- 修 bug 只加载当前文件和相关 spec，不加载无关 spec/skill。
-- 实现阶段优先读 `specs/` 契约，不反复读 `docs/` 设计文档。
-- 修改代码使用增量编辑，不为了局部修改重写整个文件。
-- 不引入新依赖、不重构已有代码，除非用户明确要求或先确认。
-
-## 5. Phase Loading
-
-| Phase | 主题               | 参考文档                                                                                                                          |
-| ----- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | Skeleton           | `.claude/skills/development/phase-1-skeleton.md`                                                                                  |
-| 2     | Database           | `.claude/skills/development/phase-2-database.md`, `specs/database.spec.md`, `specs/schema.spec.md`                                |
-| 3     | API                | `.claude/skills/development/phase-3-api.md`, `specs/api.spec.md`                                                                  |
-| 4-6   | LLM                | `.claude/skills/llm-development/SKILL.md`, `specs/provider.spec.md`, `specs/orchestrator.spec.md`                                 |
-| 7     | Workflow           | `.claude/skills/development/phase-7-workflow.md`, `specs/workflow.spec.md`, `specs/state-machine.spec.md`, `specs/prompt.spec.md` |
-| 8-9   | Synthesis/Artifact | `.claude/skills/development/phase-8-9-synthesis-artifact.md`                                                                      |
-| 10    | Frontend           | `.claude/skills/development/phase-10-frontend.md`, `specs/frontend.spec.md`, `specs/api.spec.md`                                  |
-
-`.claude/skills/**` 当前仍是项目 playbook 的存放位置。Claude 可以通过 skills 使用；Codex 需要时直接读取对应 Markdown 文件。
-
-## 6. Verification
-
-常用验证命令：
+## 5. Commands
 
 ```bash
-pnpm test
-pnpm lint
-pnpm build
-pnpm db:migrate
-curl localhost:3001/api/v1/health
+pnpm harness:check   # 架构、文档、配置、安全、代码形态
+pnpm verify:fast     # harness + lint + typecheck + deterministic eval
+pnpm verify          # format + fast checks + all tests + build
+pnpm eval            # Mock 模式的核心 Agent 行为评估
+pnpm diagnose:project -- <project-id> # 脱敏项目诊断
 ```
 
-命令输出原则：
+真实 Baishan 测试必须显式设置 `RUN_REAL_BAISHAN_STREAM=1`，默认 CI 不产生模型费用。
 
-- 默认只保留成功/失败、错误堆栈和最终统计。
-- 单条命令输出超过 30 行时，只保留关键错误或末尾摘要。
-- 测试通过时只汇总数量；测试失败时列失败用例详情。
+## 6. Code And Review
 
-## 7. Self-Check
+- 复用已有模式和依赖；新增依赖前说明必要性。
+- 禁止 `any`、`@ts-ignore`、`eval`、`console.log`、硬编码密钥和无错误处理的 Prisma/LLM 调用。
+- 生产文件目标不超过 200 行，函数不超过 50 行，参数不超过 3 个；存量豁免只能缩小。
+- 修 bug 必须补回归测试；Review 优先关注边界、异步、并发、类型、安全和行为回退。
+- 不执行破坏性 Git 命令，不撤销与任务无关的用户修改。
 
-每次编码后检查：
+## 7. Tool Notes
 
-```text
-□ 新依赖？ □ 绕过 LlmOrchestrator？ □ 新包/目录？ □ MVP 外功能？
-□ 禁止技术？ □ 命名规范？ □ 测试？ □ Controller/Service 直接调 LLM？
-□ 非白名单 import llm-orchestrator？ □ 过度设计？
-```
-
-## 8. Tool-Specific Notes
-
-- Claude Code: `CLAUDE.md` is the entry file and should point to this file.
-- Claude-only skills/settings remain under `.claude/`.
-- Codex: this `AGENTS.md` is the project instruction file.
-- Do not duplicate long-lived rules across `AGENTS.md` and `CLAUDE.md`; update this file instead.
+- `CLAUDE.md` 只保留入口，不复制规则。
+- `.claude/skills/` 只保留 Claude 适配层，通用正文位于 `docs/playbooks/`。
+- `.claude/settings.local.json` 和 `.env` 是本机文件，禁止提交。
+- 工具自身使用 MCP 不等于把 MCP 引入本项目运行时。

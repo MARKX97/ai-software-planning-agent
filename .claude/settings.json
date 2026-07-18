@@ -46,7 +46,11 @@
       "Bash(pnpm lint)",
       "Bash(pnpm typecheck)",
       "Bash(pnpm typecheck *)",
-      "Bash(pnpm format:check)"
+      "Bash(pnpm format:check)",
+      "Bash(pnpm harness:check)",
+      "Bash(pnpm verify:fast)",
+      "Bash(pnpm verify)",
+      "Bash(pnpm eval)"
     ]
   }
 }

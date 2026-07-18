@@ -9,6 +9,7 @@
 - Authentication: `Authorization: Bearer <BAISHAN_API_KEY>`
 - The API key exists only in the NestJS API Server environment. Browser code never calls Baishan directly.
 - Model IDs are case-sensitive and configured with `BAISHAN_MODEL_*`.
+- `.env.example` is the checked-in example baseline. `pnpm harness:check` fails when its Base URL or model IDs drift from API defaults or CI overrides.
 
 The official LLM API page contains conflicting `prompt`/`messages` and `/completions`/`/chat/completions` examples. This project follows the executable Quick Start and streaming-guide form: `/chat/completions` with `messages`.
 

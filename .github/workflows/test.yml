@@ -28,9 +28,6 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_planning_agent?schema=public
       BAISHAN_API_KEY: ''
       BAISHAN_BASE_URL: ''
-      BAISHAN_MODEL_DEEPSEEK: deepseek-v4-pro
-      BAISHAN_MODEL_GLM: glm-5.1
-      BAISHAN_MODEL_MINIMAX: minimax-m2.5
       COST_MAX_COST_PER_PROJECT: '5'
       NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:3001/api/v1
       NEXT_PUBLIC_API_KEY: ''
@@ -49,11 +46,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @ai-planning/database exec prisma migrate deploy
-      - run: pnpm format:check
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
+      - run: pnpm verify
 
       - run: pnpm --filter @ai-planning/web exec playwright install --with-deps chromium firefox webkit
 

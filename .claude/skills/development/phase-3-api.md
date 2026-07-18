@@ -1,28 +1,8 @@
 ---
 name: development-phase-3
-description: Phase 3 — API, NestJS controllers, DTOs, Swagger, RESTful routes.
-triggers:
-  - Phase 3
-  - API
-  - controller
-  - DTO
-  - Swagger
+description: Historical Phase 3 entry.
 ---
 
-# Phase 3 — API
+# Phase 3 Entry
 
-## 目标
-
-搭建 NestJS 11 基础，实现 Controller + DTO + Swagger 文档。
-
-## 核心交付
-
-1. NestJS 模块化项目结构（modules/）
-2. Controller（RESTful，`/api/v1/`）
-3. Zod DTO 校验
-4. Swagger/OpenAPI 文档
-5. 统一错误格式 `{ error: { code, message, details } }`
-
-## 验收
-
-接口按 OpenAPI 返回 200/201/202/204，Swagger 页面可访问。
+该 Phase 已完成。读取 `docs/exec-plans/completed/phases-1-10.md`、`specs/api.spec.md` 和 `contracts/openapi.yaml`。

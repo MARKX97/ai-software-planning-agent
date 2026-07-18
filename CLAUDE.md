@@ -1,18 +1,7 @@
 # Claude Code Entry
 
-本项目的通用 agent 规则以 `AGENTS.md` 为唯一来源。
+先读取并遵守 `AGENTS.md`，再通过 `docs/README.md` 定位任务相关的 spec、contract 和 playbook。
 
-Claude Code 启动后必须先读取并遵守：
-
-- `AGENTS.md`
-
-Claude 专用配置和 skills 保留在：
-
-- `.claude/settings.json`
-- `.claude/skills/`
-
-规则维护原则：
-
-- 通用项目规范只更新 `AGENTS.md`。
-- `CLAUDE.md` 只作为 Claude Code 自动识别入口。
-- 不要把 `.claude/settings.local.json` 当作团队规范；它属于个人本机授权/状态。
+- 通用规则只维护在 `AGENTS.md` 和 `docs/`。
+- `.claude/skills/` 仅提供 Claude 的薄入口。
+- `.claude/settings.local.json` 属于本机状态，禁止提交。

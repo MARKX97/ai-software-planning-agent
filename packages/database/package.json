@@ -21,7 +21,8 @@
     "test": "echo \"no tests yet\"",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "db:seed": "tsx src/seed/index.ts"
+    "db:seed": "tsx src/seed/index.ts",
+    "diagnose:project": "tsx src/diagnose-project.ts"
   },
   "prisma": {
     "seed": "tsx src/seed/index.ts"

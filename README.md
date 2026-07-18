@@ -96,22 +96,24 @@ pnpm dev
 
 本项目采用“一套通用规则 + 工具专用入口”的方式，避免 Codex 和 Claude Code 各维护一份规范导致漂移。
 
-| 文件/目录               | 用途                                                         |
-| ----------------------- | ------------------------------------------------------------ |
-| `AGENTS.md`             | 通用 agent 规则唯一来源；Codex 直接识别并使用                |
-| `CLAUDE.md`             | Claude Code 自动识别入口；内容只指向 `AGENTS.md`             |
-| `.claude/skills/`       | Claude 专用 skills；Codex 需要时可直接读取对应 Markdown 文件 |
-| `.claude/settings.json` | Claude 项目级配置                                            |
+| 文件/目录               | 用途                                             |
+| ----------------------- | ------------------------------------------------ |
+| `AGENTS.md`             | 通用 agent 规则唯一来源；Codex 直接识别并使用    |
+| `CLAUDE.md`             | Claude Code 自动识别入口；内容只指向 `AGENTS.md` |
+| `docs/README.md`        | Codex、Claude 和开发者共用的知识地图             |
+| `docs/playbooks/`       | 通用开发、测试、LLM 和部署流程                   |
+| `.claude/skills/`       | Claude 薄入口；正文统一指向 `docs/playbooks/`    |
+| `.claude/settings.json` | Claude 项目级配置                                |
 
 使用原则：
 
-- 修改长期有效的项目规范时，只改 `AGENTS.md`。
+- 修改长期有效的项目规范时，更新 `AGENTS.md` 指向的权威文档。
 - 不要在 `CLAUDE.md` 里复制完整规则，避免和 `AGENTS.md` 冲突。
 - `.claude/settings.local.json` 属于个人本机授权/状态，不作为团队规范来源。
 
 ## 测试策略（本地验证用什么测试）
 
-不是 e2e 单一方案，而是**分层金字塔**（通用要求见 `AGENTS.md`，Claude playbook 见 `.claude/skills/testing/SKILL.md`）。每个 Phase 的本地验证由不同层组合而成：
+不是 e2e 单一方案，而是**分层金字塔**（通用要求见 `docs/playbooks/testing.md`）。每个 Phase 的本地验证由不同层组合而成：
 
 ```
         ┌───────┐
@@ -183,14 +185,27 @@ ai-software-planning-agent/
 │   └── config/           # 共享配置
 ├── specs/                # System Contracts (人读)
 ├── contracts/            # Machine-readable contracts (OpenAPI + JSON Schema)
-└── docs/                 # Project context
+└── docs/                 # 知识地图、playbook、执行计划和项目上下文
 ```
 
 ## Documentation
 
+- 统一知识地图：`docs/README.md`
 - 产品定位与 MVP 范围：`docs/product-vision.md`
 - 架构与技术栈：`docs/architecture-overview.md`
 - 系统契约：`specs/*.spec.md`
 - 通用 agent 开发规范：`AGENTS.md`
 - Claude Code 入口：`CLAUDE.md`
-- Claude 开发流程 playbook：`.claude/skills/development/SKILL.md`
+- 通用开发流程：`docs/playbooks/development.md`
+
+## Harness Commands
+
+```bash
+pnpm harness:check
+pnpm verify:fast
+pnpm verify
+pnpm eval
+pnpm diagnose:project -- <project-id>
+```
+
+`verify:fast` 用于本地和 pre-push；`verify` 是完整静态检查、测试和构建入口。代码形态存量债务采用只能缩小的精确基线，架构、配置、文档和密钥规则没有存量豁免。

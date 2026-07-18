@@ -75,3 +75,24 @@ Shared: packages/shared/        跨层 LLM 类型、枚举与 Zod Schema
 - 仅 Workflow Agent，不支持 Multi-Agent
 - 不引入 RAG、MCP
 - 不引入 Redis、Kafka、Elasticsearch、Kubernetes
+
+## Workspace 依赖矩阵
+
+| Workspace                   | 允许依赖的内部包                                   |
+| --------------------------- | -------------------------------------------------- |
+| `packages/shared`           | 无                                                 |
+| `packages/config`           | 无                                                 |
+| `packages/database`         | 无                                                 |
+| `packages/llm-core`         | `shared`                                           |
+| `packages/llm-providers`    | `llm-core`, `shared`                               |
+| `packages/llm-orchestrator` | `llm-core`, `llm-providers`, `shared`              |
+| `apps/api`                  | `config`, `database`, `llm-orchestrator`, `shared` |
+| `apps/web`                  | 无；通过 HTTP 访问 API                             |
+
+API 中只有以下位置可以 import `LlmOrchestratorService`：
+
+- `apps/api/src/llm/`：应用组装。
+- `apps/api/src/health/` 和 `apps/api/src/modules/models/`：仅调用 `healthCheck()`。
+- `apps/api/src/modules/workflow/`：模型调用、工作流、融合和产物生成。
+
+Controller、其他 API 模块和 Web 不得访问 Orchestrator、Provider 或 Adapter。上述边界由 `pnpm harness:check` 强制执行。
