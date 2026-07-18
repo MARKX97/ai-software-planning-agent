@@ -21,7 +21,7 @@
 | platform_recommendation   | callSingle       | **glm**                                          | 性价比              |
 | planning_generation       | callSingle × 11  | **deepseek** (PRD/Architecture) + **glm** (其余) | 核心产物用 DeepSeek |
 
-需求范围、MVP 与技术方案检查点中的讨论也使用 `callSingleStream(glm)`。这些对话调用不改变对应阶段的结构化产出路由。
+需求澄清以及需求范围、MVP、技术方案检查点讨论使用 `callSingleStreamWithFallback(glm -> minimax -> deepseek)`。仅在当前 Provider 尚未输出 delta 时降级；这些对话调用不改变对应阶段的结构化产出路由。
 
 ## 2. 产物级模型路由
 
@@ -58,6 +58,7 @@
 4. MiniMax: 多模型分析中提供第三方视角
 5. 避免所有阶段都调用 3 个模型
 6. 仅用户直接看到的对话回复走流式；内部结构化分析保持非流式
+7. 对话降级顺序固定为 GLM、MiniMax、DeepSeek；输出开始后禁止切换模型
 ```
 
 ## 5. 成本对比

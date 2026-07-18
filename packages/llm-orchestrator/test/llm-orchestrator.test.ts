@@ -127,6 +127,51 @@ describe('callWithFallback', () => {
   });
 });
 
+describe('callSingleStreamWithFallback', () => {
+  it('switches providers before output and reports the failed attempt', async () => {
+    const svc = new LlmOrchestratorService(
+      makeRegistry(new AlwaysFailProvider('glm', 'glm-model'), new MockLLMProvider('minimax')),
+    );
+    const failures: string[] = [];
+    const response = await svc.callSingleStreamWithFallback(['glm', 'minimax'], 'hello', {
+      onDelta: () => {},
+      onProviderFailure: (attempt) => {
+        failures.push(`${attempt.attemptNumber}:${attempt.provider}:${attempt.model}`);
+      },
+    });
+    assert.equal(response.provider, 'minimax');
+    assert.deepEqual(failures, ['1:glm:glm-model']);
+  });
+
+  it('does not switch providers after output has started', async () => {
+    const broken = new BrokenStreamProvider(true);
+    const fallback = new MockLLMProvider('minimax');
+    const svc = new LlmOrchestratorService(makeRegistry(broken, fallback));
+    await assert.rejects(
+      () =>
+        svc.callSingleStreamWithFallback(['glm', 'minimax'], 'hello', {
+          onDelta: () => {},
+        }),
+      LLMTimeoutError,
+    );
+    assert.equal(broken.attempts, 1);
+    assert.equal(svc.getStats().byProvider['minimax'], undefined);
+  });
+
+  it('throws when every stream provider fails', async () => {
+    const svc = new LlmOrchestratorService(
+      makeRegistry(new AlwaysFailProvider('glm'), new AlwaysFailProvider('minimax')),
+    );
+    await assert.rejects(
+      () =>
+        svc.callSingleStreamWithFallback(['glm', 'minimax'], 'hello', {
+          onDelta: () => {},
+        }),
+      AllModelsFailedError,
+    );
+  });
+});
+
 describe('callMulti', () => {
   it('returns null entries for failed providers', async () => {
     const svc = new LlmOrchestratorService(
@@ -169,8 +214,15 @@ describe('CostController', () => {
   it('detects over-budget', () => {
     const ctrl = new CostController(1.0);
     ctrl.track('p1', { inputCost: 0.5, outputCost: 0.5, cachedInputCost: 0, totalCost: 1.0 });
+    assert.equal(ctrl.isOverBudget('p1'), true);
+  });
+
+  it('hydrates the latest persisted project total', () => {
+    const ctrl = new CostController(5.0);
+    ctrl.sync('p1', 4.5);
+    assert.equal(ctrl.getStats('p1').totalCost, 4.5);
     assert.equal(ctrl.isOverBudget('p1'), false);
-    ctrl.track('p1', { inputCost: 0.5, outputCost: 0.5, cachedInputCost: 0, totalCost: 1.0 });
+    ctrl.sync('p1', 5);
     assert.equal(ctrl.isOverBudget('p1'), true);
   });
 
@@ -181,7 +233,6 @@ describe('CostController', () => {
       modelIds: { deepseek: 'd', glm: 'g', minimax: 'm' },
       costLimitPerProject: 0,
     });
-    await svc.callSingle('glm', 'hi', { projectId: 'p1' });
     await assert.rejects(() => svc.callSingle('glm', 'hi', { projectId: 'p1' }));
   });
 });

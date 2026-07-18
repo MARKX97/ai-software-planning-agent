@@ -1,5 +1,6 @@
 export function mockCheckpointDiscussion(prompt: string): string {
-  const checkpoint = prompt.match(/Checkpoint: (.+)/)?.[1] ?? '当前方案';
+  const checkpoint =
+    prompt.match(/<untrusted-context name="checkpointName">\n(.+)\n/)?.[1] ?? '当前方案';
   const latestMessage = [...prompt.matchAll(/^user: (.+)$/gm)].at(-1)?.[1] ?? '';
   const reply = checkpointReply(latestMessage);
   return `关于${checkpoint}，${reply}我会把这个取舍带进后续规划。还有哪一点让你不踏实，可以接着聊；都顺眼了再确认往下走。`;

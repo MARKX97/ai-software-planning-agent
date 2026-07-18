@@ -31,6 +31,8 @@ export class AppConfigService {
   readonly modelMinimax: string;
   /** Per-project LLM cost ceiling (CNY). */
   readonly costLimitPerProject: number;
+  /** Model-producing workflow operations allowed per project/caller each minute. */
+  readonly workflowRateLimitPerMinute: number;
   /** API version surfaced in health/payloads. */
   readonly version: string;
   /** Secret used to derive short-lived export download tokens. */
@@ -48,6 +50,10 @@ export class AppConfigService {
     this.modelGlm = process.env['BAISHAN_MODEL_GLM'] ?? 'GLM-4.5';
     this.modelMinimax = process.env['BAISHAN_MODEL_MINIMAX'] ?? 'MiniMax-M2.5';
     this.costLimitPerProject = this.parseNumber(process.env['COST_MAX_COST_PER_PROJECT'], 5);
+    this.workflowRateLimitPerMinute = this.parseNonNegativeInt(
+      process.env['WORKFLOW_RATE_LIMIT_PER_MINUTE'],
+      10,
+    );
     this.version = process.env['API_VERSION'] ?? '1.0.0';
     this.downloadTokenSecret =
       process.env['DOWNLOAD_TOKEN_SECRET'] || this.apiKey || randomBytes(32).toString('hex');
@@ -61,5 +67,10 @@ export class AppConfigService {
   private parseNumber(value: string | undefined, fallback: number): number {
     const parsed = Number.parseFloat(value ?? '');
     return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private parseNonNegativeInt(value: string | undefined, fallback: number): number {
+    const parsed = Number.parseInt(value ?? '', 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
   }
 }

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Project } from '@ai-planning/database';
+import { safeUserTextSchema } from '../../common/security/sensitive-text.js';
 
 /**
  * Zod schemas + DTOs for Projects endpoints.
@@ -8,7 +9,7 @@ import type { Project } from '@ai-planning/database';
  */
 export const createProjectSchema = z.object({
   name: z.string().min(1).max(200),
-  original_idea: z.string().min(1).max(10000),
+  original_idea: safeUserTextSchema(10000),
 });
 
 export type CreateProjectRequest = z.infer<typeof createProjectSchema>;

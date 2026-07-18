@@ -152,13 +152,13 @@ describe('MockLLMProvider', () => {
   it('supports multiple clarification rounds before continuing', async () => {
     const provider = new MockLLMProvider('glm');
     const first = await provider.chat(
-      'WORKFLOW_REQUIREMENT_CLARIFICATION\nClarification replies received: 0',
+      'WORKFLOW_REQUIREMENT_CLARIFICATION\n<untrusted-context name="clarificationRound">\n0\n</untrusted-context>',
     );
     const second = await provider.chat(
-      'WORKFLOW_REQUIREMENT_CLARIFICATION\nClarification replies received: 1',
+      'WORKFLOW_REQUIREMENT_CLARIFICATION\n<untrusted-context name="clarificationRound">\n1\n</untrusted-context>',
     );
     const continued = await provider.chat(
-      'WORKFLOW_REQUIREMENT_CLARIFICATION\nClarification replies received: 2',
+      'WORKFLOW_REQUIREMENT_CLARIFICATION\n<untrusted-context name="clarificationRound">\n2\n</untrusted-context>',
     );
     assert.match(first.content, /首版主要服务哪个城市/);
     assert.match(second.content, /最后一个问题/);
@@ -168,7 +168,7 @@ describe('MockLLMProvider', () => {
     const provider = new MockLLMProvider('glm');
     const chunks: string[] = [];
     const result = await provider.chatStream(
-      'WORKFLOW_CHECKPOINT_DISCUSSION\nCheckpoint: MVP 取舍',
+      'WORKFLOW_CHECKPOINT_DISCUSSION\n<untrusted-context name="checkpointName">\nMVP 取舍\n</untrusted-context>',
       {
         onDelta: (content) => chunks.push(content),
       },
@@ -179,13 +179,13 @@ describe('MockLLMProvider', () => {
   it('varies repeated checkpoint replies using the latest user feedback', async () => {
     const provider = new MockLLMProvider('glm');
     const budget = await provider.chat(
-      'WORKFLOW_CHECKPOINT_DISCUSSION\nCheckpoint: MVP 取舍\nuser: 首版预算要控制住',
+      'WORKFLOW_CHECKPOINT_DISCUSSION\n<untrusted-context name="checkpointName">\nMVP 取舍\n</untrusted-context>\nuser: 首版预算要控制住',
     );
     const scope = await provider.chat(
-      'WORKFLOW_CHECKPOINT_DISCUSSION\nCheckpoint: MVP 取舍\nuser: 登录功能以后再做',
+      'WORKFLOW_CHECKPOINT_DISCUSSION\n<untrusted-context name="checkpointName">\nMVP 取舍\n</untrusted-context>\nuser: 登录功能以后再做',
     );
     const deferredPlatform = await provider.chat(
-      'WORKFLOW_CHECKPOINT_DISCUSSION\nCheckpoint: 平台推荐\nuser: 移动端和微信小程序以后再评估',
+      'WORKFLOW_CHECKPOINT_DISCUSSION\n<untrusted-context name="checkpointName">\n平台推荐\n</untrusted-context>\nuser: 移动端和微信小程序以后再评估',
     );
     assert.match(budget.content, /预算优先级/);
     assert.match(scope.content, /移出首版/);
@@ -210,7 +210,9 @@ describe('MockLLMProvider', () => {
   });
   it('returns readable Markdown for demo artifacts', async () => {
     const provider = new MockLLMProvider('deepseek');
-    const response = await provider.chat('Artifact type to generate:\nprd');
+    const response = await provider.chat(
+      'Artifact type to generate:\n<untrusted-context name="artifactType">\nprd\n</untrusted-context>',
+    );
     assert.match(response.content, /^# 今晚吃什么 PRD/);
   });
 });

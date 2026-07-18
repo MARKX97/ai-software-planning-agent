@@ -20,7 +20,7 @@ const log: ModelExecutionLogResponse = {
   provider_name: 'deepseek',
   model_id: 'demo-model',
   status: 'success',
-  attempt_number: 0,
+  attempt_number: 2,
   prompt_version_id: null,
   input_tokens: 10,
   output_tokens: 20,
@@ -52,10 +52,12 @@ describe('UsageLogTable', () => {
       </QueryClientProvider>,
     );
 
-    const button = await screen.findByRole('button', { name: '看看细节' });
+    const button = await screen.findByRole('button', { name: '看看细节' }, { timeout: 3_000 });
     await userEvent.click(button);
     expect(await screen.findByText('demo prompt')).toBeInTheDocument();
     expect(screen.getByText('demo response')).toBeInTheDocument();
     expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('第 2 次')).toBeInTheDocument();
+    expect(screen.getByText('接手')).toBeInTheDocument();
   });
 });

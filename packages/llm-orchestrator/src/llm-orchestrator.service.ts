@@ -1,7 +1,13 @@
 import type { ILLMProvider } from '@ai-planning/llm-core';
-import type { LLMCallOptions, LLMResponse, LLMStreamOptions } from '@ai-planning/shared';
+import type {
+  LLMCallOptions,
+  LLMFallbackStreamOptions,
+  LLMResponse,
+  LLMStreamOptions,
+} from '@ai-planning/shared';
 import type { ProviderRegistry } from '@ai-planning/llm-providers';
 import { callStreamWithRetry, callWithRetry } from './strategies/retry-strategy.js';
+import { callStreamWithFallback } from './strategies/stream-fallback.js';
 import { AllModelsFailedError } from './errors/all-models-failed.error.js';
 import { CallTracker } from './monitoring/call-tracker.js';
 import { CostController } from './monitoring/cost-controller.js';
@@ -60,6 +66,22 @@ export class LlmOrchestratorService {
       this.recordFailure(provider, startedAt);
       throw error;
     }
+  }
+
+  /** Stream through providers in order, switching only before the first delta. */
+  async callSingleStreamWithFallback(
+    providerNames: string[],
+    prompt: string,
+    options: LLMFallbackStreamOptions,
+  ): Promise<LLMResponse> {
+    this.checkBudget(options);
+    const { response, retries, provider } = await callStreamWithFallback({
+      providers: providerNames.map((name) => this.registry.get(name)),
+      prompt,
+      options,
+      onFailure: (failed, startedAt) => this.recordFailure(failed, startedAt),
+    });
+    return this.finalize(response, provider, retries, options);
   }
 
   /** Parallel call to all providers; partial failure → null entries. */
@@ -133,6 +155,12 @@ export class LlmOrchestratorService {
   /** Per-project cost stats (spec §5). */
   getProjectCost(projectId: string) {
     return this.costController.getStats(projectId);
+  }
+
+  /** Hydrate project cost from the API layer's persisted aggregate. */
+  syncProjectCost(projectId: string, totalCost: number): boolean {
+    this.costController.sync(projectId, totalCost);
+    return this.costController.isOverBudget(projectId);
   }
 
   private checkBudget(options: LLMCallOptions): void {

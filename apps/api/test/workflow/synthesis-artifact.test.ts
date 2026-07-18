@@ -91,7 +91,7 @@ function analysis(
 }
 
 function hasArtifactType(prompt: string, type: ArtifactType): boolean {
-  return prompt.includes(`Artifact type to generate:\n${type}`);
+  return prompt.includes(`<untrusted-context name="artifactType">\n${type}\n`);
 }
 
 function mockOrchestrator(

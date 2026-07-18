@@ -75,6 +75,16 @@ pnpm dev
 # API: http://localhost:3001/api/v1/health
 ```
 
+也可以使用 Docker Compose 启动完整本地 Demo：
+
+```bash
+docker compose up --build
+# Web: http://localhost:3000
+# API: http://localhost:3001/api/v1/health
+```
+
+Compose 默认在未配置 `BAISHAN_API_KEY` 时使用 Mock Provider。真实白山密钥只传给 API 容器，不会进入 Web 镜像。
+
 ## Tech Stack
 
 | 层       | 技术                          |
@@ -87,6 +97,8 @@ pnpm dev
 | AI 接入  | Baishan OpenAI-compatible API |
 
 用户可见的模型回复由 NestJS API 通过 SSE 代理到浏览器。`BAISHAN_BASE_URL` 与 `BAISHAN_API_KEY` 只配置在 API Server 的 `.env`，不会下发到前端；内部分析与产物生成仍使用结构化非流式调用。
+
+用户可见对话支持 `GLM -> MiniMax -> DeepSeek` 的首字前降级：只有当前模型尚未输出内容时才会切换，避免重复文本。模型工作流操作同时执行 Bearer 认证、单实例限流和持久化项目成本准入；成本达到上限后不再启动新模型调用。
 
 白山接入使用官方 OpenAI-compatible 地址 `https://api.edgefn.net/v1/chat/completions` 和 Bearer Token。模型 ID 区分大小写，`.env.example` 提供的是公开文档可验证的默认值；部署前应在白山控制台核对账号实际可用模型与价格。平台缓存自动生效，项目会记录响应中的 `cached_tokens` 并纳入本地成本估算。
 

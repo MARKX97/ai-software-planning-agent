@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   Res,
+  UseGuards,
   UsePipes,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -36,6 +37,7 @@ import type {
   WorkflowStatusResponse,
 } from './workflow-response.dto.js';
 import { WorkflowSse } from './workflow-sse.js';
+import { WorkflowRateLimitGuard } from '../../common/guards/workflow-rate-limit.guard.js';
 
 /**
  * Workflow endpoints — run, status, continue, states, executions, execution logs.
@@ -51,6 +53,7 @@ export class WorkflowController {
 
   @Post('projects/:project_id/run')
   @ApiOperation({ summary: '启动工作流' })
+  @UseGuards(WorkflowRateLimitGuard)
   @UsePipes(new ZodValidationPipe(runWorkflowSchema))
   async run(
     @Param('project_id', UUID_V4_PIPE) projectId: string,
@@ -70,6 +73,7 @@ export class WorkflowController {
 
   @Post('projects/:project_id/workflow/continue')
   @ApiOperation({ summary: '继续工作流' })
+  @UseGuards(WorkflowRateLimitGuard)
   @UsePipes(new ZodValidationPipe(continueWorkflowSchema))
   async continue(
     @Param('project_id', UUID_V4_PIPE) projectId: string,
@@ -81,6 +85,7 @@ export class WorkflowController {
 
   @Post('projects/:project_id/workflow/discuss')
   @ApiOperation({ summary: '讨论当前检查点' })
+  @UseGuards(WorkflowRateLimitGuard)
   @UsePipes(new ZodValidationPipe(discussWorkflowSchema))
   async discuss(
     @Param('project_id', UUID_V4_PIPE) projectId: string,
@@ -93,6 +98,7 @@ export class WorkflowController {
   @Post('projects/:project_id/workflow/advance')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: '确认并进入下一环节' })
+  @UseGuards(WorkflowRateLimitGuard)
   @UsePipes(new ZodValidationPipe(advanceWorkflowSchema))
   async advance(
     @Param('project_id', UUID_V4_PIPE) projectId: string,

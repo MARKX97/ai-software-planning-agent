@@ -175,7 +175,9 @@ function mockRequirementQuestions(prompt: string): unknown[] {
 }
 
 function mockClarification(prompt: string): string {
-  const replyCount = Number(prompt.match(/Clarification replies received:\s*(\d+)/)?.[1] ?? 0);
+  const replyCount = Number(
+    prompt.match(/<untrusted-context name="clarificationRound">\n(\d+)\n/)?.[1] ?? 0,
+  );
   const firstRound = replyCount === 0;
   const secondRound = replyCount === 1;
   if (firstRound) {

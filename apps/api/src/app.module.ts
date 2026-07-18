@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { OrchestratorModule } from './llm/orchestrator.module.js';
@@ -11,6 +12,7 @@ import { ArtifactsModule } from './modules/artifacts/artifacts.module.js';
 import { ExportsModule } from './modules/exports/exports.module.js';
 import { UsageModule } from './modules/usage/usage.module.js';
 import { AppController } from './app.controller.js';
+import { AuthGuard } from './common/guards/auth.guard.js';
 
 /**
  * Root application module.
@@ -31,5 +33,6 @@ import { AppController } from './app.controller.js';
     UsageModule,
   ],
   controllers: [AppController],
+  providers: [{ provide: APP_GUARD, useClass: AuthGuard }],
 })
 export class AppModule {}

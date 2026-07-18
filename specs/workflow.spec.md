@@ -94,6 +94,9 @@ INIT
 - 本轮用户消息只作为临时上下文传入模型。完整生成成功后，在一个事务中保存用户消息、助手消息和 conversation 更新时间。
 - 取消或失败不保存半条助手消息，也不重复保存用户消息；`continue/discuss` 恢复原检查点，`run` 可重新启动。
 - 客户端断开会取消上游模型请求并将 execution 标记为 `cancelled`。
+- 需求澄清与检查点讨论按 `glm -> minimax -> deepseek` 降级。首个 delta 前失败可切换，输出开始后失败不得切换。
+- 每个失败 Provider 和最终成功 Provider 都写入同一 execution 的模型调用日志；`attempt_number` 表示本次逻辑调用中的 Provider 顺序。
+- 每个用户操作在状态变更或打开 SSE 前同步并校验持久化项目成本，预算耗尽不创建新的 execution。
 
 ### 4.3 MULTI_MODEL_ANALYSIS
 

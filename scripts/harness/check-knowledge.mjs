@@ -210,6 +210,36 @@ function checkSecrets() {
   return issues;
 }
 
+function checkDockerContext() {
+  const required = ['.git', '.env*', 'node_modules', 'data', 'output', 'tmp'];
+  if (!exists('.dockerignore')) {
+    return [
+      issue(
+        'HE-SEC-006',
+        'Docker build context has no .dockerignore.',
+        'Add .dockerignore and exclude local secrets, dependencies, outputs and data.',
+        'docs/playbooks/deployment.md',
+      ),
+    ];
+  }
+  const entries = new Set(
+    read('.dockerignore')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#')),
+  );
+  return required
+    .filter((entry) => !entries.has(entry))
+    .map((entry) =>
+      issue(
+        'HE-SEC-006',
+        `.dockerignore does not exclude ${entry}.`,
+        'Exclude the path from Docker build context.',
+        'docs/playbooks/deployment.md',
+      ),
+    );
+}
+
 export function checkKnowledge() {
   return [
     ...checkMarkdownLinks(),
@@ -218,5 +248,6 @@ export function checkKnowledge() {
     ...checkSchemaMirrors(),
     ...checkConfig(),
     ...checkSecrets(),
+    ...checkDockerContext(),
   ];
 }

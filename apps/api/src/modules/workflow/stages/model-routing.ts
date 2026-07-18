@@ -18,6 +18,9 @@ export const STAGE_PROVIDER: Record<string, string> = {
   planning_generation: 'mixed', // special: per-artifact routing below
 };
 
+/** User-visible dialogue fallback order. Switching is allowed only before output. */
+export const DIALOGUE_PROVIDER_ORDER = ['glm', 'minimax', 'deepseek'] as const;
+
 /** Per-stage timeout contract in milliseconds. */
 export const STAGE_TIMEOUT_MS: Record<string, number> = {
   requirement_analysis: 60_000,

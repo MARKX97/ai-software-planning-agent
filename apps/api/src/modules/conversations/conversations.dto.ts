@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Conversation, Message } from '@ai-planning/database';
+import { safeUserTextSchema } from '../../common/security/sensitive-text.js';
 
 /**
  * Zod schemas + DTOs for Conversations endpoints.
@@ -7,7 +8,7 @@ import type { Conversation, Message } from '@ai-planning/database';
  * @internal
  */
 export const sendMessageSchema = z.object({
-  content: z.string().min(1).max(50000),
+  content: safeUserTextSchema(50000),
 });
 
 export type SendMessageRequest = z.infer<typeof sendMessageSchema>;

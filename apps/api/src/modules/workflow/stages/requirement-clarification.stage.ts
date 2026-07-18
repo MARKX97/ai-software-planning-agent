@@ -14,7 +14,7 @@ import { renderPrompt } from '../../../prompts/prompt-template.js';
 import { CLARIFICATION_PROMPT } from '../../../prompts/clarification.prompt.js';
 import type { StageDeps } from './stage-deps.js';
 import type { StageProcessor } from './stage-processor.js';
-import { logModelCall } from './model-call-log.js';
+import { callDialogueModel } from './dialogue-model-call.js';
 
 export interface ClarificationResult extends StageResult {
   readonly needsMoreClarification: boolean;
@@ -35,20 +35,11 @@ export class RequirementClarificationStage implements StageProcessor {
       conversationHistory: ctx.conversationHistory || '(none)',
       clarificationRound: String(ctx.clarificationRound),
     });
-    const stream = this.deps.stream;
-    const response = stream
-      ? await this.deps.orchestrator.callSingleStream('glm', prompt, {
-          projectId: ctx.projectId,
-          ...stream,
-        })
-      : await this.deps.orchestrator.callSingle('glm', prompt, { projectId: ctx.projectId });
-    await logModelCall(this.deps.db, {
-      projectId: ctx.projectId,
-      executionId: ctx.executionId,
+    const response = await callDialogueModel({
+      deps: this.deps,
+      ctx,
       stage: this.stage,
-      provider: 'glm',
-      promptText: prompt,
-      response,
+      prompt,
     });
     const needsMore = questions.length > 0 && ctx.clarificationRound < MAX_CLARIFICATION_ROUNDS;
     return {

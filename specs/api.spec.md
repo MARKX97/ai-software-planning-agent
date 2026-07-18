@@ -81,6 +81,8 @@
 - LLM 调用只允许白名单模块通过 `LlmOrchestratorService`。
 - `run`、`workflow/continue`、`workflow/discuss` 返回 `200 text/event-stream`；`workflow/advance` 仍返回 `202 application/json`。
 - Controller 只绑定 SSE headers 和输出，模型调用与持久化仍由 Workflow Service/Stage 完成。
+- `run`、`workflow/continue`、`workflow/discuss`、`workflow/advance` 在进入业务逻辑前执行按项目和调用方计数的固定窗口限流；默认每分钟 10 次，超限返回 `429 RATE_LIMITED`。
+- 四个模型工作流操作在创建 execution 或打开 SSE 前读取持久化项目成本；达到配置上限时返回 `503 COST_LIMIT_EXCEEDED`。
 
 ### 4.3 Error
 
@@ -95,6 +97,8 @@
 | 500  | 内部错误               |
 | 502  | LLM 或导出依赖失败     |
 | 503  | 成本限制或服务不可用   |
+
+成本上限是新调用准入控制，不是白山账单硬上限。已经并行发出的模型调用允许完成并计费；达到上限后，后续模型工作流操作必须在流开始前被拒绝。
 
 错误码枚举以 `contracts/openapi.yaml` 为准。
 

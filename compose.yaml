@@ -1,0 +1,77 @@
+name: ai-planning-agent
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ai_planning_agent
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d ai_planning_agent']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      target: api
+    environment:
+      API_PORT: 3001
+      API_KEY: ''
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_planning_agent?schema=public
+      DATA_DIR: /app/data
+      DOWNLOAD_TOKEN_SECRET: local-demo-only
+      BAISHAN_BASE_URL: ${BAISHAN_BASE_URL:-https://api.edgefn.net/v1}
+      BAISHAN_API_KEY: ${BAISHAN_API_KEY:-}
+      BAISHAN_MODEL_DEEPSEEK: ${BAISHAN_MODEL_DEEPSEEK:-DeepSeek-R1-0528}
+      BAISHAN_MODEL_GLM: ${BAISHAN_MODEL_GLM:-GLM-4.5}
+      BAISHAN_MODEL_MINIMAX: ${BAISHAN_MODEL_MINIMAX:-MiniMax-M2.5}
+      COST_MAX_COST_PER_PROJECT: ${COST_MAX_COST_PER_PROJECT:-5.00}
+      WORKFLOW_RATE_LIMIT_PER_MINUTE: ${WORKFLOW_RATE_LIMIT_PER_MINUTE:-10}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - '3001:3001'
+    volumes:
+      - artifact_data:/app/data
+
+  web:
+    build:
+      context: .
+      target: web
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - '3000:3000'
+
+volumes:
+  postgres_data:
+  artifact_data:

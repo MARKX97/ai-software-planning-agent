@@ -77,6 +77,40 @@ describe('workflow stage processors', () => {
     }
   });
 
+  it('persists failed dialogue providers before the fallback success', async () => {
+    const logs: Array<{ data: Record<string, unknown> }> = [];
+    const stage = new RequirementClarificationStage({
+      orchestrator: {
+        callSingleStreamWithFallback: async (
+          _providers: string[],
+          _prompt: string,
+          options: {
+            onProviderFailure: (attempt: Record<string, unknown>) => Promise<void>;
+          },
+        ) => {
+          await options.onProviderFailure({
+            provider: 'glm',
+            model: 'glm-model',
+            attemptNumber: 1,
+            latencyMs: 20,
+            errorCode: 'LLM_NETWORK_ERROR',
+            errorMessage: 'api_key=abcdefghijklmnopqrstuvwxyz1234',
+          });
+          return response('minimax', null);
+        },
+      },
+      db: db(logs),
+      stream: { onDelta: () => {} },
+    } as never);
+    await stage.execute(context);
+    assert.equal(logs.length, 2);
+    assert.equal(logs[0].data['provider_name'], 'glm');
+    assert.equal(logs[0].data['attempt_number'], 1);
+    assert.equal(logs[0].data['error_message'], '[REDACTED]');
+    assert.equal(logs[1].data['provider_name'], 'minimax');
+    assert.equal(logs[1].data['attempt_number'], 2);
+  });
+
   it('reports 3/3, 2/3 and 1/3 multi-model degradation levels', async () => {
     for (const successCount of [3, 2, 1]) {
       const providers = ['deepseek', 'glm', 'minimax'].map((provider, index) => [

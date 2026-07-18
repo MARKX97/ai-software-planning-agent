@@ -181,7 +181,8 @@ API:
 
 - 模型调用日志分页展示，默认 `limit=20`
 - Prompt 和响应详情只在用户点击后加载
-- 成本超过预算 80% 时显示 warning
+- 成本达到预算 80% 但未耗尽时显示 warning；达到上限时显示阻止新模型调用的 error 状态
+- 模型调用日志展示 `attempt_number`；同一 execution/stage 失败后成功时标记后续 Provider 已接手
 
 ## 5. 组件分层
 

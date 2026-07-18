@@ -9,6 +9,7 @@ import { stageName, statusName } from '@/components/project/project-status';
 import { getModelLogDetail, listModelLogs } from '@/features/usage/api';
 import { getUserErrorMessage } from '@/lib/api-client';
 import { formatCurrency, formatDateTime, formatNumber } from '@/lib/format';
+import type { ModelExecutionLogResponse } from '@/types/api';
 
 const PAGE_SIZE = 20;
 
@@ -82,8 +83,8 @@ export function UsageLogTable({ projectId }: { projectId: string }) {
                   return (
                     <Fragment key={log.id}>
                       <tr className={selected ? 'bg-cyan-50' : 'border-b border-slate-100'}>
-                        <td className="py-3 pr-4 font-semibold text-slate-900">
-                          {log.provider_name}
+                        <td className="py-3 pr-4 text-slate-900">
+                          <ProviderAttempt log={log} />
                         </td>
                         <td className="py-3 pr-4 text-slate-700">{stageName(log.stage)}</td>
                         <td className="py-3 pr-4">
@@ -132,6 +133,20 @@ export function UsageLogTable({ projectId }: { projectId: string }) {
         ) : null}
       </CardBody>
     </Card>
+  );
+}
+
+function ProviderAttempt({ log }: { log: ModelExecutionLogResponse }) {
+  return (
+    <>
+      <span className="font-semibold">{log.provider_name}</span>
+      <span className="ml-2 text-xs text-slate-500">第 {log.attempt_number} 次</span>
+      {log.attempt_number > 1 && log.status === 'success' ? (
+        <Badge className="ml-2" variant="active">
+          接手
+        </Badge>
+      ) : null}
+    </>
   );
 }
 

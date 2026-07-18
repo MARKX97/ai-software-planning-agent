@@ -5,6 +5,7 @@ import { AppException } from '../../src/common/exception/app-exception.js';
 import { ErrorCode } from '../../src/common/exception/error-code.js';
 import { HttpExceptionFilter } from '../../src/common/exception/http-exception.filter.js';
 import { AuthGuard } from '../../src/common/guards/auth.guard.js';
+import { WorkflowRateLimitGuard } from '../../src/common/guards/workflow-rate-limit.guard.js';
 import { ZodValidationPipe } from '../../src/common/pipes/zod-validation.pipe.js';
 import {
   createProjectSchema,
@@ -42,6 +43,8 @@ describe('API request contracts', () => {
   });
 
   it('rejects invalid body, path-dependent and pagination values', () => {
+    const assignedSecret = ['api_key=', 'abcdefghijklmnopqrstuvwxyz1234'].join('');
+    const prefixedSecret = ['sk-', 'abcdefghijklmnopqrstuvwxyz'].join('');
     assert.equal(createProjectSchema.safeParse({ name: '', original_idea: 'idea' }).success, false);
     assert.equal(sendMessageSchema.safeParse({ content: '' }).success, false);
     assert.equal(
@@ -56,6 +59,20 @@ describe('API request contracts', () => {
     assert.equal(tokenUsageQuerySchema.safeParse({ project_id: 'bad' }).success, false);
     assert.equal(listProjectsQuerySchema.safeParse({ limit: 101 }).success, false);
     assert.equal(listArtifactsQuerySchema.safeParse({ type: 'unknown' }).success, false);
+    assert.equal(
+      createProjectSchema.safeParse({
+        name: 'secret',
+        original_idea: assignedSecret,
+      }).success,
+      false,
+    );
+    assert.equal(
+      continueWorkflowSchema.safeParse({
+        conversation_id: '550e8400-e29b-41d4-a716-446655440000',
+        message: prefixedSecret,
+      }).success,
+      false,
+    );
   });
 
   it('normalizes validation failures through the project pipe', () => {
@@ -148,5 +165,31 @@ describe('API error and auth contracts', () => {
       (error: unknown) => error instanceof AppException && error.code === ErrorCode.FORBIDDEN,
     );
     assert.equal(new AuthGuard(reflector, { apiKey: '' } as never).canActivate(context()), true);
+  });
+
+  it('limits model workflow operations by caller and project', () => {
+    const guard = new WorkflowRateLimitGuard({ workflowRateLimitPerMinute: 1 } as never);
+    const context = (projectId: string) =>
+      ({
+        switchToHttp: () => ({
+          getRequest: () => ({
+            headers: { authorization: 'Bearer caller' },
+            params: { project_id: projectId },
+            ip: '127.0.0.1',
+          }),
+        }),
+      }) as never;
+    assert.equal(guard.canActivate(context('project-a')), true);
+    assert.throws(
+      () => guard.canActivate(context('project-a')),
+      (error: unknown) => error instanceof AppException && error.code === ErrorCode.RATE_LIMITED,
+    );
+    assert.equal(guard.canActivate(context('project-b')), true);
+    assert.equal(
+      new WorkflowRateLimitGuard({ workflowRateLimitPerMinute: 0 } as never).canActivate(
+        context('project-a'),
+      ),
+      true,
+    );
   });
 });

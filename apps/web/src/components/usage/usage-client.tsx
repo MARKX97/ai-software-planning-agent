@@ -10,6 +10,7 @@ import { stageName } from '@/components/project/project-status';
 import { UsageLogTable } from '@/components/usage/usage-log-table';
 import { getTokenUsage } from '@/features/usage/api';
 import { formatCurrency, formatNumber } from '@/lib/format';
+import type { TokenUsageDetailResponse } from '@/types/api';
 
 export function UsageClient({ projectId }: { projectId: string }) {
   const usageQuery = useQuery({
@@ -40,14 +41,7 @@ export function UsageClient({ projectId }: { projectId: string }) {
       ) : null}
       {usage ? (
         <>
-          {usage.cost_limit.alert_triggered ? (
-            <p
-              className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900"
-              role="status"
-            >
-              已经用了预算的 80%，剩下 {formatCurrency(usage.cost_limit.remaining)} 可以继续安排。
-            </p>
-          ) : null}
+          <BudgetNotice usage={usage} />
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {[
               { label: '总成本', value: formatCurrency(usage.total_cost) },
@@ -125,5 +119,27 @@ export function UsageClient({ projectId }: { projectId: string }) {
 
       <UsageLogTable projectId={projectId} />
     </PageFrame>
+  );
+}
+
+function BudgetNotice({ usage }: { usage: TokenUsageDetailResponse }) {
+  if (usage.total_cost >= usage.cost_limit.max_cost_per_project) {
+    return (
+      <p
+        className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+        role="alert"
+      >
+        这次的模型预算已经用完，新的讨论和推进会先停下。这里是本地估算，最终账单以白山控制台为准。
+      </p>
+    );
+  }
+  if (!usage.cost_limit.alert_triggered) return null;
+  return (
+    <p
+      className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900"
+      role="status"
+    >
+      已经用了预算的 80%，剩下 {formatCurrency(usage.cost_limit.remaining)} 可以继续安排。
+    </p>
   );
 }

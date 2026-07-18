@@ -87,6 +87,21 @@ export interface LLMStreamOptions extends LLMCallOptions {
   readonly signal?: AbortSignal;
 }
 
+/** One failed Provider dispatch in a logical fallback call. */
+export interface LLMFallbackAttempt {
+  readonly provider: string;
+  readonly model: string;
+  readonly attemptNumber: number;
+  readonly latencyMs: number;
+  readonly errorCode: string;
+  readonly errorMessage: string;
+}
+
+/** Stream options with an audit callback for exhausted Provider attempts. */
+export interface LLMFallbackStreamOptions extends LLMStreamOptions {
+  readonly onProviderFailure?: (attempt: LLMFallbackAttempt) => void | Promise<void>;
+}
+
 /** Normalized response from a single model invocation. */
 export interface LLMResponse {
   /** Provider logical name. */

@@ -32,6 +32,7 @@ import { nextCheckpointStage } from './workflow-interaction-guard.js';
 import { buildWorkflowStatus, createExecution } from './workflow-store.js';
 import { streamContinue, streamDiscuss, streamRun } from './workflow-stream-actions.js';
 import type { WorkflowSse } from './workflow-sse.js';
+import { syncProjectBudget } from './workflow-budget.js';
 
 export type { ExecutionLogsListResponse } from './workflow-history.js';
 
@@ -75,6 +76,7 @@ export class WorkflowService {
       input.conversation_id,
       project.current_stage as WorkflowStage,
     );
+    await syncProjectBudget(this.deps(), projectId);
     await markCheckpointConfirmed(this.db, projectId, project.current_stage as WorkflowStage);
     await closeWorkflowConversation(this.db, input.conversation_id);
     const execution = await createExecution(this.db, projectId, nextStage);
@@ -119,6 +121,10 @@ export class WorkflowService {
   }
 
   private deps() {
-    return { db: this.db, projects: this.projects, orchestrator: this.orchestrator };
+    return {
+      db: this.db,
+      projects: this.projects,
+      orchestrator: this.orchestrator,
+    };
   }
 }

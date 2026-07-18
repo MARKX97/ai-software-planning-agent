@@ -33,9 +33,14 @@ export class CostController {
     this.spent.set(projectId, current + cost.totalCost);
   }
 
+  /** Replace the in-memory value with the latest persisted project total. */
+  sync(projectId: string, totalCost: number): void {
+    this.spent.set(projectId, Math.max(0, totalCost));
+  }
+
   /** True when the project has exceeded its budget. */
   isOverBudget(projectId: string): boolean {
-    return (this.spent.get(projectId) ?? 0) > this.maxCostPerProject;
+    return (this.spent.get(projectId) ?? 0) >= this.maxCostPerProject;
   }
 
   /** Stats for one project. */

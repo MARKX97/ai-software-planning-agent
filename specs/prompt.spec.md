@@ -63,6 +63,13 @@ apps/api/src/prompts/<name>.prompt.ts
 ✅ 集中在 apps/api/src/prompts/ 目录
 ```
 
+### 2.5 不可信上下文
+
+- `renderPrompt()` 为所有 Prompt 添加统一安全前言，并把每个插值值放入带变量名的 `<untrusted-context>` 边界。
+- 插值内容中的边界关闭标签必须转义；高置信度 API Key、Token、Secret、Password 赋值必须脱敏。
+- 项目想法和对话消息在 API 输入边界拒绝高置信度密钥，避免原始密钥进入数据库、Prompt 和模型调用日志。
+- 上述措施降低 Prompt Injection 和密钥误传风险，但不宣称可以绝对阻止模型越权；工作流推进、数据库写入和权限判断继续由确定性应用代码完成。
+
 ## 3. Structured Output Schema 映射
 
 | 阶段                    | Schema 文件                                          |

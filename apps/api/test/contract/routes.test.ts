@@ -2,7 +2,8 @@ import 'reflect-metadata';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { RequestMethod } from '@nestjs/common';
-import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import { APP_GUARD } from '@nestjs/core';
+import { METHOD_METADATA, MODULE_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { IS_PUBLIC_KEY } from '../../src/common/guards/public.decorator.js';
 import { HealthController } from '../../src/health/health.controller.js';
 import { ModelsController } from '../../src/modules/models/models.controller.js';
@@ -12,6 +13,8 @@ import { ConversationsController } from '../../src/modules/conversations/convers
 import { ArtifactsController } from '../../src/modules/artifacts/artifacts.controller.js';
 import { ExportsController } from '../../src/modules/exports/exports.controller.js';
 import { UsageController } from '../../src/modules/usage/usage.controller.js';
+import { AppModule } from '../../src/app.module.js';
+import { AuthGuard } from '../../src/common/guards/auth.guard.js';
 
 const controllers = [
   HealthController,
@@ -89,5 +92,18 @@ describe('API route contract', () => {
     assert.equal(Reflect.getMetadata(IS_PUBLIC_KEY, HealthController.prototype.check), true);
     assert.equal(Reflect.getMetadata(IS_PUBLIC_KEY, ModelsController.prototype.list), true);
     assert.equal(Reflect.getMetadata(IS_PUBLIC_KEY, ModelsController.prototype.detail), true);
+  });
+
+  it('registers bearer authentication as a global guard', () => {
+    const providers = Reflect.getMetadata(MODULE_METADATA.PROVIDERS, AppModule) as Array<{
+      provide?: unknown;
+      useClass?: unknown;
+    }>;
+    assert.equal(
+      providers.some(
+        (provider) => provider.provide === APP_GUARD && provider.useClass === AuthGuard,
+      ),
+      true,
+    );
   });
 });

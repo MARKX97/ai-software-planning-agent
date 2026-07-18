@@ -25,6 +25,7 @@ import {
   markExecutionFailed,
 } from './workflow-execution-state.js';
 import { WorkflowSse } from './workflow-sse.js';
+import { syncProjectBudget } from './workflow-budget.js';
 
 export interface WorkflowStreamDeps {
   readonly db: PrismaService;
@@ -44,6 +45,7 @@ export async function streamRun(
 ): Promise<void> {
   const project = await deps.projects.findOrFail(input.projectId);
   assertWorkflowNotRunning(project);
+  await syncProjectBudget(deps, input.projectId);
   const conversationId = await resolveWorkflowConversation(
     deps.db,
     input.projectId,
@@ -72,6 +74,7 @@ export async function streamContinue(
   await resolveWorkflowConversation(deps.db, input.projectId, input.body.conversation_id);
   assertCanContinueWorkflow(project);
   assertWorkflowInteraction(status, input.body.conversation_id, 'reply');
+  await syncProjectBudget(deps, input.projectId);
   const execution = await createExecution(deps.db, input.projectId);
   await updateProjectStage(deps.db, input.projectId, WorkflowStage.REQUIREMENT_ANALYSIS);
   input.stream.open();
@@ -96,6 +99,7 @@ export async function streamDiscuss(
   const status = await buildWorkflowStatus(deps.db, deps.projects, input.projectId);
   await resolveWorkflowConversation(deps.db, input.projectId, input.body.conversation_id);
   assertWorkflowInteraction(status, input.body.conversation_id);
+  await syncProjectBudget(deps, input.projectId);
   const stage = project.current_stage as WorkflowStage;
   const execution = await createExecution(deps.db, input.projectId, stage);
   input.stream.open();

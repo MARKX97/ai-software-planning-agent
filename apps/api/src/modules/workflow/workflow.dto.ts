@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { WORKFLOW_STAGES } from '../usage/usage.dto.js';
+import { safeUserTextSchema } from '../../common/security/sensitive-text.js';
 
 /**
  * Zod request/query schemas for the Workflow endpoints.
@@ -14,7 +15,7 @@ export type RunWorkflowRequest = z.infer<typeof runWorkflowSchema>;
 
 export const continueWorkflowSchema = z.object({
   conversation_id: z.string().uuid(),
-  message: z.string().min(1).max(50000),
+  message: safeUserTextSchema(50000),
 });
 
 export type ContinueWorkflowRequest = z.infer<typeof continueWorkflowSchema>;

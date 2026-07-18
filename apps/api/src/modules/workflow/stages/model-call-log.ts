@@ -10,6 +10,7 @@ import type { LLMResponse } from '@ai-planning/shared';
 import type { WorkflowStage } from '@ai-planning/shared';
 import { CallStatus } from '@ai-planning/shared';
 import type { PrismaService } from '../../../database/database.module.js';
+import { redactSensitiveText } from '../../../common/security/sensitive-text.js';
 
 export interface ModelCallLogEntry {
   readonly projectId: string;
@@ -19,6 +20,10 @@ export interface ModelCallLogEntry {
   readonly promptText: string;
   readonly response: LLMResponse | null;
   readonly error?: string;
+  readonly errorCode?: string;
+  readonly latencyMs?: number;
+  readonly modelId?: string;
+  readonly attemptNumber?: number;
 }
 
 /** Persist a single model call (success or failure) to the execution log. */
@@ -34,11 +39,11 @@ export async function logModelCall(db: PrismaService, entry: ModelCallLogEntry):
       execution_id: entry.executionId,
       stage: entry.stage,
       provider_name: provider,
-      model_id: entry.response?.model ?? entry.provider,
+      model_id: entry.response?.model ?? entry.modelId ?? entry.provider,
       status,
-      attempt_number: (entry.response?.retries ?? 0) + 1,
-      prompt_text: entry.promptText,
-      response_text: entry.response?.content ?? null,
+      attempt_number: entry.attemptNumber ?? 1,
+      prompt_text: redactSensitiveText(entry.promptText),
+      response_text: entry.response ? redactSensitiveText(entry.response.content) : null,
       structured_output: (entry.response?.structuredOutput ?? null) as never,
       input_tokens: usage?.inputTokens ?? 0,
       output_tokens: usage?.outputTokens ?? 0,
@@ -47,9 +52,9 @@ export async function logModelCall(db: PrismaService, entry: ModelCallLogEntry):
       cost_output: cost?.outputCost ?? 0,
       cost_cached: cost?.cachedInputCost ?? 0,
       cost_total: cost?.totalCost ?? 0,
-      latency_ms: entry.response?.latencyMs ?? null,
-      error_code: entry.response ? null : status.toUpperCase(),
-      error_message: entry.error ?? null,
+      latency_ms: entry.response?.latencyMs ?? entry.latencyMs ?? null,
+      error_code: entry.response ? null : (entry.errorCode ?? status.toUpperCase()),
+      error_message: entry.error ? redactSensitiveText(entry.error) : null,
     },
   });
   await updateTokenUsage(db, entry, now);
@@ -105,8 +110,9 @@ async function updateTokenUsage(
 
 function callStatus(entry: ModelCallLogEntry): CallStatus {
   if (entry.response) return CallStatus.SUCCESS;
-  if (/timeout|timed out|aborted/i.test(entry.error ?? '')) return CallStatus.TIMEOUT;
-  if (/rate.?limit|too many requests|429/i.test(entry.error ?? '')) {
+  const signal = `${entry.errorCode ?? ''} ${entry.error ?? ''}`;
+  if (/timeout|timed out|aborted/i.test(signal)) return CallStatus.TIMEOUT;
+  if (/rate.?limit|too many requests|429/i.test(signal)) {
     return CallStatus.RATE_LIMITED;
   }
   return CallStatus.FAILED;

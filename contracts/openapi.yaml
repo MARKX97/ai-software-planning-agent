@@ -661,7 +661,7 @@ components:
           $ref: '#/components/schemas/CallStatus'
         attempt_number:
           type: integer
-          description: 第几次尝试 (1-based)
+          description: 同一次逻辑模型调用中的 Provider 尝试顺序 (1-based)
         prompt_version_id:
           type: string
           format: uuid
@@ -1363,6 +1363,18 @@ paths:
                 error:
                   code: 'WORKFLOW_ALREADY_RUNNING'
                   message: 'Workflow is already running for this project'
+        '429':
+          description: 模型工作流操作频率超限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: 项目成本已达到配置上限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /projects/{project_id}/workflow/status:
     get:
@@ -1522,6 +1534,18 @@ paths:
                   details:
                     current_stage: 'multi_model_analysis'
                     expected_stage: 'requirement_clarification'
+        '429':
+          description: 模型工作流操作频率超限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: 项目成本已达到配置上限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /projects/{project_id}/workflow/discuss:
     post:
@@ -1580,6 +1604,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: 模型工作流操作频率超限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: 项目成本已达到配置上限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /projects/{project_id}/workflow/advance:
     post:
@@ -1614,6 +1650,18 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: 当前阶段不可推进或会话不匹配
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: 模型工作流操作频率超限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: 项目成本已达到配置上限
           content:
             application/json:
               schema:

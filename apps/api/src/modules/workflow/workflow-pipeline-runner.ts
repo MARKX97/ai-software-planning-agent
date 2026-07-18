@@ -162,10 +162,7 @@ function mapLlmError(error: unknown): void {
     throw AppException.internal('模型服务暂时不可用，请稍后重试。', ErrorCode.LLM_ERROR);
   }
   if (error instanceof Error && error.message.includes('Cost limit exceeded')) {
-    throw AppException.badRequest(
-      ErrorCode.COST_LIMIT_EXCEEDED,
-      '本项目已达到成本上限，请调整预算后重试。',
-    );
+    throw AppException.costLimitExceeded();
   }
 }
 
