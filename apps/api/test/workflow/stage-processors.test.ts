@@ -14,6 +14,7 @@ const context: WorkflowContext = {
   executionId: 'execution-1',
   originalIdea: 'planning agent',
   conversationHistory: 'user reply',
+  confirmedDecisions: [],
   clarificationRound: 0,
   resultsByStage: {
     [WorkflowStage.REQUIREMENT_ANALYSIS]: {
@@ -50,6 +51,7 @@ function db(logs: unknown[]) {
         aggregate: async () => ({ _avg: { latency_ms: 1 } }),
       },
       tokenUsage: { upsert: async () => undefined },
+      promptVersion: { findFirst: async () => ({ id: 'prompt-v1' }) },
     },
   };
 }
@@ -74,6 +76,10 @@ describe('workflow stage processors', () => {
       );
       assert.equal(logs.length, 1);
       assert.equal((logs[0] as { data: { attempt_number: number } }).data.attempt_number, 1);
+      assert.equal(
+        (logs[0] as { data: { prompt_version_id: string } }).data.prompt_version_id,
+        'prompt-v1',
+      );
     }
   });
 

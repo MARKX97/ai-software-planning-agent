@@ -57,6 +57,8 @@ const status = {
   next_stage: null,
   clarification_questions: [],
   model_status: null,
+  decision_snapshots: [],
+  quality_report: null,
   error_message: null,
   started_at: null,
   updated_at: '2026-07-13T00:00:00.000Z',

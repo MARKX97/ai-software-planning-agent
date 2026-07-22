@@ -24,6 +24,7 @@ export interface ModelCallLogEntry {
   readonly latencyMs?: number;
   readonly modelId?: string;
   readonly attemptNumber?: number;
+  readonly promptName?: string;
 }
 
 /** Persist a single model call (success or failure) to the execution log. */
@@ -32,6 +33,11 @@ export async function logModelCall(db: PrismaService, entry: ModelCallLogEntry):
   const provider = entry.provider as 'deepseek' | 'glm' | 'minimax';
   const usage = entry.response?.usage;
   const cost = entry.response?.cost;
+  const promptVersion = await db.client.promptVersion?.findFirst({
+    where: { prompt_name: entry.promptName ?? entry.stage },
+    orderBy: { created_at: 'desc' },
+    select: { id: true },
+  });
   const now = new Date();
   await db.client.modelExecutionLog.create({
     data: {
@@ -42,6 +48,7 @@ export async function logModelCall(db: PrismaService, entry: ModelCallLogEntry):
       model_id: entry.response?.model ?? entry.modelId ?? entry.provider,
       status,
       attempt_number: entry.attemptNumber ?? 1,
+      prompt_version_id: promptVersion?.id ?? null,
       prompt_text: redactSensitiveText(entry.promptText),
       response_text: entry.response ? redactSensitiveText(entry.response.content) : null,
       structured_output: (entry.response?.structuredOutput ?? null) as never,

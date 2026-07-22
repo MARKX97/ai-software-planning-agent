@@ -1,3 +1,15 @@
+import type { WorkflowStatusResponse } from './workflow-insights';
+
+export type {
+  ArtifactQualityCheck,
+  ArtifactQualityReport,
+  DecisionSnapshot,
+  WorkflowProgress,
+  WorkflowStateListResponse,
+  WorkflowStateResponse,
+  WorkflowStatusResponse,
+} from './workflow-insights';
+
 export interface ApiErrorBody {
   error: {
     code: string;
@@ -47,47 +59,6 @@ export interface ProjectListResponse {
   total: number;
   offset: number;
   limit: number;
-}
-
-export interface WorkflowProgress {
-  completed_stages: number;
-  total_stages: number;
-  percentage: number;
-}
-
-export interface WorkflowStatusResponse {
-  project_id: string;
-  conversation_id: string | null;
-  status: string;
-  current_stage: string;
-  stage_display_name: string;
-  progress: WorkflowProgress;
-  waiting_for: 'reply' | 'review' | null;
-  next_stage: string | null;
-  clarification_questions: unknown[] | null;
-  model_status: Record<string, string> | null;
-  error_message: string | null;
-  started_at: string | null;
-  updated_at: string;
-}
-
-export interface WorkflowStateResponse {
-  id: string;
-  project_id: string;
-  stage: string;
-  status: string;
-  display_name: string;
-  progress: WorkflowProgress;
-  data_json: Record<string, unknown> | null;
-  error_message: string | null;
-  started_at: string | null;
-  completed_at: string | null;
-  created_at: string;
-}
-
-export interface WorkflowStateListResponse {
-  items: WorkflowStateResponse[];
-  total: number;
 }
 
 export interface ModelExecutionLogResponse {

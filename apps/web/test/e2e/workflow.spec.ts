@@ -16,11 +16,11 @@ test('user can create a project, finish workflow, inspect and download artifacts
     await page.getByRole('button', { name: '把它放进项目里' }).click();
 
     await expect(page).toHaveURL(/\/projects\/[0-9a-f-]+$/);
-    await expect(page.getByRole('button', { name: '开始把它想清楚' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '开始把它想清楚' })).toBeVisible();
     projectId = page.url().split('/').at(-1) ?? '';
 
-    await page.getByRole('button', { name: '开始把它想清楚' }).click();
-    await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/workflow$`));
+    await page.getByRole('link', { name: '开始把它想清楚' }).click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/workflow\\?start=1$`));
     await expect(page.getByRole('heading', { name: '项目进展' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '把不清楚的地方聊明白' })).toBeVisible({
       timeout: 30_000,
@@ -39,7 +39,9 @@ test('user can create a project, finish workflow, inspect and download artifacts
 
     await page.getByLabel('你的回复').fill('首版先保证规划结果可执行，协作功能以后再做。');
     await page.getByRole('button', { name: '继续讨论' }).click();
-    await expect(page.getByText(/反馈.*带入后续规划/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('aside article').filter({ hasText: /带进后续规划/ })).toBeVisible({
+      timeout: 30_000,
+    });
 
     await page.getByRole('button', { name: '确认，继续下一环节' }).click();
     await expect(page.locator('aside').getByText('需求综合', { exact: true })).toBeVisible({

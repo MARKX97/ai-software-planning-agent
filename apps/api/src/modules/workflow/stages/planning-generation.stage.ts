@@ -25,27 +25,35 @@ export class PlanningGenerationStage implements StageProcessor {
     const generator = new ArtifactGenerator(this.deps.orchestrator, store);
     const result = await generator.generateAll(ctx);
     for (const item of result.successes) {
-      await logModelCall(this.deps.db, {
-        projectId: ctx.projectId,
-        executionId: ctx.executionId,
-        stage: this.stage,
-        provider: item.provider,
-        promptText: item.prompt,
-        response: item.response,
-      });
+      for (const call of item.calls) await this.logCall(ctx, item.provider, call);
     }
     for (const item of result.failures) {
-      await logModelCall(this.deps.db, {
-        projectId: ctx.projectId,
-        executionId: ctx.executionId,
-        stage: this.stage,
-        provider: item.provider,
-        promptText: item.prompt,
-        response: null,
-        error: item.error,
-      });
+      for (const call of item.calls) await this.logCall(ctx, item.provider, call);
     }
+    if (result.successes.length === 0) throw new Error('All artifact generations failed');
     return toStageResult(this.stage, result);
+  }
+
+  private async logCall(
+    ctx: WorkflowContext,
+    provider: string,
+    call: {
+      readonly prompt: string;
+      readonly response: import('@ai-planning/shared').LLMResponse | null;
+      readonly error?: string;
+      readonly attemptNumber: number;
+    },
+  ): Promise<void> {
+    await logModelCall(this.deps.db, {
+      projectId: ctx.projectId,
+      executionId: ctx.executionId,
+      stage: this.stage,
+      provider,
+      promptText: call.prompt,
+      response: call.response,
+      error: call.error,
+      attemptNumber: call.attemptNumber,
+    });
   }
 }
 
@@ -62,6 +70,7 @@ function toStageResult(
     structuredOutput: {
       generated,
       failed: result.failures.map((item) => ({ type: item.type, error: item.error })),
+      quality_report: result.qualityReport,
     },
     content: result.successes
       .map((item) => `## ${item.type}\n${item.response.content}`)

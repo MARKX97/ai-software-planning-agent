@@ -96,10 +96,34 @@ export async function buildWorkflowContext(
     projectId: input.projectId,
     executionId: input.executionId,
     originalIdea: input.originalIdea,
-    conversationHistory: appendCurrentMessage(conversation.history, input.userMessage),
+    conversationHistory: buildControlledHistory(
+      conversation.confirmedDecisions,
+      appendCurrentMessage(conversation.history, input.userMessage),
+    ),
+    confirmedDecisions: conversation.confirmedDecisions,
     clarificationRound: conversation.clarificationRound + (input.userMessage ? 1 : 0),
     resultsByStage,
   };
+}
+
+const MAX_CONTEXT_CHARACTERS = 24_000;
+
+function buildControlledHistory(
+  decisions: WorkflowContext['confirmedDecisions'],
+  currentConversation: string,
+): string {
+  const confirmed = decisions
+    .map((item) =>
+      [
+        `[confirmed:${item.stage}] ${item.summary}`,
+        ...item.decisions.map((decision) => `- ${decision}`),
+        ...item.user_feedback.map((feedback) => `- 用户补充：${feedback}`),
+      ].join('\n'),
+    )
+    .join('\n');
+  const prefix = confirmed ? `${confirmed}\n\n[current_conversation]\n` : '';
+  const remaining = Math.max(0, MAX_CONTEXT_CHARACTERS - prefix.length);
+  return `${prefix.slice(0, MAX_CONTEXT_CHARACTERS)}${currentConversation.slice(-remaining)}`;
 }
 
 async function persistCheckpointMessage(

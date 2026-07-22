@@ -10,6 +10,7 @@ import {
   type WorkflowProgress,
 } from '../usage/usage.dto.js';
 import { WorkflowStage } from '@ai-planning/shared';
+import type { ArtifactQualityReport, DecisionSnapshot } from '@ai-planning/shared';
 import { workflowInteraction } from './workflow-checkpoints.js';
 
 export interface WorkflowStatusResponse {
@@ -23,6 +24,8 @@ export interface WorkflowStatusResponse {
   next_stage: string | null;
   clarification_questions: unknown[] | null;
   model_status: Record<string, string> | null;
+  decision_snapshots: DecisionSnapshot[];
+  quality_report: ArtifactQualityReport | null;
   error_message: string | null;
   started_at: string | null;
   updated_at: string;
@@ -157,28 +160,35 @@ export function toWorkflowExecutionDetailResponse(
   };
 }
 
-export function buildStatusFromProject(
-  project: Project,
-  completedStages: number,
-  activeState: WorkflowState | null = null,
-  modelStatus: Record<string, string> | null = null,
-  conversationId: string | null = null,
-): WorkflowStatusResponse {
-  const interaction = workflowInteraction(activeState?.data_json);
+export function buildStatusFromProject(input: {
+  readonly project: Project;
+  readonly completedStages: number;
+  readonly activeState?: WorkflowState | null;
+  readonly modelStatus?: Record<string, string> | null;
+  readonly conversationId?: string | null;
+  readonly decisionSnapshots?: DecisionSnapshot[];
+  readonly qualityReport?: ArtifactQualityReport | null;
+}): WorkflowStatusResponse {
+  const interaction = workflowInteraction(input.activeState?.data_json);
   return {
-    project_id: project.id,
-    conversation_id: conversationId,
-    status: project.status,
-    current_stage: project.current_stage,
-    stage_display_name: stageDisplayName(project.current_stage),
-    progress: buildProgress(completedStages),
+    project_id: input.project.id,
+    conversation_id: input.conversationId ?? null,
+    status: input.project.status,
+    current_stage: input.project.current_stage,
+    stage_display_name: stageDisplayName(input.project.current_stage),
+    progress: buildProgress(input.completedStages),
     waiting_for: interaction.waitingFor,
     next_stage: interaction.nextStage,
-    clarification_questions: extractClarificationQuestions(project, activeState),
-    model_status: modelStatus,
-    error_message: project.error_message,
-    started_at: project.started_at?.toISOString() ?? null,
-    updated_at: project.updated_at.toISOString(),
+    clarification_questions: extractClarificationQuestions(
+      input.project,
+      input.activeState ?? null,
+    ),
+    model_status: input.modelStatus ?? null,
+    decision_snapshots: input.decisionSnapshots ?? [],
+    quality_report: input.qualityReport ?? null,
+    error_message: input.project.error_message,
+    started_at: input.project.started_at?.toISOString() ?? null,
+    updated_at: input.project.updated_at.toISOString(),
   };
 }
 

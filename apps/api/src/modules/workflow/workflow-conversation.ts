@@ -4,10 +4,13 @@ import { WorkflowStage } from '@ai-planning/shared';
 import { AppException } from '../../common/exception/app-exception.js';
 import { ErrorCode } from '../../common/exception/error-code.js';
 import { checkpointIntroduction } from './workflow-checkpoints.js';
+import { decisionSnapshotsFromMessages } from './workflow-decisions.js';
+import type { DecisionSnapshot } from '@ai-planning/shared';
 
 export interface WorkflowConversationContext {
   readonly history: string;
   readonly clarificationRound: number;
+  readonly confirmedDecisions: readonly DecisionSnapshot[];
 }
 
 /** Reuse a requested conversation or create one for this workflow run. */
@@ -41,12 +44,12 @@ export async function loadWorkflowConversationContext(
   if (!conversation) {
     throwConversationNotFound(projectId, conversationId);
   }
-  const messages = conversations
-    .filter((item) => item.id === conversationId || item.messages.some(isWorkflowMessage))
-    .flatMap((item) => item.messages);
+  const allMessages = conversations.flatMap((item) => item.messages);
+  const messages = conversation.messages.filter((message) => !isDecisionSnapshot(message));
   return {
     history: messages.map((message) => `${message.role}: ${message.content}`).join('\n'),
     clarificationRound: conversation.messages.filter((message) => message.role === 'user').length,
+    confirmedDecisions: decisionSnapshotsFromMessages(allMessages),
   };
 }
 
@@ -159,9 +162,7 @@ function throwConversationNotFound(projectId: string, conversationId: string): n
   );
 }
 
-function isWorkflowMessage(message: { role: string; metadata: unknown }): boolean {
-  if (message.role !== 'assistant' || !message.metadata || typeof message.metadata !== 'object') {
-    return false;
-  }
-  return (message.metadata as Record<string, unknown>)['workflow'] === true;
+function isDecisionSnapshot(message: { metadata: unknown }): boolean {
+  if (!message.metadata || typeof message.metadata !== 'object') return false;
+  return (message.metadata as Record<string, unknown>)['kind'] === 'decision_snapshot';
 }

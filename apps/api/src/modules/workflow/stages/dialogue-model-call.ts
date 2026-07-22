@@ -8,6 +8,7 @@ export interface DialogueCallInput {
   readonly ctx: WorkflowContext;
   readonly stage: WorkflowStage;
   readonly prompt: string;
+  readonly promptName: string;
 }
 
 /** Call the dialogue model and persist every Provider dispatch in order. */
@@ -34,6 +35,7 @@ export async function callDialogueModel(input: DialogueCallInput): Promise<LLMRe
               errorCode: attempt.errorCode,
               latencyMs: attempt.latencyMs,
               attemptNumber: attempt.attemptNumber,
+              promptName: input.promptName,
             });
           },
         },
@@ -49,6 +51,7 @@ export async function callDialogueModel(input: DialogueCallInput): Promise<LLMRe
     promptText: input.prompt,
     response,
     attemptNumber: successAttempt,
+    promptName: input.promptName,
   });
   return response;
 }

@@ -40,6 +40,7 @@ export class RequirementClarificationStage implements StageProcessor {
       ctx,
       stage: this.stage,
       prompt,
+      promptName: 'requirement_clarification',
     });
     const needsMore = questions.length > 0 && ctx.clarificationRound < MAX_CLARIFICATION_ROUNDS;
     return {

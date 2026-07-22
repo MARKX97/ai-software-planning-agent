@@ -42,7 +42,7 @@
 2. 检查工作树，保留用户已有修改。
 3. 复杂改动先在 `docs/exec-plans/active/` 建计划；小修复可直接处理。
 4. 先更新契约/文档，再实现代码和测试。
-5. 运行与改动范围相称的验证，最后执行 `pnpm verify:fast`。
+5. 运行与改动范围相称的验证，最后执行 `pnpm verify:fast`；任何代码或产品变更都必须按 testing playbook 执行 Web E2E。
 6. 完成复杂计划后移入 `docs/exec-plans/completed/` 并记录验证结果。
 
 复杂改动指 API、Schema、数据库、架构边界或跨多个 package 的变更。

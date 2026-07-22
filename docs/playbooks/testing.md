@@ -18,9 +18,12 @@
 pnpm eval            # 核心 Agent 行为，Mock 且确定性
 pnpm test            # 全部单元/契约测试
 pnpm verify          # format、harness、lint、typecheck、test、build
+pnpm --filter @ai-planning/web test:e2e # Web 端到端测试
 ```
 
-HTTP integration 由 CI 在 PostgreSQL 和运行中 API 上显式启用；Playwright 由 CI 启动 API/Web 后运行。
+每次代码或产品变更都必须执行 Web E2E。测试需要 PostgreSQL、完成迁移的数据库以及运行在 `3001`/`3000` 端口的 API/Web；CI 会自动准备这些条件。
+
+HTTP integration 由 CI 在 PostgreSQL 和运行中 API 上显式启用。
 
 ## Canonical Evaluation Fixture
 
@@ -30,6 +33,8 @@ HTTP integration 由 CI 在 PostgreSQL 和运行中 API 上显式启用；Playwr
 - 需求、MVP 和平台方案可多轮讨论并确认推进。
 - 结构化阶段输出满足共享 Schema。
 - 生成 11 类非空产物并产生 Token/成本记录。
+- 确认检查点后生成可恢复的结构化决策快照，后续 Prompt 不包含无关历史会话。
+- 产物质量规则可触发且最多触发一次修订，质量报告覆盖 11 类预期产物。
 - SSE 超时、取消、首 token 后失败和重试边界。
 
 评估断言业务状态、Schema 和持久化不变量，不断言自然语言逐字一致。

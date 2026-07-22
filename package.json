@@ -18,7 +18,7 @@
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "harness:check": "node --test scripts/harness/harness.test.mjs && node scripts/harness/check.mjs",
-    "eval": "pnpm --filter @ai-planning/llm-core test && pnpm --filter @ai-planning/llm-orchestrator test && pnpm --filter @ai-planning/api test && pnpm --filter @ai-planning/web exec vitest run test/sse-client.test.ts test/clarification-conversation.test.tsx test/workflow-stage-rail.test.tsx",
+    "eval": "pnpm --filter @ai-planning/llm-core test && pnpm --filter @ai-planning/llm-orchestrator test && pnpm --filter @ai-planning/api test && pnpm --filter @ai-planning/web exec vitest run test/sse-client.test.ts test/clarification-conversation.test.tsx test/workflow-stage-rail.test.tsx test/workflow-status-panels.test.tsx",
     "verify:fast": "pnpm harness:check && pnpm lint && pnpm typecheck && pnpm eval",
     "verify": "pnpm format:check && pnpm harness:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "diagnose:project": "dotenv -e .env -- pnpm --filter @ai-planning/database diagnose:project --",

@@ -20,6 +20,7 @@ export class CheckpointDiscussionStage {
       ctx,
       stage: checkpoint,
       prompt,
+      promptName: 'checkpoint_discussion',
     });
     return response.content;
   }

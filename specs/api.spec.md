@@ -1,6 +1,6 @@
 # API — System Contract
 
-> Version: 1.2.0
+> Version: 1.3.0
 > Status: Contract Summary
 > Owner: Backend Lead + Frontend Lead
 > Machine Contract: `contracts/openapi.yaml`
@@ -108,6 +108,7 @@
 - 所有列表接口必须处理分页。
 - `workflow/status` 是前端轮询的唯一状态入口。
 - `workflow/status.conversation_id` 指向当前检查点会话；`waiting_for=reply` 表示 Agent 需要补充信息，`waiting_for=review` 表示可讨论或确认推进。
+- `workflow/status.decision_snapshots` 返回已确认检查点的结构化结论；`quality_report` 在规划生成完成后返回确定性质量检查结果，生成前为 `null`。
 - `workflow/continue` 只用于需求澄清回复；其他检查点讨论使用 `workflow/discuss`，确认后使用 `workflow/advance`。
 - 三个流式接口使用 Fetch POST 读取 SSE。允许多个 `delta`，随后必须且只能有一个 `done` 或 `error`；服务端每 15 秒发送 comment heartbeat。
 - SSE 响应必须使用 `Content-Type: text/event-stream`、`Cache-Control: no-cache, no-transform` 和 `X-Accel-Buffering: no`，避免中间代理缓存或缓冲。

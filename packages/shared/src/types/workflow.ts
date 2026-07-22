@@ -6,6 +6,7 @@
  * @internal
  */
 import type { WorkflowStage } from '../enums/workflow-stage.js';
+import type { DecisionSnapshot } from '../schemas/workflow-insight.schema.js';
 import type { LLMResponse } from './llm.js';
 
 /** Per-stage structured-output payload produced by the orchestrator. */
@@ -26,6 +27,7 @@ export interface WorkflowContext {
   readonly executionId: string;
   readonly originalIdea: string;
   readonly conversationHistory: string;
+  readonly confirmedDecisions: readonly DecisionSnapshot[];
   clarificationRound: number;
   readonly resultsByStage: Record<WorkflowStage, StageResult>;
 }

@@ -16,6 +16,8 @@ const status: WorkflowStatusResponse = {
   next_stage: 'multi_model_analysis',
   clarification_questions: ['Who is the target user?'],
   model_status: null,
+  decision_snapshots: [],
+  quality_report: null,
   error_message: null,
   started_at: null,
   updated_at: '2026-07-09T00:00:00.000Z',

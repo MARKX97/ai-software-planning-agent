@@ -12,4 +12,4 @@ Context (synthesized requirement, MVP plan, architecture decisions):
 Artifact type to generate:
 {{artifactType}}
 
-Generate the requested artifact as Markdown content. Be specific, actionable, and concrete. Include relevant sections, code examples where helpful, and clear acceptance criteria where applicable. Do NOT generate any other artifact type — only {{artifactType}}.`;
+Generate the requested artifact as Markdown content. Start with one level-one heading, write substantive content, and leave no template placeholders. Be specific, actionable, and concrete. Include relevant sections, code examples where helpful, and clear acceptance criteria where applicable. Do NOT generate any other artifact type — only {{artifactType}}.`;

@@ -392,6 +392,69 @@ components:
           type: string
           enum: [running, completed, failed, pending]
 
+    DecisionSnapshot:
+      type: object
+      required: [stage, summary, decisions, user_feedback, confirmed_at]
+      properties:
+        stage:
+          $ref: '#/components/schemas/WorkflowStage'
+        summary:
+          type: string
+        decisions:
+          type: array
+          items:
+            type: string
+        user_feedback:
+          type: array
+          items:
+            type: string
+        confirmed_at:
+          type: string
+          format: date-time
+
+    ArtifactQualityCheck:
+      type: object
+      required: [id, label, status, affected_artifacts, message]
+      properties:
+        id:
+          type: string
+          enum:
+            [artifact_coverage, markdown_structure, substantive_content, unresolved_placeholders]
+        label:
+          type: string
+        status:
+          type: string
+          enum: [passed, warning]
+        affected_artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArtifactType'
+        message:
+          type: string
+
+    ArtifactQualityReport:
+      type: object
+      required: [status, expected_artifacts, generated_artifacts, checks, revised_artifacts]
+      properties:
+        status:
+          type: string
+          enum: [passed, warning]
+        expected_artifacts:
+          type: integer
+          const: 11
+        generated_artifacts:
+          type: integer
+          minimum: 0
+          maximum: 11
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArtifactQualityCheck'
+        revised_artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArtifactType'
+
     WorkflowStatusResponse:
       type: object
       required:
@@ -402,6 +465,8 @@ components:
           current_stage,
           stage_display_name,
           progress,
+          decision_snapshots,
+          quality_report,
           updated_at,
         ]
       properties:
@@ -442,6 +507,15 @@ components:
           $ref: '#/components/schemas/ModelStatus'
           nullable: true
           description: 多模型状态 (仅在 multi_model_analysis 阶段)
+        decision_snapshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/DecisionSnapshot'
+          description: 已确认人工检查点的结构化决策，按确认时间升序排列
+        quality_report:
+          $ref: '#/components/schemas/ArtifactQualityReport'
+          nullable: true
+          description: 规划生成完成后的确定性质量报告；生成前为空
         error_message:
           type: string
           nullable: true

@@ -50,6 +50,8 @@ describe('ArtifactGenerator', () => {
       assert.equal(result.failures.length, 1);
       assert.equal(result.failures[0]?.type, 'backend_spec');
       assert.equal(saved.length, ARTIFACT_TYPES.length - 1);
+      assert.equal(result.qualityReport.status, 'warning');
+      assert.equal(result.qualityReport.generated_artifacts, ARTIFACT_TYPES.length - 1);
       assert.equal(calls.find((c) => hasArtifactType(c.prompt, 'prd'))?.provider, 'deepseek');
       assert.equal(
         calls.find((c) => hasArtifactType(c.prompt, 'architecture'))?.provider,
@@ -59,6 +61,36 @@ describe('ArtifactGenerator', () => {
         calls.find((c) => hasArtifactType(c.prompt, 'requirement_report'))?.provider,
         'glm',
       );
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it('revises a mechanically invalid artifact at most once', async () => {
+    let prdCalls = 0;
+    const calls: Array<{ provider: string; prompt: string }> = [];
+    const saved: Array<{ type: ArtifactType; content: string }> = [];
+    const orchestrator = {
+      callSingle: async (provider: string, prompt: string): Promise<LLMResponse> => {
+        calls.push({ provider, prompt });
+        if (hasArtifactType(prompt, 'prd') && prdCalls++ === 0) {
+          return response(provider, prompt, 'too short');
+        }
+        return response(provider, prompt);
+      },
+    } as unknown as LlmOrchestratorService;
+    const dataDir = await mkdtemp(join(tmpdir(), 'artifact-revision-'));
+    try {
+      const generator = new ArtifactGenerator(
+        orchestrator,
+        new ArtifactFileStore(mockDb(saved) as never, dataDir),
+      );
+      const result = await generator.generateAll(context());
+
+      assert.equal(calls.length, ARTIFACT_TYPES.length + 1);
+      assert.deepEqual(result.qualityReport.revised_artifacts, ['prd']);
+      assert.equal(result.qualityReport.status, 'passed');
+      assert.equal(result.successes.find((item) => item.type === 'prd')?.calls.length, 2);
     } finally {
       await rm(dataDir, { recursive: true, force: true });
     }
@@ -107,11 +139,13 @@ function mockOrchestrator(
   } as unknown as LlmOrchestratorService;
 }
 
-function response(provider: string, prompt: string): LLMResponse {
+function response(provider: string, prompt: string, content?: string): LLMResponse {
   return {
     provider,
     model: provider,
-    content: `# ${prompt.slice(0, 24)}`,
+    content:
+      content ??
+      `# ${prompt.slice(0, 24)}\n\n## Goal\n\n${'Detailed, actionable planning content. '.repeat(6)}`,
     structuredOutput: null,
     usage: { inputTokens: 1, outputTokens: 1, cachedTokens: 0, totalTokens: 2 },
     cost: { inputCost: 0, outputCost: 0, cachedInputCost: 0, totalCost: 0 },
@@ -143,6 +177,7 @@ function context(): WorkflowContext {
     executionId: 'execution-1',
     originalIdea: 'Build planning agent',
     conversationHistory: '',
+    confirmedDecisions: [],
     clarificationRound: 0,
     resultsByStage: {
       [WorkflowStage.REQUIREMENT_SYNTHESIS]: {

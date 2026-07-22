@@ -25,8 +25,7 @@ import {
   listWorkflowStates,
   type ExecutionLogsListResponse,
 } from './workflow-history.js';
-import { closeWorkflowConversation } from './workflow-conversation.js';
-import { markCheckpointConfirmed } from './workflow-state-persister.js';
+import { confirmCheckpointDecision } from './workflow-decisions.js';
 import { executeWorkflowPipeline } from './workflow-executor.js';
 import { nextCheckpointStage } from './workflow-interaction-guard.js';
 import { buildWorkflowStatus, createExecution } from './workflow-store.js';
@@ -77,8 +76,11 @@ export class WorkflowService {
       project.current_stage as WorkflowStage,
     );
     await syncProjectBudget(this.deps(), projectId);
-    await markCheckpointConfirmed(this.db, projectId, project.current_stage as WorkflowStage);
-    await closeWorkflowConversation(this.db, input.conversation_id);
+    await confirmCheckpointDecision(this.db, {
+      projectId,
+      conversationId: input.conversation_id,
+      stage: project.current_stage as WorkflowStage,
+    });
     const execution = await createExecution(this.db, projectId, nextStage);
     const result = await executeWorkflowPipeline(this.deps(), {
       projectId,

@@ -1,6 +1,6 @@
 # Schema — System Contract
 
-> Version: 1.0.0
+> Version: 1.1.0
 > Status: Contract
 > Owner: Backend Lead
 > Tokens: ~8,000
@@ -141,7 +141,21 @@ RiskItem: `{id, category, description, probability, impact, mitigation, continge
 
 `model_execution_logs` 额外记录 `cached_tokens` 与 `cost_cached`，`token_usage` 记录 `total_cached_tokens`，用于对齐白山 Usage 返回和缓存计费。
 
-## 4. 版本兼容
+## 4. V2 工作流派生契约
+
+`DecisionSnapshot` 存于 `messages.metadata.snapshot`，并通过工作流状态接口返回：
+
+| 字段            | 类型            | 必填 |
+| --------------- | --------------- | ---- |
+| `stage`         | WorkflowStage   | 是   |
+| `summary`       | string          | 是   |
+| `decisions`     | string[]        | 是   |
+| `user_feedback` | string[]        | 是   |
+| `confirmed_at`  | ISO 8601 string | 是   |
+
+`ArtifactQualityReport` 存于 `planning_generation` 的 `workflow_states.data_json.quality_report`，包含 `status`、产物覆盖数、检查项和自动修订记录。两者均使用共享 Zod Schema 解析持久化 JSON；解析失败的数据不得进入模型上下文或 API 响应。
+
+## 5. 版本兼容
 
 - 字段不可删除（标记 deprecated）
 - 新增字段必须可选

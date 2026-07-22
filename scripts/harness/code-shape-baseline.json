@@ -1,7 +1,5 @@
 {
-  "max-lines": {
-    "apps/web/src/types/api.ts": 204
-  },
+  "max-lines": {},
   "max-lines-per-function": {
     "apps/web/src/components/artifact/artifact-client.tsx#ArtifactsClient": 146,
     "apps/web/src/components/artifact/artifact-detail-client.tsx#ArtifactDetailClient": 85,
@@ -13,8 +11,7 @@
     "apps/web/src/components/workflow/clarification-conversation.tsx#ClarificationConversation": 120,
     "apps/web/src/components/workflow/stage-rail.tsx#StageRail": 71,
     "apps/web/src/components/workflow/use-workflow-actions.ts#useWorkflowActions": 127,
-    "apps/web/src/components/workflow/workflow-client.tsx#WorkflowClient": 141,
-    "apps/web/src/components/workflow/workflow-status-panels.tsx#WorkflowStatusPanels": 65
+    "apps/web/src/components/workflow/workflow-client.tsx#WorkflowClient": 141
   },
   "max-params": {
     "apps/api/src/common/exception/app-exception.ts#constructor": 4,
@@ -22,7 +19,6 @@
     "apps/api/src/modules/workflow/stages/analysis-result-persister.ts#persistAnalysisResult": 5,
     "apps/api/src/modules/workflow/workflow-conversation.ts#appendAgentReply": 5,
     "apps/api/src/modules/workflow/workflow-history.ts#listWorkflowExecutionLogs": 4,
-    "apps/api/src/modules/workflow/workflow-response.dto.ts#buildStatusFromProject": 5,
     "apps/api/src/modules/workflow/workflow-state-persister.ts#buildStageState": 4,
     "apps/api/src/modules/workflow/workflow-state-persister.ts#markStageCompleted": 5,
     "apps/api/src/modules/workflow/workflow-state-persister.ts#markStageRunning": 4,

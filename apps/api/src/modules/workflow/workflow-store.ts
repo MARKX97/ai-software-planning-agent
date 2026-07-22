@@ -6,6 +6,8 @@ import { ErrorCode } from '../../common/exception/error-code.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import { buildStatusFromProject, type WorkflowStatusResponse } from './workflow-response.dto.js';
 import { workflowFailureMessage } from './workflow-execution-state.js';
+import { loadDecisionSnapshots } from './workflow-decisions.js';
+import { artifactQualityReportFromState } from './artifact-generation/artifact-quality.js';
 export async function createExecution(
   db: PrismaService,
   projectId: string,
@@ -87,21 +89,31 @@ export async function buildWorkflowStatus(
   projectId: string,
 ): Promise<WorkflowStatusResponse> {
   const project = await projects.findOrFail(projectId);
-  const [completedStages, activeState, modelStatus, conversation] = await Promise.all([
-    countCompletedStages(db, projectId),
-    db.client.workflowState.findUnique({
-      where: { project_id_stage: { project_id: projectId, stage: project.current_stage } },
-    }),
-    buildModelStatus(db, projectId, project.current_stage),
-    findWorkflowConversation(db, projectId, project.current_stage, project.status),
-  ]);
-  return buildStatusFromProject(
+  const [completedStages, activeState, modelStatus, conversation, decisions, planningState] =
+    await Promise.all([
+      countCompletedStages(db, projectId),
+      db.client.workflowState.findUnique({
+        where: { project_id_stage: { project_id: projectId, stage: project.current_stage } },
+      }),
+      buildModelStatus(db, projectId, project.current_stage),
+      findWorkflowConversation(db, projectId, project.current_stage, project.status),
+      loadDecisionSnapshots(db, projectId),
+      db.client.workflowState.findUnique({
+        where: {
+          project_id_stage: { project_id: projectId, stage: WorkflowStage.PLANNING_GENERATION },
+        },
+        select: { data_json: true },
+      }),
+    ]);
+  return buildStatusFromProject({
     project,
     completedStages,
     activeState,
     modelStatus,
-    conversation?.id ?? null,
-  );
+    conversationId: conversation?.id ?? null,
+    decisionSnapshots: decisions,
+    qualityReport: artifactQualityReportFromState(planningState?.data_json),
+  });
 }
 
 async function findWorkflowConversation(

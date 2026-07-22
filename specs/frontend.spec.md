@@ -1,6 +1,6 @@
 # Frontend — System Contract
 
-> Version: 1.1.0
+> Version: 1.2.0
 > Status: Contract
 > Owner: Frontend Lead
 > Tokens: ~7,000
@@ -9,7 +9,7 @@
 
 ## 1. 范围
 
-第一版包含 Web UI。Web UI 是用户创建项目、完成需求澄清、查看工作流进度、阅读/导出产物的主要入口。
+V1 包含 Web UI。Web UI 是用户创建项目、完成需求澄清、查看工作流进度、阅读/导出产物的主要入口。
 
 不包含:
 
@@ -142,6 +142,8 @@ API:
 
 - `model_status` 中任一模型 failed 时显示 warning，不阻断流程
 - 工作流 failed 时展示 `error_message` 和相关执行历史入口
+- 有决策快照时按检查点顺序展示摘要和明确决定，帮助用户核对后续阶段使用的上下文。
+- 规划生成结束后展示质量状态、产物覆盖数、检查项和已自动修订的产物；`warning` 不伪装成完全通过。
 
 ### 4.5 ArtifactsPage
 
@@ -233,7 +235,7 @@ type ApiError = {
 要求:
 
 - 所有请求带 `Authorization: Bearer <api_key>`，但 `/health` 和 `/models` 除外。
-- `API_KEY` 来源第一版使用环境变量或本地开发配置，不提供用户登录 UI。
+- `API_KEY` 来源在 V1 使用环境变量或本地开发配置，不提供用户登录 UI。
 - 所有非 2xx 响应必须解析为 `ApiError`。
 - SSE Client 必须支持跨 chunk 事件拼接、comment heartbeat、JSON 流前错误、SSE 流后错误和 AbortSignal。
 - 不在组件中拼接 URL，使用 API Client 方法。

@@ -74,23 +74,12 @@ export async function markStageWaiting(
   });
 }
 
-export async function markCheckpointConfirmed(
-  db: PrismaService,
-  projectId: string,
-  stage: WorkflowStage,
-): Promise<void> {
-  const state = await db.client.workflowState.findUnique({
-    where: { project_id_stage: { project_id: projectId, stage } },
-  });
-  const data = state?.data_json;
+export function confirmedStateData(data: unknown): unknown {
   const nextData = data && typeof data === 'object' && !Array.isArray(data) ? { ...data } : data;
   if (nextData && typeof nextData === 'object' && !Array.isArray(nextData)) {
     delete (nextData as Record<string, unknown>)['_workflow'];
   }
-  await db.client.workflowState.update({
-    where: { project_id_stage: { project_id: projectId, stage } },
-    data: { status: StageStatus.COMPLETED, data_json: nextData as never, updated_at: new Date() },
-  });
+  return nextData;
 }
 
 function waitingData(result: StageResult, waitingFor: WorkflowWait): Record<string, unknown> {
