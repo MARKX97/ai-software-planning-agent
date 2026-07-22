@@ -4,9 +4,14 @@ ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@10.19.0 --activate
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable \
+  && corepack prepare pnpm@10.19.0 --activate
 COPY . .
 RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @ai-planning/database db:generate
 
 FROM base AS build
 RUN pnpm build

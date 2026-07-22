@@ -24,6 +24,7 @@ docker compose up --build
 ```
 
 - Compose 启动 PostgreSQL 16、API 和 Web；API 在启动前执行 `prisma migrate deploy`。
+- Docker 镜像必须在目标 Linux 环境内执行 `prisma generate`，不得复用宿主机生成的 Prisma Engine；基础镜像必须提供 Prisma 运行时所需的 OpenSSL。
 - Web: `http://localhost:3000`；API health: `http://localhost:3001/api/v1/health`。
 - `BAISHAN_API_KEY` 为空时使用确定性 Mock；配置真实密钥时只注入 API 容器。
 - Compose 是本地演示入口，不代表生产部署方案。

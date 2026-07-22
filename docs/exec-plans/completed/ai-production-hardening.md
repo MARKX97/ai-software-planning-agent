@@ -47,4 +47,4 @@
 - LLM Orchestrator：18 通过。
 - API：72 通过，1 个真实 PostgreSQL HTTP 集成测试按默认配置跳过。
 - Web：17 通过。
-- 本机未安装 Docker CLI，未执行本地 Compose smoke test；GitHub Actions 已增加独立 `docker-smoke` job 负责构建、迁移、健康检查和清理。
+- 2026-07-19 已在 Apple Silicon Mac 上执行本地 Compose smoke test；修复镜像复用宿主机 Prisma Engine 的跨平台问题后，镜像构建、迁移、API/Web 健康检查均通过。GitHub Actions 继续通过独立 `docker-smoke` job 做回归验证。
