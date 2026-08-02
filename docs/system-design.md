@@ -23,6 +23,8 @@
 | LLM Provider 与 Orchestrator   | `specs/provider.spec.md` + `specs/orchestrator.spec.md`                                        |
 | 模型路由与 Prompt 管理         | `specs/model-routing.spec.md` + `specs/prompt.spec.md`                                         |
 | Web UI                         | `specs/frontend.spec.md`                                                                       |
+| V3 项目知识库（Proposed）      | `specs/knowledge-base.spec.md`                                                                 |
+| V3 Agent Graph（Proposed）     | `specs/agent-graph.spec.md`                                                                    |
 | 开发流程、测试、部署           | `docs/playbooks/development.md` + `docs/playbooks/testing.md` + `docs/playbooks/deployment.md` |
 
 ## 开发加载规则
@@ -46,3 +48,20 @@ API Server 是唯一持有 Baishan Base URL 与 API Key 的边界。浏览器只
 模型工作流操作先执行认证、单实例限流和持久化成本准入。达到项目成本上限后不再启动新模型调用；已经并行发出的调用允许完成，实际账单仍以白山控制台为准。
 
 白山传输细节、模型配置、错误映射与缓存计费规则见 [`docs/baishan-integration.md`](./baishan-integration.md)。
+
+## V3 目标数据流（Planned）
+
+```text
+Upload / Public GitHub Repository
+  -> Knowledge Source Validation
+  -> Parse -> Chunk -> Embed -> PostgreSQL + pgvector
+
+Workflow Request
+  -> AgentGraphService
+  -> Search / Read / Repository Tools
+  -> LlmOrchestratorService
+  -> Structured Result + Evidence Citations
+  -> Existing Workflow / Artifact Persistence
+```
+
+V3 只增加知识检索和 Graph 编排，不改变 API Server 持有密钥、Chat 模型只经 Orchestrator 调用、人工检查点控制关键决策等现有边界。详细契约只维护在知识库和 Agent Graph spec 中。

@@ -1,3 +1,5 @@
 # Active Plans
 
-当前没有其他长期执行计划。进行中的复杂任务应在此目录新增独立 Markdown 文件。
+## Planned
+
+- [`v3-rag-agent.md`](./v3-rag-agent.md)：项目知识库、RAG、证据引用与 LangGraph 受控编排。

@@ -1,7 +1,7 @@
 # Architecture Overview
 
-> Version: 1.0.0
-> Status: Architecture Source of Truth
+> Version: 1.1.0
+> Status: Current V2 + Proposed V3 Target
 
 ---
 
@@ -69,12 +69,57 @@ Shared: packages/shared/        跨层 LLM 类型、枚举与 Zod Schema
 ✅ 业务代码只能通过 LlmOrchestratorService 调用
 ```
 
-## 设计约束
+## V2 当前设计约束
 
 - 单体架构，不允许微服务
 - 仅 Workflow Agent，不支持 Multi-Agent
 - 不引入 RAG、MCP
 - 不引入 Redis、Kafka、Elasticsearch、Kubernetes
+
+## V3 Target Architecture（Proposed）
+
+V3 保留模块化单体和现有 LLM 三层架构，只在 API Workflow 与 Orchestrator 之间增加 Agent Graph，并在 PostgreSQL 中增加项目知识索引。
+
+```text
+Browser / SSE
+  -> NestJS Workflow Controller
+  -> AgentGraphService (LangGraph)
+       -> Knowledge Tools (LangChain)
+            -> Document Loader / Splitter
+            -> Embedding Provider
+            -> PostgreSQL 16 + pgvector / Full Text Search
+       -> Existing LlmOrchestratorService
+            -> Providers -> OpenAI-compatible Adapter -> Baishan
+  -> Workflow / Graph projections persisted by Prisma
+```
+
+### 技术职责
+
+| 技术           | V3 职责                                                                 |
+| -------------- | ----------------------------------------------------------------------- |
+| LangChain      | 文档加载、切片、Embedding、Retriever 和 Tool 接口，不负责工作流状态推进 |
+| LangGraph      | Graph State、条件边、持久化 checkpoint、人工 interrupt 和受控 Tool 编排 |
+| pgvector       | 在现有 PostgreSQL 中保存与检索 Embedding，不新增独立数据库              |
+| PostgreSQL FTS | 精确匹配技术名词、路径和标识符，与向量结果融合                          |
+
+### V3 依赖与调用边界
+
+- `apps/api/src/modules/knowledge/` 负责导入、索引、检索和引用；不得调用 Chat LLM。
+- `apps/api/src/modules/workflow/graph/` 负责 LangGraph State、Node、Edge 和 Tool 编排。
+- Graph Node 只能通过 `LlmOrchestratorService` 调用 Chat LLM，不得 import Provider、Adapter 或模型 SDK。
+- Embedding 使用独立配置和适配器；密钥只存在 API Server，浏览器只读取处理状态和脱敏错误。
+- 普通数据访问继续使用 Prisma；向量相似度查询集中在数据库包的单一 Repository，使用参数化 Raw SQL。
+- Graph checkpoint 是执行恢复来源；现有 `workflow_states`、消息和产物继续作为用户可见读模型与审计记录。
+- 所有 Graph Node 在 interrupt 前的副作用必须幂等，重放不得重复写消息、产物、Token 或成本。
+- 知识内容是 `untrusted-context`，只能作为证据，不得修改权限、路由、工具白名单和确定性状态转换。
+
+### V3 仍禁止
+
+- Multi-Agent、Supervisor、运行时 MCP 和无限制 ReAct 循环。
+- 微服务、Redis、Kafka、WebSocket、GraphQL 和独立向量数据库。
+- LangGraph 或 LangChain 绕过现有 Orchestrator 直接调用 Chat 模型。
+
+V3 详细行为见 `specs/knowledge-base.spec.md` 和 `specs/agent-graph.spec.md`；在对应机器契约和实现完成前，本节只表示目标架构。
 
 ## Workspace 依赖矩阵
 
