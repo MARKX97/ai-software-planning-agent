@@ -44,7 +44,7 @@ flowchart LR
     controller["Workflow Controller"]
     workflow["Workflow Service<br/>项目校验、成本准入"]
     stages["Stage Executor<br/>9 个阶段 / 4 个检查点"]
-    graph["P1 · LangGraph<br/>checkpoint / resume"]
+    agentGraph["P1 · LangGraph<br/>checkpoint / resume"]
     tools["P2 · 受控 Tools<br/>单阶段最多 3 次"]
     retriever["P0 · Retriever<br/>Vector + FTS + RRF"]
     orchestrator["LlmOrchestratorService<br/>路由、重试、降级"]
@@ -61,8 +61,8 @@ flowchart LR
 
   user -->|"POST /api/v1"| guard --> controller --> workflow -->|"V2 runner"| stages
   workflow -. "P0 固定检索" .-> retriever -. "证据上下文" .-> stages
-  workflow -. "P1 Graph runner" .-> graph -. "run_stage" .-> stages
-  graph -. "P2 动态取证" .-> tools -.-> retriever -. "检索结果" .-> graph
+  workflow -. "P1 Graph runner" .-> agentGraph -. "run_stage" .-> stages
+  agentGraph -. "P2 动态取证" .-> tools -.-> retriever -. "检索结果" .-> agentGraph
   stages -->|"Structured Output Schema"| orchestrator --> provider --> adapter --> baishan
   baishan -->|"SSE 或完整响应"| adapter --> provider --> orchestrator
   orchestrator -->|"delta"| stream --> user
@@ -71,7 +71,7 @@ flowchart LR
   database -->|"决策快照 + 当前会话"| stages
 
   classDef planned fill:#f7f1ff,stroke:#7c3aed,stroke-width:1.5px,stroke-dasharray:5 4;
-  class graph,tools,retriever planned;
+  class agentGraph,tools,retriever planned;
 ```
 
 V2 阶段顺序：`需求分析 → 需求澄清 → 检查点 1 → 多模型分析 → 需求融合 → 检查点 2 → 可行性分析 → 风险分析 → MVP 收缩 → 检查点 3 → 平台推荐 → 检查点 4 → 规划生成`。
