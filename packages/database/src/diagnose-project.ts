@@ -1,4 +1,5 @@
 import { prisma } from './client.js';
+import { summarizeDiagnosticText } from './diagnostic-summary.js';
 
 const projectId = process.argv[2];
 
@@ -72,13 +73,6 @@ const projectDiagnosticSelect = {
   token_usage: true,
 } as const;
 
-function summarize(content: string): string {
-  const redacted = content
-    .replace(/sk-[A-Za-z0-9_-]{8,}/g, '[REDACTED]')
-    .replace(/(api[_-]?key|token|secret)\s*[:=]\s*\S+/gi, '$1=[REDACTED]');
-  return redacted.length > 240 ? `${redacted.slice(0, 237)}...` : redacted;
-}
-
 async function diagnose(id: string): Promise<unknown> {
   const project = await prisma.project.findUnique({
     where: { id },
@@ -91,7 +85,7 @@ async function diagnose(id: string): Promise<unknown> {
       ...conversation,
       messages: conversation.messages.reverse().map((message) => ({
         ...message,
-        content: summarize(message.content),
+        content: summarizeDiagnosticText(message.content),
       })),
     })),
   };

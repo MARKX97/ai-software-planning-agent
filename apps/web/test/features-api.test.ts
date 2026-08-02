@@ -1,13 +1,24 @@
 import { beforeEach, describe, it, vi } from 'vitest';
-import { exportPrd, getExportDownload } from '@/features/artifacts/api';
+import {
+  downloadArtifact,
+  exportPrd,
+  getArtifact,
+  getExport,
+  getExportDownload,
+  listArtifacts,
+} from '@/features/artifacts/api';
+import { createProject, deleteProject, getProject, listProjects } from '@/features/projects/api';
 import {
   advanceWorkflow,
   continueWorkflow,
+  createConversation,
   discussWorkflow,
+  getWorkflowStatus,
   listConversationMessages,
+  listWorkflowStates,
   runWorkflow,
 } from '@/features/workflow/api';
-import { getTokenUsage, listModelLogs } from '@/features/usage/api';
+import { getModelLogDetail, getTokenUsage, listModelLogs } from '@/features/usage/api';
 import { apiDownload, apiRequest } from '@/lib/api-client';
 import { apiEventStream } from '@/lib/sse-client';
 
@@ -24,6 +35,38 @@ describe('feature API clients', () => {
       method: 'POST',
       body: { format: 'markdown', artifact_types: ['prd'] },
     });
+  });
+
+  it('maps every non-streaming feature operation to its API contract', async () => {
+    vi.mocked(apiRequest).mockResolvedValue({});
+    vi.mocked(apiDownload).mockResolvedValue(new Blob());
+    await listProjects({ offset: 20, limit: 10, status: 'completed' });
+    await createProject({ name: 'Project', original_idea: 'Idea' });
+    await getProject('project-1');
+    await deleteProject('project-1');
+    await getWorkflowStatus('project-1');
+    await listWorkflowStates('project-1');
+    await createConversation('project-1');
+    await listArtifacts('project-1', 'prd');
+    await getArtifact('project-1', 'artifact-1');
+    await downloadArtifact('project-1', 'artifact-1');
+    await getExport('project-1', 'export-1');
+    await getModelLogDetail('project-1', 'log-1');
+
+    expect(vi.mocked(apiRequest).mock.calls).toEqual([
+      ['/projects', { query: { offset: 20, limit: 10, status: 'completed' } }],
+      ['/projects', { method: 'POST', body: { name: 'Project', original_idea: 'Idea' } }],
+      ['/projects/project-1'],
+      ['/projects/project-1', { method: 'DELETE' }],
+      ['/projects/project-1/workflow/status'],
+      ['/projects/project-1/workflow/states'],
+      ['/projects/project-1/conversations', { method: 'POST', body: {} }],
+      ['/projects/project-1/artifacts', { query: { type: 'prd' } }],
+      ['/projects/project-1/artifacts/artifact-1'],
+      ['/projects/project-1/export/export-1'],
+      ['/projects/project-1/usage/logs/log-1'],
+    ]);
+    expect(apiDownload).toHaveBeenCalledWith('/projects/project-1/artifacts/artifact-1/download');
   });
 
   it('sends workflow and usage paths with the expected payloads', async () => {

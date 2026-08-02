@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { apiRequest, getUserErrorMessage } from '../src/lib/api-client';
+import { apiDownload, apiRequest, getUserErrorMessage } from '../src/lib/api-client';
 import { ApiClientError } from '../src/types/api';
 
 describe('apiRequest', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it('parses ApiError responses', async () => {
@@ -73,5 +74,56 @@ describe('apiRequest', () => {
     expect(getUserErrorMessage('fetch failed')).toBe(
       '无法连接到服务，请检查网络或确认服务已启动后重试。',
     );
+  });
+
+  it('builds query, auth and JSON body while omitting empty query values', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_KEY', 'test-key');
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    await apiRequest('/projects', {
+      method: 'POST',
+      query: { offset: 0, status: '', missing: undefined },
+      body: { name: 'Project' },
+    });
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toContain('/projects?offset=0');
+    expect(String(url)).not.toContain('status=');
+    expect(init).toMatchObject({
+      method: 'POST',
+      headers: { Authorization: 'Bearer test-key', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Project' }),
+    });
+  });
+
+  it('handles empty success and malformed JSON responses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 204 })),
+    );
+    await expect(apiRequest('/projects/project-1', { method: 'DELETE' })).resolves.toBeUndefined();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('not-json', { status: 200 })),
+    );
+    await expect(apiRequest('/projects')).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+  });
+
+  it('downloads successful responses and maps failed downloads', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('file', { status: 200 })),
+    );
+    const blob = await apiDownload('/artifact');
+    expect(await blob.text()).toBe('file');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: { code: 'ARTIFACT_NOT_FOUND' } }), { status: 404 }),
+      ),
+    );
+    await expect(apiDownload('/artifact')).rejects.toMatchObject({ code: 'ARTIFACT_NOT_FOUND' });
   });
 });

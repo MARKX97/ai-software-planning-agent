@@ -18,7 +18,7 @@
     "dev": "tsup src/index.ts --format esm --dts --watch",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"no tests yet\"",
+    "test": "tsx --test test/*.test.ts",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "tsx src/seed/index.ts",

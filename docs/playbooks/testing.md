@@ -27,6 +27,18 @@ pnpm --filter @ai-planning/web test:e2e # Web 端到端测试
 
 HTTP integration 由 CI 在 PostgreSQL 和运行中 API 上显式启用。
 
+## V2 Coverage Contract
+
+当前 V2 的测试完成标准按行为风险判断，不以 100% 行覆盖为目标：
+
+- Service：CRUD、项目归属、分页/筛选、聚合、not found 和降级分支必须有单元测试。
+- Workflow：状态转换、检查点、上下文边界、持久化状态、SSE、重试和成本边界必须有确定性测试。
+- Security/Config：认证、限流、敏感信息处理、环境变量解析和用户可见错误映射必须有测试。
+- Web：API/SSE client、关键状态组件、表单校验、异步 action、error/retry 和下载必须有组件测试或 E2E。
+- E2E：至少覆盖导航、项目创建/删除、完整工作流、四个检查点、11 类产物、下载、成本页和 API 失败恢复。
+
+不为 re-export、常量包、Nest 模块声明、纯样式 UI 原子组件、Prisma 生成代码或 Planned V3 创建无行为断言的测试。数据库约束由 Prisma/HTTP integration 验证。
+
 ## Canonical Evaluation Fixture
 
 `packages/llm-core/src/mock/mock-demo-content.ts` 是本地评估 fixture。它必须稳定覆盖：

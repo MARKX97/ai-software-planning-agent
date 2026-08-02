@@ -9,3 +9,4 @@
 ## V2
 
 - [`v2-controlled-quality-loop.md`](./v2-controlled-quality-loop.md)：V2 决策快照、受控上下文、产物质量闭环与 Prompt 追溯。
+- [`v2-test-coverage.md`](./v2-test-coverage.md)：V2 关键分支、数据隔离、错误恢复、HTTP 集成与 Playwright E2E 覆盖。
