@@ -14,6 +14,7 @@
 | 主题                           | 权威来源                                                    |
 | ------------------------------ | ----------------------------------------------------------- |
 | 文档地图与加载规则             | `docs/README.md`                                            |
+| 跨任务项目记忆                 | `docs/project-memory.md`                                    |
 | 产品定位与范围                 | `docs/product-vision.md`                                    |
 | 架构与依赖方向                 | `docs/architecture-overview.md`                             |
 | 行为契约                       | `specs/*.spec.md`                                           |
@@ -22,7 +23,7 @@
 | 开发、测试、部署、LLM playbook | `docs/playbooks/`                                           |
 | 复杂任务计划与技术债           | `docs/exec-plans/`, `docs/tech-debt.md`                     |
 
-具体任务只加载相关 spec，不批量加载所有文档。
+每次任务先读取项目记忆；具体任务只加载相关 spec，不批量加载所有文档。
 
 ## 3. Immutable Boundaries
 
@@ -43,7 +44,7 @@
 
 ## 4. Work Protocol
 
-1. 读取 `docs/README.md` 和任务相关 spec。
+1. 读取 `docs/README.md`、`docs/project-memory.md` 和任务相关 spec。
 2. 检查工作树，保留用户已有修改。
 3. 复杂改动先在 `docs/exec-plans/active/` 建计划；小修复可直接处理。
 4. 先更新契约/文档，再实现代码和测试。

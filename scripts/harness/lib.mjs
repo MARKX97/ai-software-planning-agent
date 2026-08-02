@@ -37,7 +37,7 @@ export function walk(path, accept = () => true) {
 export function trackedFiles() {
   return execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' })
     .split('\0')
-    .filter(Boolean);
+    .filter((file) => file && exists(file));
 }
 
 export function issue(rule, message, fix, doc = 'docs/README.md') {

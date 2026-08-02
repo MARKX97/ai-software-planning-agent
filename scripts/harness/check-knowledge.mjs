@@ -71,18 +71,41 @@ function checkOpenApiRefs() {
 
 function checkKnowledgeIndex() {
   const index = read('docs/README.md');
+  const agents = read('AGENTS.md');
+  const issues = [];
+  if (!index.includes('project-memory.md')) {
+    issues.push(
+      issue(
+        'HE-DOC-003',
+        'docs/README.md does not index docs/project-memory.md.',
+        'Add the project memory to the knowledge map.',
+      ),
+    );
+  }
+  if (!agents.includes('docs/project-memory.md')) {
+    issues.push(
+      issue(
+        'HE-DOC-003',
+        'AGENTS.md does not load docs/project-memory.md.',
+        'Add the project memory to the agent knowledge map and work protocol.',
+      ),
+    );
+  }
   const required = walk('specs', (file) => file.endsWith('.spec.md')).map((file) =>
     repoPath(file).replace('specs/', ''),
   );
-  return required
-    .filter((name) => !index.includes(name))
-    .map((name) =>
-      issue(
-        'HE-DOC-003',
-        `docs/README.md does not index specs/${name}.`,
-        'Add the spec to the knowledge map under its owning topic.',
+  issues.push(
+    ...required
+      .filter((name) => !index.includes(name))
+      .map((name) =>
+        issue(
+          'HE-DOC-003',
+          `docs/README.md does not index specs/${name}.`,
+          'Add the spec to the knowledge map under its owning topic.',
+        ),
       ),
-    );
+  );
+  return issues;
 }
 
 function checkSchemaMirrors() {

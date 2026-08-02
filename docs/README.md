@@ -7,6 +7,7 @@
 
 | 主题                       | 权威文档                                                                                                   | 何时读取                 |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------ |
+| 跨任务项目记忆             | [`project-memory.md`](./project-memory.md)                                                                 | 每次任务开始             |
 | 产品定位、目标用户、MVP    | [`product-vision.md`](./product-vision.md)                                                                 | 需求和范围变更           |
 | 架构、目录、依赖方向       | [`architecture-overview.md`](./architecture-overview.md)                                                   | 新模块、跨包修改、Review |
 | 系统数据流入口             | [`system-design.md`](./system-design.md)                                                                   | 理解端到端流程           |
@@ -30,6 +31,12 @@ JSON Schema 位于 [`contracts/schemas/llm/`](../contracts/schemas/llm/)，与 `
 - [`deployment.md`](./playbooks/deployment.md)：本地运行、CI 和环境变量。
 
 `.claude/skills/` 只负责让 Claude Code 发现这些 playbook，不是通用知识源。
+
+## Project Memory
+
+[`project-memory.md`](./project-memory.md) 只保存经过验证、跨任务仍有价值且不属于正式契约的事实。产品规则、架构约束和行为定义仍以对应 spec、contract 或 playbook 为准；Memory 只保留摘要、证据链接和对后续工作的影响。
+
+Agent 每次开始任务时读取 Active Memory；只有出现可复用的新事实、已知风险或重复踩坑时才更新，禁止写入会话流水、原始日志、密钥、未验证推测和短期任务进度。
 
 ## Plans And Debt
 
