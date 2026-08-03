@@ -36,6 +36,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
   }
 
   private toStatus(err: unknown): number {
+    if (isUploadLimitError(err)) return HttpStatus.PAYLOAD_TOO_LARGE;
     if (err instanceof AppException || err instanceof HttpException) return err.getStatus();
     if (err instanceof ZodError) return HttpStatus.BAD_REQUEST;
     return HttpStatus.INTERNAL_SERVER_ERROR;
@@ -61,6 +62,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         details: { issues: err.issues.map((i) => ({ path: i.path, message: i.message })) },
       };
     }
+    if (isUploadLimitError(err)) {
+      return { code: ErrorCode.INVALID_INPUT, message: 'File exceeds the 20 MiB limit' };
+    }
     if (err instanceof HttpException) {
       const res = err.getResponse();
       const message =
@@ -77,4 +81,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (status === HttpStatus.TOO_MANY_REQUESTS) return ErrorCode.RATE_LIMITED;
     return ErrorCode.INTERNAL_ERROR;
   }
+}
+
+function isUploadLimitError(error: unknown): error is { code: 'LIMIT_FILE_SIZE' } {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    error.code === 'LIMIT_FILE_SIZE'
+  );
 }

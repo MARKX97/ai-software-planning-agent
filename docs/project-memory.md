@@ -20,9 +20,9 @@
 
 - **Status:** Active
 - **Last verified:** 2026-08-03
-- **Fact:** 当前可运行产品是 V2；知识库、RAG、LangGraph 和受控 Tool 编排仍是 Planned V3，不得描述为已交付。
-- **Evidence:** [`product-vision.md`](./product-vision.md)、[`architecture-overview.md`](./architecture-overview.md)、[`v3-rag-agent.md`](./exec-plans/active/v3-rag-agent.md)。
-- **Impact:** 需求、简历、演示和技术说明必须区分 Current 与 Planned；V3 实施仍遵循 contract-first。
+- **Fact:** 当前可运行产品是 V2 确定性工作流加 V3 P0 知识证据闭环；Markdown/TXT、混合检索、PRD/Architecture 引用和最小 UI 已交付，LangGraph、PDF/仓库与动态 Tool 仍为 Planned。
+- **Evidence:** [`product-vision.md`](./product-vision.md)、[`architecture-overview.md`](./architecture-overview.md)、[`v3-rag-agent.md`](./exec-plans/completed/v3-rag-agent.md)。
+- **Impact:** 对外说明可以描述 V3 P0，但不得宣称 LangGraph、仓库感知、运行时 Tool 或完整 V3 已交付；后续阶段继续遵循 contract-first。
 
 ### MEM-002 Real Model Verification Boundary
 

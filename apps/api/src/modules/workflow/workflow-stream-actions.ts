@@ -2,6 +2,7 @@ import { LLMCancelledError, type LlmOrchestratorService } from '@ai-planning/llm
 import { WorkflowStage, type LLMStreamOptions } from '@ai-planning/shared';
 import type { PrismaService } from '../../database/database.module.js';
 import type { ProjectsService } from '../projects/projects.service.js';
+import type { KnowledgeRetrievalService } from '../knowledge/knowledge-retrieval.service.js';
 import { toMessageResponse } from '../conversations/conversations.dto.js';
 import type {
   ContinueWorkflowRequest,
@@ -31,6 +32,7 @@ export interface WorkflowStreamDeps {
   readonly db: PrismaService;
   readonly projects: ProjectsService;
   readonly orchestrator: LlmOrchestratorService;
+  readonly knowledge?: KnowledgeRetrievalService;
 }
 
 interface StreamInput<T> {
@@ -115,6 +117,7 @@ export async function streamDiscuss(
       db: deps.db,
       orchestrator: deps.orchestrator,
       dataDir: deps.projects.dataDir(),
+      knowledge: deps.knowledge,
       stream: streamOptions(input.stream),
     }).execute(ctx, stage);
     const message = await appendWorkflowInteraction(deps.db, {

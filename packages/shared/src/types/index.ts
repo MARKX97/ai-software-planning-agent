@@ -4,3 +4,4 @@
  */
 export * from './llm.js';
 export * from './workflow.js';
+export * from './knowledge.js';

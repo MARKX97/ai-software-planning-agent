@@ -13,7 +13,7 @@ const MIN_CONTENT_CHARACTERS = 120;
 const RULES: ReadonlyArray<{
   readonly id: ArtifactQualityIssueId;
   readonly label: string;
-  readonly passes: (content: string) => boolean;
+  readonly passes: (content: string, citations: readonly string[]) => boolean;
 }> = [
   {
     id: 'markdown_structure',
@@ -30,10 +30,18 @@ const RULES: ReadonlyArray<{
     label: '模板完整性',
     passes: (content) => !/\{\{[^}]+\}\}/.test(content),
   },
+  {
+    id: 'citation_consistency',
+    label: '证据引用一致性',
+    passes: (content, citations) => validCitations(content, citations),
+  },
 ];
 
-export function inspectArtifact(content: string): ArtifactQualityIssueId[] {
-  return RULES.filter((rule) => !rule.passes(content.trim())).map((rule) => rule.id);
+export function inspectArtifact(
+  content: string,
+  citations: readonly string[] = [],
+): ArtifactQualityIssueId[] {
+  return RULES.filter((rule) => !rule.passes(content.trim(), citations)).map((rule) => rule.id);
 }
 
 export function artifactQualityReportFromState(data: unknown): ArtifactQualityReport | null {
@@ -42,6 +50,12 @@ export function artifactQualityReportFromState(data: unknown): ArtifactQualityRe
     (data as Record<string, unknown>)['quality_report'],
   );
   return parsed.success ? parsed.data : null;
+}
+
+function validCitations(content: string, allowed: readonly string[]): boolean {
+  const markers = [...content.matchAll(/\[(S[1-9]\d*)\]/g)].map((match) => match[1] ?? '');
+  if (allowed.length === 0) return markers.length === 0;
+  return markers.length > 0 && markers.every((marker) => allowed.includes(marker));
 }
 
 export function buildArtifactQualityReport(input: {

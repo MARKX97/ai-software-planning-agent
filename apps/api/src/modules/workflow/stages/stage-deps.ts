@@ -7,10 +7,12 @@
 import type { LlmOrchestratorService } from '@ai-planning/llm-orchestrator';
 import type { LLMStreamOptions } from '@ai-planning/shared';
 import type { PrismaService } from '../../../database/database.module.js';
+import type { KnowledgeRetrievalService } from '../../knowledge/knowledge-retrieval.service.js';
 
 export interface StageDeps {
   readonly orchestrator: LlmOrchestratorService;
   readonly db: PrismaService;
   readonly dataDir: string;
+  readonly knowledge?: KnowledgeRetrievalService;
   readonly stream?: Pick<LLMStreamOptions, 'onDelta' | 'signal'>;
 }

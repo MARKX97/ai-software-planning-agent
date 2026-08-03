@@ -25,6 +25,10 @@ const USER_ERROR_MESSAGES: Record<string, string> = {
   RATE_LIMITED: '请求过于频繁，请稍后再试。',
   EXPORT_NOT_READY: '导出文件仍在生成，请稍后再试。',
   EXPORT_FAILED: '导出生成失败，请重新导出。',
+  KNOWLEDGE_SOURCE_NOT_FOUND: '这份项目资料不存在或已被删除，请刷新后重试。',
+  KNOWLEDGE_SOURCE_CONFLICT: '这份项目资料正在处理，请稍后再试。',
+  KNOWLEDGE_INDEXING_FAILED: '项目资料索引失败，请检查文件后重新索引。',
+  KNOWLEDGE_UNAVAILABLE: '知识库暂时不可用，规划仍可继续，但不会使用项目资料。',
   UNAUTHORIZED: '身份验证已失效，请检查 API Key 后重试。',
   FORBIDDEN: '当前凭证无权执行此操作，请检查 API Key。',
   INTERNAL_ERROR: '服务暂时不可用，请稍后重试。',
@@ -130,10 +134,16 @@ export async function parseApiError(response: Response): Promise<ApiClientError>
 export async function apiFetch(path: string, options: RequestOptions = {}): Promise<Response> {
   const method = options.method ?? 'GET';
   const hasBody = options.body !== undefined;
+  const formData = options.body instanceof FormData;
   return fetchApi(buildUrl(path, options.query), {
     method,
-    headers: headers(hasBody),
-    body: hasBody ? JSON.stringify(options.body) : undefined,
+    headers: headers(hasBody && !formData),
+    body:
+      options.body instanceof FormData
+        ? options.body
+        : hasBody
+          ? JSON.stringify(options.body)
+          : undefined,
     cache: 'no-store',
     signal: options.signal,
   });

@@ -1,7 +1,7 @@
 # Architecture Overview
 
-> Version: 1.1.0
-> Status: Current V2 + Proposed V3 Target
+> Version: 1.2.0
+> Status: Current V2 + V3 P0; Proposed P1/P2 Target
 
 ---
 
@@ -69,43 +69,46 @@ Shared: packages/shared/        跨层 LLM 类型、枚举与 Zod Schema
 ✅ 业务代码只能通过 LlmOrchestratorService 调用
 ```
 
-## V2 当前设计约束
+## 当前设计约束
 
 - 单体架构，不允许微服务
 - 仅 Workflow Agent，不支持 Multi-Agent
-- 不引入 RAG、MCP
+- P0 仅使用固定阶段 RAG，不引入运行时 MCP 或动态 Agent Tool
 - 不引入 Redis、Kafka、Elasticsearch、Kubernetes
 
-## V3 Target Architecture（Proposed）
+## V3 P0 Current And P1/P2 Target
 
-V3 保留模块化单体和现有 LLM 三层架构，只在 API Workflow 与 Orchestrator 之间增加 Agent Graph，并在 PostgreSQL 中增加项目知识索引。
+V3 P0 已在 PostgreSQL 中增加项目知识索引，并由现有 Workflow 在规划生成前执行一次固定检索。P1 才会在 API Workflow 与 Orchestrator 之间增加 Agent Graph。
 
 ```text
 Browser / SSE
   -> NestJS Workflow Controller
-  -> AgentGraphService (LangGraph)
-       -> Knowledge Tools (LangChain)
+  -> Existing Workflow Executor
+       -> Fixed Knowledge Retrieval (P0)
             -> Document Loader / Splitter
             -> Embedding Provider
             -> PostgreSQL 16 + pgvector / Full Text Search
        -> Existing LlmOrchestratorService
             -> Providers -> OpenAI-compatible Adapter -> Baishan
-  -> Workflow / Graph projections persisted by Prisma
+  -> Workflow / knowledge state persisted by Prisma
+
+P1: Workflow Executor -> AgentGraphService (LangGraph checkpoint / resume)
+P2: AgentGraphService -> controlled Knowledge Tools
 ```
 
 ### 技术职责
 
-| 技术           | V3 职责                                                                 |
-| -------------- | ----------------------------------------------------------------------- |
-| LangChain      | 文档加载、切片、Embedding、Retriever 和 Tool 接口，不负责工作流状态推进 |
-| LangGraph      | Graph State、条件边、持久化 checkpoint、人工 interrupt 和受控 Tool 编排 |
-| pgvector       | 在现有 PostgreSQL 中保存与检索 Embedding，不新增独立数据库              |
-| PostgreSQL FTS | 精确匹配技术名词、路径和标识符，与向量结果融合                          |
+| 技术           | V3 职责                                                                    |
+| -------------- | -------------------------------------------------------------------------- |
+| LangChain      | P0 文档加载与切片；后续 Retriever/Tool 接口，不负责工作流状态推进          |
+| LangGraph      | P1 Graph State、条件边、持久化 checkpoint、人工 interrupt 和受控 Tool 编排 |
+| pgvector       | 在现有 PostgreSQL 中保存与检索 Embedding，不新增独立数据库                 |
+| PostgreSQL FTS | 精确匹配技术名词、路径和标识符，与向量结果融合                             |
 
 ### V3 依赖与调用边界
 
 - `apps/api/src/modules/knowledge/` 负责导入、索引、检索和引用；不得调用 Chat LLM。
-- `apps/api/src/modules/workflow/graph/` 负责 LangGraph State、Node、Edge 和 Tool 编排。
+- P1 才新增 `apps/api/src/modules/workflow/graph/` 承载 LangGraph State、Node、Edge 和 Tool 编排。
 - Graph Node 只能通过 `LlmOrchestratorService` 调用 Chat LLM，不得 import Provider、Adapter 或模型 SDK。
 - Embedding 使用独立配置和适配器；密钥只存在 API Server，浏览器只读取处理状态和脱敏错误。
 - 普通数据访问继续使用 Prisma；向量相似度查询集中在数据库包的单一 Repository，使用参数化 Raw SQL。
@@ -119,7 +122,7 @@ Browser / SSE
 - 微服务、Redis、Kafka、WebSocket、GraphQL 和独立向量数据库。
 - LangGraph 或 LangChain 绕过现有 Orchestrator 直接调用 Chat 模型。
 
-V3 详细行为见 `specs/knowledge-base.spec.md` 和 `specs/agent-graph.spec.md`；在对应机器契约和实现完成前，本节只表示目标架构。
+V3 P0 详细行为以 `specs/knowledge-base.spec.md` 为准；`specs/agent-graph.spec.md` 继续表示 P1/P2 目标架构。
 
 ## Workspace 依赖矩阵
 
@@ -133,6 +136,8 @@ V3 详细行为见 `specs/knowledge-base.spec.md` 和 `specs/agent-graph.spec.md
 | `packages/llm-orchestrator` | `llm-core`, `llm-providers`, `shared`              |
 | `apps/api`                  | `config`, `database`, `llm-orchestrator`, `shared` |
 | `apps/web`                  | 无；通过 HTTP 访问 API                             |
+
+P0 仅允许 `apps/api` 直接依赖 `@langchain/core` 和 `@langchain/textsplitters`；上传文本 Loader 基于 Core 的 `BaseDocumentLoader`，不为 P0 引入已 deprecated 的 `@langchain/community` 或 Agent 聚合包。其他 workspace 与 LangGraph 继续禁止，后续阶段按 execution plan 单独放行。
 
 API 中只有以下位置可以 import `LlmOrchestratorService`：
 

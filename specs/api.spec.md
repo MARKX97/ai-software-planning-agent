@@ -1,6 +1,6 @@
 # API — System Contract
 
-> Version: 1.3.0
+> Version: 1.6.0
 > Status: Contract Summary
 > Owner: Backend Lead + Frontend Lead
 > Machine Contract: `contracts/openapi.yaml`
@@ -64,6 +64,11 @@
 | GET    | `/usage/tokens`                                                   | Token 用量   |
 | GET    | `/projects/{project_id}/usage/logs`                               | 模型调用日志 |
 | GET    | `/projects/{project_id}/usage/logs/{log_id}`                      | 日志详情     |
+| POST   | `/projects/{project_id}/knowledge/sources`                        | 上传知识源   |
+| GET    | `/projects/{project_id}/knowledge/sources`                        | 知识源列表   |
+| POST   | `/projects/{project_id}/knowledge/sources/{source_id}/reindex`    | 重新索引     |
+| DELETE | `/projects/{project_id}/knowledge/sources/{source_id}`            | 删除知识源   |
+| POST   | `/projects/{project_id}/knowledge/search`                         | 预览知识检索 |
 
 ## 4. 实现约束
 
@@ -93,10 +98,15 @@
 | 403  | API Key 无效           |
 | 404  | 资源不存在             |
 | 409  | 状态冲突或非法阶段转换 |
+| 413  | 上传文件超过大小限制   |
 | 429  | 频率超限               |
 | 500  | 内部错误               |
 | 502  | LLM 或导出依赖失败     |
 | 503  | 成本限制或服务不可用   |
+
+知识源创建 P0 仅接受 `.md`、`.txt` 的 `multipart/form-data`，并在请求内完成首轮索引；PDF 与公开 GitHub 仓库在 P1 才开放。重复上传同一项目内相同 SHA-256 内容返回现有来源，不重复创建记录。重新索引在请求内完成，相同内容与相同索引配置直接复用 active revision。知识检索无结果返回 `200`、空 `items` 和 `insufficient_evidence=true`。
+
+知识检索对 `project_id` 和可选 `source_ids` 的交集在数据库查询内过滤，最多返回 8 条脱敏证据。产物列表继续不返回引用；产物详情新增 `citations`，只包含正文实际使用的 `[S#]` 快照，来源删除后仍可读取。
 
 成本上限是新调用准入控制，不是白山账单硬上限。已经并行发出的模型调用允许完成并计费；达到上限后，后续模型工作流操作必须在流开始前被拒绝。
 
@@ -123,7 +133,7 @@
 必须覆盖:
 
 - OpenAPI schema 校验。
-- 28 个接口的 success response。
+- 全部已实现接口的 success response；机器契约先行阶段不得用空路由伪造通过。
 - 参数错误、未认证、资源不存在、状态冲突。
 - 关键轮询接口: workflow status、export status。
 - SSE 分片解析、事件顺序、流前 JSON 错误、流后 error、取消和成功后原子持久化。

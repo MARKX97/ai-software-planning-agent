@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { extractImports } from './check-architecture.mjs';
+import { extractImports, isForbiddenExternal } from './check-architecture.mjs';
 import { metricFromMessage } from './check-code-shape.mjs';
 import { markdownTargets, parseEnv } from './check-knowledge.mjs';
 
@@ -11,6 +11,13 @@ describe('harness parsers', () => {
       'b',
       'c',
     ]);
+  });
+
+  it('allows P0 LangChain packages only in the API workspace', () => {
+    assert.equal(isForbiddenExternal('@langchain/textsplitters', '@ai-planning/api'), false);
+    assert.equal(isForbiddenExternal('@langchain/textsplitters', '@ai-planning/database'), true);
+    assert.equal(isForbiddenExternal('@langchain/community', '@ai-planning/api'), true);
+    assert.equal(isForbiddenExternal('redis', '@ai-planning/api'), true);
   });
 
   it('parses env values without treating comments as keys', () => {

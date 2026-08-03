@@ -41,7 +41,7 @@ const forbiddenPackages = [
   'mongoose',
   'mongodb',
   'langchain',
-  '@langchain/core',
+  '@langchain',
   'llamaindex',
   'chromadb',
   '@modelcontextprotocol/sdk',
@@ -51,6 +51,15 @@ const forbiddenPackages = [
   'ws',
   'openai',
 ];
+
+const approvedExternal = {
+  '@ai-planning/api': new Set(['@langchain/core', '@langchain/textsplitters']),
+};
+
+export function isForbiddenExternal(name, workspace) {
+  const forbidden = forbiddenPackages.some((item) => name === item || name.startsWith(`${item}/`));
+  return forbidden && !approvedExternal[workspace]?.has(name);
+}
 
 export function extractImports(source) {
   const imports = [];
@@ -76,7 +85,7 @@ function checkManifest(path, workspace) {
         ),
       );
     }
-    if (forbiddenPackages.some((item) => name === item || name.startsWith(`${item}/`))) {
+    if (isForbiddenExternal(name, workspace)) {
       issues.push(
         issue(
           'HE-ARCH-002',

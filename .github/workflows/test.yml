@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:0.8.2-pg16
         env:
           POSTGRES_DB: ai_planning_agent
           POSTGRES_USER: postgres

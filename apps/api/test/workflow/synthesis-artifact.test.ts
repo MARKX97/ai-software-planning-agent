@@ -15,6 +15,7 @@ import {
 import { ConflictResolver } from '../../src/modules/workflow/synthesis/conflict-resolver.js';
 import { ArtifactGenerator } from '../../src/modules/workflow/artifact-generation/artifact-generator.js';
 import { ArtifactFileStore } from '../../src/modules/workflow/artifact-generation/artifact-file-store.js';
+import { inspectArtifact } from '../../src/modules/workflow/artifact-generation/artifact-quality.js';
 import { ARTIFACT_TYPES } from '../../src/modules/workflow/stages/model-routing.js';
 
 describe('ConflictResolver', () => {
@@ -95,6 +96,39 @@ describe('ArtifactGenerator', () => {
       await rm(dataDir, { recursive: true, force: true });
     }
   });
+
+  it('persists only valid citation markers and rejects hallucinated keys', async () => {
+    const saved: SavedArtifact[] = [];
+    const orchestrator = {
+      callSingle: async (provider: string, prompt: string): Promise<LLMResponse> => {
+        const marker = prompt.includes('[S1]') ? ' [S1]' : '';
+        return response(
+          provider,
+          prompt,
+          `# Cited artifact\n\n${'Detailed evidence-backed content. '.repeat(6)}${marker}`,
+        );
+      },
+    } as unknown as LlmOrchestratorService;
+    const dataDir = await mkdtemp(join(tmpdir(), 'artifact-citation-'));
+    try {
+      const generator = new ArtifactGenerator(
+        orchestrator,
+        new ArtifactFileStore(mockDb(saved) as never, dataDir),
+      );
+      const result = await generator.generateAll(context(), [evidence()]);
+      const prd = result.successes.find((item) => item.type === 'prd');
+      assert.deepEqual(
+        prd?.citations.map((item) => item.citationKey),
+        ['S1'],
+      );
+      assert.equal(saved.find((item) => item.type === 'prd')?.citationCount, 1);
+      assert.deepEqual(inspectArtifact('# Valid\n\n' + 'x'.repeat(130) + ' [S9]', ['S1']), [
+        'citation_consistency',
+      ]);
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
 });
 
 function analysis(
@@ -155,19 +189,47 @@ function response(provider: string, prompt: string, content?: string): LLMRespon
   };
 }
 
-function mockDb(saved: Array<{ type: ArtifactType; content: string }>): unknown {
+interface SavedArtifact {
+  type: ArtifactType;
+  content: string;
+  citationCount?: number;
+}
+
+function mockDb(saved: SavedArtifact[]): unknown {
   return {
     client: {
       artifact: {
         updateMany: async () => ({ count: 0 }),
-        create: async (args: { data: { type: ArtifactType; content: string } }) => {
-          saved.push({ type: args.data.type, content: args.data.content });
+        create: async (args: {
+          data: {
+            type: ArtifactType;
+            content: string;
+            citations?: { create: unknown[] };
+          };
+        }) => {
+          saved.push({
+            type: args.data.type,
+            content: args.data.content,
+            citationCount: args.data.citations?.create.length,
+          });
           return { id: `${args.data.type}-id`, ...args.data };
         },
         findFirst: async () => null,
       },
       tokenUsage: { upsert: async () => undefined },
     },
+  };
+}
+
+function evidence() {
+  return {
+    sourceId: '550e8400-e29b-41d4-a716-446655440000',
+    documentId: '550e8400-e29b-41d4-a716-446655440001',
+    chunkId: '550e8400-e29b-41d4-a716-446655440002',
+    title: 'Architecture',
+    locator: 'guide.md:L1-L4',
+    excerpt: 'Use PostgreSQL 16.',
+    contentHash: 'a'.repeat(64),
   };
 }
 

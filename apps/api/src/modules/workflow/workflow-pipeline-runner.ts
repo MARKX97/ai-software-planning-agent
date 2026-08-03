@@ -25,6 +25,7 @@ import {
   type WorkflowContext,
 } from '@ai-planning/shared';
 import type { PrismaService } from '../../database/database.module.js';
+import type { KnowledgeRetrievalService } from '../knowledge/knowledge-retrieval.service.js';
 import { AppException } from '../../common/exception/app-exception.js';
 import { ErrorCode } from '../../common/exception/error-code.js';
 import { WorkflowStateMachine } from './state-machine/workflow-state-machine.js';
@@ -44,6 +45,7 @@ export interface PipelineRunDeps {
   readonly db: PrismaService;
   readonly orchestrator: LlmOrchestratorService;
   readonly dataDir: string;
+  readonly knowledge?: KnowledgeRetrievalService;
   readonly stream?: Pick<LLMStreamOptions, 'onDelta' | 'signal'>;
 }
 
@@ -62,6 +64,7 @@ export async function runPipeline(
     orchestrator: deps.orchestrator,
     db: deps.db,
     dataDir: deps.dataDir,
+    knowledge: deps.knowledge,
     stream: deps.stream,
   };
   const registry = createStageRegistry(stageDeps);

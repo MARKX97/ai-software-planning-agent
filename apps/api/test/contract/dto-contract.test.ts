@@ -145,6 +145,26 @@ describe('API error and auth contracts', () => {
     });
   });
 
+  it('maps oversized multipart uploads without exposing Multer internals', () => {
+    let status = 0;
+    let payload: unknown;
+    const response = {
+      status(code: number) {
+        status = code;
+        return { json: (value: unknown) => (payload = value) };
+      },
+    };
+    const host = { switchToHttp: () => ({ getResponse: () => response }) } as never;
+    new HttpExceptionFilter().catch(
+      { name: 'MulterError', code: 'LIMIT_FILE_SIZE', message: 'internal multer detail' },
+      host,
+    );
+    assert.equal(status, 413);
+    assert.deepEqual(payload, {
+      error: { code: ErrorCode.INVALID_INPUT, message: 'File exceeds the 20 MiB limit' },
+    });
+  });
+
   it('enforces bearer auth while allowing an empty API key configuration', () => {
     const reflector = { getAllAndOverride: () => false } as never;
     const config = { apiKey: 'secret' } as never;

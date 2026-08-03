@@ -108,6 +108,20 @@ enum LLMProvider {
   minimax  @map("minimax")
 }
 
+enum KnowledgeSourceKind {
+  file              @map("file")
+  github_repository @map("github_repository")
+}
+
+enum KnowledgeStatus {
+  pending             @map("pending")
+  processing          @map("processing")
+  ready               @map("ready")
+  ready_with_warnings @map("ready_with_warnings")
+  failed              @map("failed")
+  deleted             @map("deleted")
+}
+
 // ------------------------------------------------------------
 // Models
 // ------------------------------------------------------------
@@ -135,6 +149,7 @@ model Project {
   exports              Export[]
   model_execution_logs ModelExecutionLog[]
   token_usage          TokenUsage?
+  knowledge_sources    KnowledgeSource[]
 
   @@index([status])
   @@index([current_stage])
@@ -258,7 +273,8 @@ model Artifact {
   updated_at        DateTime      @map("updated_at") @db.Timestamptz
   deleted_at        DateTime?     @map("deleted_at") @db.Timestamptz
 
-  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  project   Project            @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  citations ArtifactCitation[]
 
   // Partial uniqueness (non-deleted rows) enforced via DB; here a plain
   // unique on (project_id, type) is too strict for soft-deleted dupes, so
@@ -369,4 +385,119 @@ model TokenUsage {
 
   @@index([total_cost(sort: Desc)])
   @@map("token_usage")
+}
+
+model KnowledgeSource {
+  id            String              @id @default(uuid()) @db.Uuid
+  project_id    String              @map("project_id") @db.Uuid
+  kind          KnowledgeSourceKind @map("kind")
+  name          String              @db.VarChar(255)
+  mime_type     String?             @map("mime_type") @db.VarChar(100)
+  source_uri    String?             @map("source_uri") @db.Text
+  content_hash  String              @map("content_hash") @db.Char(64)
+  content_text  String?             @map("content_text") @db.Text
+  status        KnowledgeStatus     @default(pending) @map("status")
+  warning_count Int                 @default(0) @map("warning_count")
+  error_code    String?             @map("error_code") @db.VarChar(50)
+  error_message String?             @map("error_message") @db.Text
+  created_at    DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updated_at    DateTime            @map("updated_at") @db.Timestamptz
+  deleted_at    DateTime?           @map("deleted_at") @db.Timestamptz
+
+  project   Project             @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  revisions KnowledgeRevision[]
+
+  @@index([project_id, status])
+  @@index([project_id, content_hash])
+  @@index([deleted_at])
+  @@map("knowledge_sources")
+}
+
+model KnowledgeRevision {
+  id                   String          @id @default(uuid()) @db.Uuid
+  source_id            String          @map("source_id") @db.Uuid
+  revision             Int
+  content_hash         String          @map("content_hash") @db.Char(64)
+  status               KnowledgeStatus @default(processing) @map("status")
+  embedding_model      String?         @map("embedding_model") @db.VarChar(100)
+  embedding_dimensions Int?            @map("embedding_dimensions")
+  indexer_version      String          @map("indexer_version") @db.VarChar(50)
+  warning_count        Int             @default(0) @map("warning_count")
+  error_code           String?         @map("error_code") @db.VarChar(50)
+  error_message        String?         @map("error_message") @db.Text
+  is_active            Boolean         @default(false) @map("is_active")
+  created_at           DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  completed_at         DateTime?       @map("completed_at") @db.Timestamptz
+
+  source    KnowledgeSource     @relation(fields: [source_id], references: [id], onDelete: Cascade)
+  documents KnowledgeDocument[]
+
+  @@unique([source_id, revision])
+  @@unique([source_id, id])
+  @@index([source_id, is_active])
+  @@map("knowledge_revisions")
+}
+
+model KnowledgeDocument {
+  id           String   @id @default(uuid()) @db.Uuid
+  source_id    String   @map("source_id") @db.Uuid
+  revision_id  String   @map("revision_id") @db.Uuid
+  logical_path String   @map("logical_path") @db.Text
+  title        String   @db.VarChar(255)
+  mime_type    String   @map("mime_type") @db.VarChar(100)
+  content_hash String   @map("content_hash") @db.Char(64)
+  metadata     Json?
+  created_at   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  revision KnowledgeRevision @relation(fields: [source_id, revision_id], references: [source_id, id], onDelete: Cascade)
+  chunks   KnowledgeChunk[]
+
+  @@unique([revision_id, logical_path])
+  @@index([source_id, revision_id])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeChunk {
+  id            String                   @id @default(uuid()) @db.Uuid
+  document_id   String                   @map("document_id") @db.Uuid
+  position      Int
+  content       String                   @db.Text
+  token_count   Int                      @map("token_count")
+  title_path    Json?                    @map("title_path")
+  page_number   Int?                     @map("page_number")
+  line_start    Int?                     @map("line_start")
+  line_end      Int?                     @map("line_end")
+  content_hash  String                   @map("content_hash") @db.Char(64)
+  embedding     Unsupported("vector")?
+  search_vector Unsupported("tsvector")? @map("search_vector")
+  created_at    DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+
+  document KnowledgeDocument @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
+  @@unique([document_id, position])
+  @@map("knowledge_chunks")
+}
+
+model ArtifactCitation {
+  id           String   @id @default(uuid()) @db.Uuid
+  artifact_id  String   @map("artifact_id") @db.Uuid
+  source_id    String   @map("source_id") @db.Uuid
+  document_id  String   @map("document_id") @db.Uuid
+  chunk_id     String   @map("chunk_id") @db.Uuid
+  citation_key String   @map("citation_key") @db.VarChar(20)
+  position     Int
+  title        String   @db.VarChar(255)
+  locator      String   @db.Text
+  excerpt      String   @db.Text
+  content_hash String   @map("content_hash") @db.Char(64)
+  created_at   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  artifact Artifact @relation(fields: [artifact_id], references: [id], onDelete: Cascade)
+
+  @@unique([artifact_id, citation_key])
+  @@unique([artifact_id, chunk_id])
+  @@index([artifact_id, position])
+  @@index([source_id])
+  @@index([chunk_id])
+  @@map("artifact_citations")
 }

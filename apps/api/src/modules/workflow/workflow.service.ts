@@ -4,6 +4,7 @@ import { WorkflowStage } from '@ai-planning/shared';
 import { PrismaService } from '../../database/database.module.js';
 import { LLM_ORCHESTRATOR } from '../../llm/llm.constants.js';
 import { ProjectsService } from '../projects/projects.service.js';
+import { KnowledgeRetrievalService } from '../knowledge/knowledge-retrieval.service.js';
 import {
   type WorkflowExecutionDetailResponse,
   type WorkflowExecutionListResponse,
@@ -37,6 +38,9 @@ export type { ExecutionLogsListResponse } from './workflow-history.js';
 
 @Injectable()
 export class WorkflowService {
+  @Inject(KnowledgeRetrievalService)
+  private readonly knowledge!: KnowledgeRetrievalService;
+
   constructor(
     private readonly db: PrismaService,
     private readonly projects: ProjectsService,
@@ -127,6 +131,7 @@ export class WorkflowService {
       db: this.db,
       projects: this.projects,
       orchestrator: this.orchestrator,
+      knowledge: this.knowledge,
     };
   }
 }

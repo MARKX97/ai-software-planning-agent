@@ -1,6 +1,6 @@
 # V3 RAG And LangGraph
 
-> Status: Planned
+> Status: Completed — P0 delivered on 2026-08-03; P1/P2 deferred
 > Product Scope: `docs/product-vision.md#v3基于项目证据的受控规划-agentplanned`
 > Contracts: `specs/knowledge-base.spec.md`, `specs/agent-graph.spec.md`
 
@@ -31,6 +31,8 @@ P0 先交付“文档进入、证据检索、产物引用”的最小纵向闭�
 
 ### P0.1 Architecture And Contract Gate
 
+Status: Completed on 2026-08-03.
+
 Dependencies: none.
 
 - 更新 Harness 依赖白名单，只放行 P0 所需的 LangChain 和 `pgvector` 能力。
@@ -44,7 +46,13 @@ Acceptance:
 
 Verification: `pnpm harness:check`, database tests, `pnpm typecheck`.
 
+Result: Harness, lint, typecheck, database tests, Docker `pgvector` migration,
+full build, and 15 cross-browser Web E2E tests passed. The migration was also
+verified to roll back atomically when `vector` was unavailable.
+
 ### P0.2 Document Parsing And Indexing
+
+Status: Completed on 2026-08-03.
 
 Dependencies: P0.1.
 
@@ -61,7 +69,14 @@ Rollback: 关闭知识源入口；V2 工作流不依赖索引。
 
 Verification: parser/indexer unit tests, PostgreSQL integration tests, `pnpm verify:fast`.
 
+Result: Stable token-based Markdown/TXT parsing, independent Mock/remote Embedding,
+atomic active revisions, warning retries, reindex, soft delete, and safe upload errors
+are implemented. API tests passed 109/109, database tests 5/5, final Docker HTTP +
+PostgreSQL/pgvector integration 1/1, Web E2E 15/15, and `pnpm verify:fast` passed.
+
 ### P0.3 Hybrid Retrieval And Citations
+
+Status: Completed on 2026-08-03.
 
 Dependencies: P0.2.
 
@@ -78,7 +93,15 @@ Rollback: 禁用 RAG feature flag，恢复现有 Prompt 输入。
 
 Verification: retrieval eval, API integration, artifact contract tests, `pnpm eval`.
 
+Result: Parameterized pgvector + PostgreSQL FTS retrieval, deterministic RRF,
+project isolation, fixed planning-stage evidence injection, validated `[S1]` citations,
+snapshot retention, and `RAG_ENABLED` rollback are implemented. Database tests passed
+7/7, API tests 114/114 with 3 explicit environment skips, Docker HTTP + PostgreSQL/
+pgvector integration 1/1, Web E2E 15/15, and `pnpm verify:fast` passed.
+
 ### P0.4 Minimum Knowledge UI
+
+Status: Completed on 2026-08-03.
 
 Dependencies: P0.1-P0.3 API contracts.
 
@@ -93,11 +116,25 @@ Rollback: 隐藏 V3 知识库入口，不影响 V2 页面。
 
 Verification: Vitest, Testing Library, Playwright, accessibility checks, `pnpm verify`.
 
+Result: The project knowledge page supports native Markdown/TXT upload, readable index
+states, warning/failure reindex, confirmed deletion, and accessible async feedback. Artifact
+details expose persisted citation snapshots through keyboard-accessible native disclosure.
+Web component tests passed 35/35, the three-browser E2E passed 15/15 including the full
+upload-to-citation and post-delete snapshot path, and `pnpm verify` passed.
+
 ### P0 Exit Gate
+
+Status: Passed on 2026-08-03.
 
 - 至少一种文档完成“上传 → 索引 → 检索 → 带引用产物”的闭环。
 - 没有知识源或关闭 feature flag 时，V2 的 9 阶段、四个检查点和 11 类产物回归通过。
 - Harness、机器契约、项目隔离、引用快照和默认零外部费用测试全部通过。
+
+Result: The three-browser E2E covers Markdown upload, indexing, retrieval, cited PRD,
+source deletion, and retained citation snapshots. A separate real HTTP + PostgreSQL run
+without knowledge sources completed all 9 stages and 4 checkpoints, produced all 11
+artifacts, and verified zero citations plus the deterministic no-evidence notice. Default
+verification remained Mock-only and `pnpm verify` passed.
 
 ## P1 — Repository Awareness And Recoverable Graph
 
@@ -186,7 +223,7 @@ Verification: integration tests, Web E2E, accessibility checks, `pnpm verify`.
 - 动态 Tool 的权限、次数、输入和审计边界不可绕过。
 - 增量重生成、失败恢复、Prompt Injection 和成本控制回归通过。
 
-## Completion Gate
+## Future V3 Release Gate（P1/P2）
 
 - 所有 Proposed spec 升级为 Contract，并与 OpenAPI、Prisma、Zod 和实现一致。
 - Mock Eval、HTTP integration、Web E2E、Harness、完整构建全部通过。

@@ -8,7 +8,7 @@
  * @internal
  */
 import { WorkflowStage } from '@ai-planning/shared';
-import type { StageResult, WorkflowContext } from '@ai-planning/shared';
+import type { EvidenceCitation, StageResult, WorkflowContext } from '@ai-planning/shared';
 import { ArtifactGenerator } from '../artifact-generation/artifact-generator.js';
 import { ArtifactFileStore } from '../artifact-generation/artifact-file-store.js';
 import type { StageDeps } from './stage-deps.js';
@@ -23,7 +23,7 @@ export class PlanningGenerationStage implements StageProcessor {
   async execute(ctx: WorkflowContext): Promise<StageResult> {
     const store = new ArtifactFileStore(this.deps.db, this.deps.dataDir);
     const generator = new ArtifactGenerator(this.deps.orchestrator, store);
-    const result = await generator.generateAll(ctx);
+    const result = await generator.generateAll(ctx, await this.loadEvidence(ctx));
     for (const item of result.successes) {
       for (const call of item.calls) await this.logCall(ctx, item.provider, call);
     }
@@ -32,6 +32,19 @@ export class PlanningGenerationStage implements StageProcessor {
     }
     if (result.successes.length === 0) throw new Error('All artifact generations failed');
     return toStageResult(this.stage, result);
+  }
+
+  private async loadEvidence(ctx: WorkflowContext): Promise<EvidenceCitation[]> {
+    if (!this.deps.knowledge) return [];
+    try {
+      const result = await this.deps.knowledge.search(ctx.projectId, {
+        query: evidenceQuery(ctx),
+        top_k: 8,
+      });
+      return result.items;
+    } catch {
+      return [];
+    }
   }
 
   private async logCall(
@@ -64,16 +77,28 @@ function toStageResult(
   const generated = result.successes.map((item) => ({
     type: item.type,
     provider: item.provider,
+    citation_count: item.citations.length,
   }));
+  const citationCount = result.successes.reduce((sum, item) => sum + item.citations.length, 0);
   return {
     stage,
     structuredOutput: {
       generated,
       failed: result.failures.map((item) => ({ type: item.type, error: item.error })),
+      insufficient_evidence: citationCount === 0,
       quality_report: result.qualityReport,
     },
-    content: result.successes
-      .map((item) => `## ${item.type}\n${item.response.content}`)
-      .join('\n\n---\n\n'),
+    content: result.successes.map((item) => `## ${item.type}\n${item.content}`).join('\n\n---\n\n'),
   };
+}
+
+function evidenceQuery(ctx: WorkflowContext): string {
+  const relevant = {
+    original_idea: ctx.originalIdea,
+    confirmed_decisions: ctx.confirmedDecisions,
+    requirement: ctx.resultsByStage.requirement_synthesis?.structuredOutput,
+    mvp: ctx.resultsByStage.mvp_compression?.structuredOutput,
+    platform: ctx.resultsByStage.platform_recommendation?.structuredOutput,
+  };
+  return JSON.stringify(relevant).slice(0, 2_000);
 }

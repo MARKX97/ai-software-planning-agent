@@ -1,7 +1,7 @@
 # System Design
 
-> Version: 1.2.0
-> Status: Current V2 + Planned V3
+> Version: 1.3.0
+> Status: Current V2 + V3 P0; Planned P1/P2
 
 ---
 
@@ -23,7 +23,7 @@
 | LLM Provider 与 Orchestrator   | `specs/provider.spec.md` + `specs/orchestrator.spec.md`                                        |
 | 模型路由与 Prompt 管理         | `specs/model-routing.spec.md` + `specs/prompt.spec.md`                                         |
 | Web UI                         | `specs/frontend.spec.md`                                                                       |
-| V3 项目知识库（Proposed）      | `specs/knowledge-base.spec.md`                                                                 |
+| V3 项目知识库（P0 Contract）   | `specs/knowledge-base.spec.md`                                                                 |
 | V3 Agent Graph（Proposed）     | `specs/agent-graph.spec.md`                                                                    |
 | 开发流程、测试、部署           | `docs/playbooks/development.md` + `docs/playbooks/testing.md` + `docs/playbooks/deployment.md` |
 
@@ -33,7 +33,7 @@
 
 ## 1. 主流程与调用链
 
-实线表示 Current V2，紫色虚线表示 Planned V3。P0/P1/P2 对应 [`v3-rag-agent.md`](./exec-plans/active/v3-rag-agent.md) 的实施优先级。
+实线表示 Current V2/P0，紫色虚线表示 Planned P1/P2。实施记录见 [`v3-rag-agent.md`](./exec-plans/completed/v3-rag-agent.md)。
 
 ```mermaid
 flowchart LR
@@ -60,7 +60,7 @@ flowchart LR
   database[("PostgreSQL<br/>状态、消息、产物、日志")]
 
   user -->|"POST /api/v1"| guard --> controller --> workflow -->|"V2 runner"| stages
-  workflow -. "P0 固定检索" .-> retriever -. "证据上下文" .-> stages
+  workflow -->|"P0 固定检索"| retriever -->|"证据上下文"| stages
   workflow -. "P1 Graph runner" .-> agentGraph -. "run_stage" .-> stages
   agentGraph -. "P2 动态取证" .-> tools -.-> retriever -. "检索结果" .-> agentGraph
   stages -->|"Structured Output Schema"| orchestrator --> provider --> adapter --> baishan
@@ -71,14 +71,14 @@ flowchart LR
   database -->|"决策快照 + 当前会话"| stages
 
   classDef planned fill:#f7f1ff,stroke:#7c3aed,stroke-width:1.5px,stroke-dasharray:5 4;
-  class agentGraph,tools,retriever planned;
+  class agentGraph,tools planned;
 ```
 
 V2 阶段顺序：`需求分析 → 需求澄清 → 检查点 1 → 多模型分析 → 需求融合 → 检查点 2 → 可行性分析 → 风险分析 → MVP 收缩 → 检查点 3 → 平台推荐 → 检查点 4 → 规划生成`。
 
 所有 Chat LLM 调用只经过 `LlmOrchestratorService`。没有知识源、证据不足或关闭 V3 feature flag 时，继续执行 V2 路径。
 
-## 2. Planned V3：知识导入与 RAG 数据流
+## 2. Current V3 P0：知识导入与 RAG 数据流
 
 ```mermaid
 flowchart LR
@@ -112,9 +112,9 @@ flowchart LR
 
 索引失败不替换旧的 active revision；RAG 内容统一视为不可信输入，不得控制权限、工作流状态或数据库写入。
 
-## 3. Current V2 + Planned V3：核心数据关系
+## 3. Current V2/P0 + Planned P1/P2：核心数据关系
 
-名称以 `_V3` 结尾的实体为 Proposed 逻辑实体，尚未进入 Prisma Schema 或数据库迁移。
+知识库和引用实体已进入 Prisma 与数据库迁移；名称以 `_V3` 结尾的 Graph 实体仍为 Proposed 逻辑实体。
 
 ```mermaid
 erDiagram
@@ -129,15 +129,15 @@ erDiagram
   WORKFLOW_EXECUTION o|--o{ MODEL_EXECUTION_LOG : records
   PROJECT ||--|| TOKEN_USAGE : aggregates
 
-  PROJECT ||--o{ KNOWLEDGE_SOURCE_V3 : owns
-  KNOWLEDGE_SOURCE_V3 ||--o{ KNOWLEDGE_DOCUMENT_V3 : contains
-  KNOWLEDGE_DOCUMENT_V3 ||--o{ KNOWLEDGE_CHUNK_V3 : splits_into
+  PROJECT ||--o{ KNOWLEDGE_SOURCE : owns
+  KNOWLEDGE_SOURCE ||--o{ KNOWLEDGE_REVISION : versions
+  KNOWLEDGE_REVISION ||--o{ KNOWLEDGE_DOCUMENT : contains
+  KNOWLEDGE_DOCUMENT ||--o{ KNOWLEDGE_CHUNK : splits_into
+  ARTIFACT ||--o{ ARTIFACT_CITATION : preserves
+  ARTIFACT_CITATION }o--|| KNOWLEDGE_CHUNK : snapshots
   PROJECT ||--o{ GRAPH_RUN_V3 : runs
   GRAPH_RUN_V3 ||--o{ TOOL_STEP_V3 : audits
-  GRAPH_RUN_V3 }o--o{ KNOWLEDGE_CHUNK_V3 : uses
-  GRAPH_RUN_V3 ||--o{ CITATION_SNAPSHOT_V3 : records
-  ARTIFACT ||--o{ CITATION_SNAPSHOT_V3 : preserves
-  CITATION_SNAPSHOT_V3 }o--|| KNOWLEDGE_CHUNK_V3 : references
+  GRAPH_RUN_V3 }o--o{ KNOWLEDGE_CHUNK : uses
 ```
 
 完整规则见 [`workflow.spec.md`](../specs/workflow.spec.md)、[`database.spec.md`](../specs/database.spec.md)、[`orchestrator.spec.md`](../specs/orchestrator.spec.md)、[`knowledge-base.spec.md`](../specs/knowledge-base.spec.md) 和 [`agent-graph.spec.md`](../specs/agent-graph.spec.md)。

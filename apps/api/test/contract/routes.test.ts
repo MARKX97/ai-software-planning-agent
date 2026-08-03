@@ -13,6 +13,8 @@ import { ConversationsController } from '../../src/modules/conversations/convers
 import { ArtifactsController } from '../../src/modules/artifacts/artifacts.controller.js';
 import { ExportsController } from '../../src/modules/exports/exports.controller.js';
 import { UsageController } from '../../src/modules/usage/usage.controller.js';
+import { KnowledgeController } from '../../src/modules/knowledge/knowledge.controller.js';
+import { KnowledgeSearchController } from '../../src/modules/knowledge/knowledge-search.controller.js';
 import { AppModule } from '../../src/app.module.js';
 import { AuthGuard } from '../../src/common/guards/auth.guard.js';
 
@@ -25,6 +27,8 @@ const controllers = [
   ArtifactsController,
   ExportsController,
   UsageController,
+  KnowledgeController,
+  KnowledgeSearchController,
 ];
 
 const expectedRoutes = [
@@ -56,6 +60,11 @@ const expectedRoutes = [
   'GET /usage/tokens',
   'GET /projects/{project_id}/usage/logs',
   'GET /projects/{project_id}/usage/logs/{log_id}',
+  'POST /projects/{project_id}/knowledge/sources',
+  'GET /projects/{project_id}/knowledge/sources',
+  'POST /projects/{project_id}/knowledge/sources/{source_id}/reindex',
+  'DELETE /projects/{project_id}/knowledge/sources/{source_id}',
+  'POST /projects/{project_id}/knowledge/search',
 ].sort();
 
 const methodNames: Record<number, string> = {
@@ -83,7 +92,7 @@ function routeEntries(controller: { prototype: object }): string[] {
 }
 
 describe('API route contract', () => {
-  it('keeps all 28 documented routes registered on controllers', () => {
+  it('keeps all 33 implemented routes registered on controllers', () => {
     const actual = controllers.flatMap(routeEntries).sort();
     assert.deepEqual(actual, expectedRoutes);
   });

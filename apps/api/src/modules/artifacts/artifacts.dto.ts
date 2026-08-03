@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import type { Artifact, ArtifactType } from '@ai-planning/database';
+import type {
+  Artifact,
+  ArtifactCitation as ArtifactCitationRow,
+  ArtifactType,
+} from '@ai-planning/database';
+import type { ArtifactCitation } from '@ai-planning/shared';
 
 /**
  * Zod schemas + DTOs for Artifacts endpoints.
@@ -38,6 +43,7 @@ export interface ArtifactResponse {
   size_bytes: number | null;
   format: string;
   created_at: string;
+  citations?: ArtifactCitation[];
 }
 
 export interface ArtifactListResponse {
@@ -46,7 +52,9 @@ export interface ArtifactListResponse {
 }
 
 /** Convert a Prisma Artifact row to the full API response shape (with content). */
-export function toArtifactResponse(a: Artifact): ArtifactResponse {
+export function toArtifactResponse(
+  a: Artifact & { citations?: ArtifactCitationRow[] },
+): ArtifactResponse {
   return {
     id: a.id,
     project_id: a.project_id,
@@ -59,6 +67,20 @@ export function toArtifactResponse(a: Artifact): ArtifactResponse {
     size_bytes: a.size_bytes,
     format: a.format,
     created_at: a.created_at.toISOString(),
+    citations: (a.citations ?? []).map(toArtifactCitation),
+  };
+}
+
+function toArtifactCitation(citation: ArtifactCitationRow): ArtifactCitation {
+  return {
+    sourceId: citation.source_id,
+    documentId: citation.document_id,
+    chunkId: citation.chunk_id,
+    citationKey: citation.citation_key,
+    title: citation.title,
+    locator: citation.locator,
+    excerpt: citation.excerpt,
+    contentHash: citation.content_hash,
   };
 }
 

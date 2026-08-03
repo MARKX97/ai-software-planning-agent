@@ -19,6 +19,19 @@ test('user can create a project, finish workflow, inspect and download artifacts
     await expect(page.getByRole('link', { name: '开始把它想清楚' })).toBeVisible();
     projectId = page.url().split('/').at(-1) ?? '';
 
+    await page.getByRole('link', { name: '准备项目资料' }).click();
+    await expect(page.getByRole('heading', { name: '项目资料库' })).toBeVisible();
+    await page.getByLabel('Markdown 或 TXT 文件').setInputFiles({
+      name: 'project-context.md',
+      mimeType: 'text/markdown',
+      buffer: Buffer.from(
+        '# 项目背景\n规划 Agent 服务产品经理，首版必须输出可追溯的 PRD 与架构证据引用。',
+      ),
+    });
+    await page.getByRole('button', { name: '上传并索引' }).click();
+    await expect(page.getByText('可用于规划')).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('link', { name: '回到项目' }).click();
+
     await page.getByRole('link', { name: '开始把它想清楚' }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/workflow\\?start=1$`));
     await expect(page.getByRole('heading', { name: '项目进展' })).toBeVisible();
@@ -70,8 +83,19 @@ test('user can create a project, finish workflow, inspect and download artifacts
 
     await prdLink.click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/artifacts/[0-9a-f-]+$`));
+    const artifactUrl = page.url();
     await expect(page.getByRole('button', { name: '下载这份内容' })).toBeVisible();
     await expect(page.locator('pre')).toContainText('本地演示模式生成');
+    await expect(page.getByText('[S1] 项目背景', { exact: true })).toBeVisible();
+    await page.getByText('[S1] 项目背景', { exact: true }).click();
+    await expect(page.getByText('生成时保存的证据快照')).toBeVisible();
+
+    await page.getByRole('link', { name: '项目资料' }).click();
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: '删除' }).click();
+    await expect(page.getByRole('heading', { name: '还没有项目资料' })).toBeVisible();
+    await page.goto(artifactUrl);
+    await expect(page.getByText('[S1] 项目背景', { exact: true })).toBeVisible();
 
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: '下载这份内容' }).click();

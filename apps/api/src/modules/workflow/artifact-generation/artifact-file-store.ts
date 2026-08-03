@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import type { Artifact, ArtifactType } from '@ai-planning/database';
-import { WorkflowStage } from '@ai-planning/shared';
+import { WorkflowStage, type ArtifactCitation } from '@ai-planning/shared';
 import type { PrismaService } from '../../../database/database.module.js';
 import { ARTIFACT_DISPLAY_NAME } from '../stages/model-routing.js';
 
@@ -10,6 +10,7 @@ export interface StoreArtifactInput {
   readonly projectId: string;
   readonly type: ArtifactType;
   readonly content: string;
+  readonly citations?: readonly ArtifactCitation[];
 }
 
 /** Persists generated Markdown in both the artifact table and DATA_DIR. */
@@ -70,6 +71,21 @@ export class ArtifactFileStore {
         content: input.content,
         file_path: filePath,
         size_bytes: Buffer.byteLength(input.content, 'utf8'),
+        citations: input.citations?.length
+          ? {
+              create: input.citations.map((citation, index) => ({
+                source_id: citation.sourceId,
+                document_id: citation.documentId,
+                chunk_id: citation.chunkId,
+                citation_key: citation.citationKey,
+                position: index + 1,
+                title: citation.title,
+                locator: citation.locator,
+                excerpt: citation.excerpt,
+                content_hash: citation.contentHash,
+              })),
+            }
+          : undefined,
         updated_at: now,
       },
     });

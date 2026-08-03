@@ -50,7 +50,10 @@ const cases = [
     PLATFORM_RECOMMENDATION_PROMPT,
     { requirement: 'requirement', mvp: 'mvp', conversationHistory: 'history' },
   ],
-  [PLANNING_GENERATION_PROMPT, { artifactType: 'prd', context: 'context' }],
+  [
+    PLANNING_GENERATION_PROMPT,
+    { artifactType: 'prd', context: 'context', evidence: 'NO_PROJECT_EVIDENCE' },
+  ],
 ] as const;
 
 describe('prompt regression', () => {

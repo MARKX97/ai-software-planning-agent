@@ -1,0 +1,6 @@
+{
+  "vector": ["chunk-a", "chunk-b", "chunk-c", "chunk-d", "chunk-e"],
+  "text": ["chunk-c", "chunk-a", "chunk-f", "chunk-g", "chunk-h"],
+  "relevant": ["chunk-a", "chunk-c", "chunk-f"],
+  "minimumRecallAt8": 1
+}

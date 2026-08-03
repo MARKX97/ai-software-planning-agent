@@ -19,6 +19,12 @@ import {
   runWorkflow,
 } from '@/features/workflow/api';
 import { getModelLogDetail, getTokenUsage, listModelLogs } from '@/features/usage/api';
+import {
+  deleteKnowledgeSource,
+  listKnowledgeSources,
+  reindexKnowledgeSource,
+  uploadKnowledgeSource,
+} from '@/features/knowledge/api';
 import { apiDownload, apiRequest } from '@/lib/api-client';
 import { apiEventStream } from '@/lib/sse-client';
 
@@ -125,6 +131,33 @@ describe('feature API clients', () => {
     });
     expect(apiDownload).toHaveBeenCalledWith(
       '/projects/project-1/export/export-1/download?token=token',
+    );
+  });
+
+  it('maps knowledge source operations and preserves the uploaded file', async () => {
+    vi.mocked(apiRequest).mockResolvedValue({});
+    const file = new File(['# Context'], 'context.md', { type: 'text/markdown' });
+    await listKnowledgeSources('project-1');
+    await uploadKnowledgeSource('project-1', file);
+    await reindexKnowledgeSource('project-1', 'source-1');
+    await deleteKnowledgeSource('project-1', 'source-1');
+    expect(apiRequest).toHaveBeenNthCalledWith(1, '/projects/project-1/knowledge/sources');
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      2,
+      '/projects/project-1/knowledge/sources',
+      expect.objectContaining({ method: 'POST', body: expect.any(FormData) }),
+    );
+    const uploadBody = vi.mocked(apiRequest).mock.calls[1]?.[1]?.body as FormData;
+    expect(uploadBody.get('file')).toBe(file);
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      3,
+      '/projects/project-1/knowledge/sources/source-1/reindex',
+      { method: 'POST' },
+    );
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      4,
+      '/projects/project-1/knowledge/sources/source-1',
+      { method: 'DELETE' },
     );
   });
 });

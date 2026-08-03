@@ -2,6 +2,7 @@ import { LLMCancelledError, type LlmOrchestratorService } from '@ai-planning/llm
 import { WorkflowStage, type LLMStreamOptions, type WorkflowContext } from '@ai-planning/shared';
 import type { PrismaService } from '../../database/database.module.js';
 import { ProjectsService } from '../projects/projects.service.js';
+import type { KnowledgeRetrievalService } from '../knowledge/knowledge-retrieval.service.js';
 import {
   appendCheckpointIntroduction,
   appendWorkflowInteraction,
@@ -30,6 +31,7 @@ export interface WorkflowExecutorDeps {
   readonly db: PrismaService;
   readonly projects: ProjectsService;
   readonly orchestrator: LlmOrchestratorService;
+  readonly knowledge?: KnowledgeRetrievalService;
 }
 
 export interface WorkflowExecutorInput {
@@ -59,6 +61,7 @@ export async function executeWorkflowPipeline(
         db: deps.db,
         orchestrator: deps.orchestrator,
         dataDir: deps.projects.dataDir(),
+        knowledge: deps.knowledge,
         stream: input.stream,
       },
       { startStage: input.startStage },

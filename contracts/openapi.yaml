@@ -25,7 +25,7 @@ info:
     - ID 格式: UUID v4
     - 分页: `offset` + `limit` (默认 20, 最大 100)
     - 错误格式: `{ error: { code, message, details } }`
-  version: '1.2.0'
+  version: '1.6.0'
   contact:
     name: AI Planning Agent Team
 
@@ -54,6 +54,8 @@ tags:
     description: AI 模型信息
   - name: Token Usage
     description: Token 用量与成本统计
+  - name: Knowledge
+    description: V3 项目知识源、索引状态与证据检索
 
 # ─────────────────────────────────────────────────────────
 # Security
@@ -121,6 +123,10 @@ components:
                 - EXECUTION_NOT_FOUND
                 - PROVIDER_NOT_FOUND
                 - EXPORT_NOT_FOUND
+                - KNOWLEDGE_SOURCE_NOT_FOUND
+                - KNOWLEDGE_SOURCE_CONFLICT
+                - KNOWLEDGE_INDEXING_FAILED
+                - KNOWLEDGE_UNAVAILABLE
                 - INVALID_STAGE_TRANSITION
                 - WORKFLOW_ALREADY_RUNNING
                 - WORKFLOW_NOT_RUNNING
@@ -198,6 +204,151 @@ components:
     MessageRole:
       type: string
       enum: [user, assistant, system]
+
+    # ─── Knowledge ───
+    KnowledgeSourceKind:
+      type: string
+      enum: [file, github_repository]
+
+    KnowledgeStatus:
+      type: string
+      enum: [pending, processing, ready, ready_with_warnings, failed, deleted]
+
+    KnowledgeSourceResponse:
+      type: object
+      required:
+        - id
+        - project_id
+        - kind
+        - name
+        - content_hash
+        - status
+        - warning_count
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/KnowledgeSourceKind'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        mime_type:
+          type: [string, 'null']
+        source_uri:
+          type: [string, 'null']
+        content_hash:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        status:
+          $ref: '#/components/schemas/KnowledgeStatus'
+        warning_count:
+          type: integer
+          minimum: 0
+        error_code:
+          type: [string, 'null']
+        error_message:
+          type: [string, 'null']
+          description: 脱敏后的失败原因
+        active_revision:
+          type: [integer, 'null']
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    KnowledgeSourceListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgeSourceResponse'
+        total:
+          type: integer
+          minimum: 0
+
+    EvidenceCitation:
+      type: object
+      required: [sourceId, documentId, chunkId, title, locator, excerpt, contentHash]
+      properties:
+        sourceId:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        chunkId:
+          type: string
+          format: uuid
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        locator:
+          type: string
+          minLength: 1
+        excerpt:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        contentHash:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+
+    ArtifactCitation:
+      allOf:
+        - $ref: '#/components/schemas/EvidenceCitation'
+        - type: object
+          required: [citationKey]
+          properties:
+            citationKey:
+              type: string
+              pattern: '^S[1-8]$'
+
+    KnowledgeSearchRequest:
+      type: object
+      required: [query]
+      additionalProperties: false
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        source_ids:
+          type: array
+          maxItems: 50
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 8
+          default: 8
+
+    KnowledgeSearchResponse:
+      type: object
+      required: [items, insufficient_evidence]
+      properties:
+        items:
+          type: array
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/EvidenceCitation'
+        insufficient_evidence:
+          type: boolean
 
     # ─── Project ───
     CreateProjectRequest:
@@ -419,7 +570,13 @@ components:
         id:
           type: string
           enum:
-            [artifact_coverage, markdown_structure, substantive_content, unresolved_placeholders]
+            [
+              artifact_coverage,
+              markdown_structure,
+              substantive_content,
+              unresolved_placeholders,
+              citation_consistency,
+            ]
         label:
           type: string
         status:
@@ -827,6 +984,12 @@ components:
         created_at:
           type: string
           format: date-time
+        citations:
+          type: array
+          maxItems: 8
+          description: 仅产物详情返回；与正文中的 [S#] 一一对应
+          items:
+            $ref: '#/components/schemas/ArtifactCitation'
 
     ArtifactListResponse:
       type: object
@@ -1356,6 +1519,204 @@ paths:
   # ═══════════════════════════════════════════════════════
   # Workflow
   # ═══════════════════════════════════════════════════════
+  /projects/{project_id}/knowledge/sources:
+    post:
+      tags: [Knowledge]
+      summary: 上传项目知识源
+      description: P0 仅接受 Markdown 或 TXT；相同项目内相同内容返回已有来源。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 相同内容已存在，返回原知识源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeSourceResponse'
+        '201':
+          description: 知识源已创建并完成首轮索引
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeSourceResponse'
+        '400':
+          description: 文件为空、超限、类型或 MIME 不匹配
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 知识源正在处理或状态冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: 文件超过 20 MiB 限制
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags: [Knowledge]
+      summary: 获取项目知识源
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 知识源列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeSourceListResponse'
+        '404':
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /projects/{project_id}/knowledge/sources/{source_id}/reindex:
+    post:
+      tags: [Knowledge]
+      summary: 重新索引知识源
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: source_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 重建完成，或相同索引配置已复用 active revision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeSourceResponse'
+        '404':
+          description: 项目或知识源不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 知识源正在处理或已删除
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /projects/{project_id}/knowledge/sources/{source_id}:
+    delete:
+      tags: [Knowledge]
+      summary: 删除知识源
+      description: 软删除来源；历史产物引用快照继续保留。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: source_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: 已删除
+        '404':
+          description: 项目或知识源不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 知识源正在处理
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /projects/{project_id}/knowledge/search:
+    post:
+      tags: [Knowledge]
+      summary: 预览项目内证据检索
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeSearchRequest'
+      responses:
+        '200':
+          description: 检索结果；无结果时返回空数组并标记证据不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeSearchResponse'
+        '400':
+          description: 请求参数无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: 知识库暂时不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /projects/{project_id}/run:
     post:
       tags: [Workflow]

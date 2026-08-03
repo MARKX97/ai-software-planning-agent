@@ -11,6 +11,7 @@ import { ConversationsModule } from './modules/conversations/conversations.modul
 import { ArtifactsModule } from './modules/artifacts/artifacts.module.js';
 import { ExportsModule } from './modules/exports/exports.module.js';
 import { UsageModule } from './modules/usage/usage.module.js';
+import { KnowledgeModule } from './modules/knowledge/knowledge.module.js';
 import { AppController } from './app.controller.js';
 import { AuthGuard } from './common/guards/auth.guard.js';
 
@@ -31,6 +32,7 @@ import { AuthGuard } from './common/guards/auth.guard.js';
     ArtifactsModule,
     ExportsModule,
     UsageModule,
+    KnowledgeModule,
   ],
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: AuthGuard }],

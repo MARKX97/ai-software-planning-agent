@@ -4,3 +4,4 @@
  */
 export * from './llm/index.js';
 export * from './workflow-insight.schema.js';
+export * from './knowledge.schema.js';

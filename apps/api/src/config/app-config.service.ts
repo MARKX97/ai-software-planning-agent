@@ -29,6 +29,13 @@ export class AppConfigService {
   readonly modelDeepseek: string;
   readonly modelGlm: string;
   readonly modelMinimax: string;
+  /** Embedding provider is configured independently from Chat LLM providers. */
+  readonly embeddingProvider: 'mock' | 'openai-compatible';
+  readonly embeddingBaseUrl: string;
+  readonly embeddingApiKey: string;
+  readonly embeddingModel: string;
+  readonly embeddingDimensions: number;
+  readonly ragEnabled: boolean;
   /** Per-project LLM cost ceiling (CNY). */
   readonly costLimitPerProject: number;
   /** Model-producing workflow operations allowed per project/caller each minute. */
@@ -49,6 +56,12 @@ export class AppConfigService {
     this.modelDeepseek = process.env['BAISHAN_MODEL_DEEPSEEK'] ?? 'DeepSeek-R1-0528';
     this.modelGlm = process.env['BAISHAN_MODEL_GLM'] ?? 'GLM-4.5';
     this.modelMinimax = process.env['BAISHAN_MODEL_MINIMAX'] ?? 'MiniMax-M2.5';
+    this.embeddingProvider = this.parseEmbeddingProvider(process.env['EMBEDDING_PROVIDER']);
+    this.embeddingBaseUrl = process.env['EMBEDDING_BASE_URL'] ?? '';
+    this.embeddingApiKey = process.env['EMBEDDING_API_KEY'] ?? '';
+    this.embeddingModel = process.env['EMBEDDING_MODEL'] ?? 'mock-embedding-v1';
+    this.embeddingDimensions = this.parsePositiveInt(process.env['EMBEDDING_DIMENSIONS'], 8, 4096);
+    this.ragEnabled = this.parseBoolean(process.env['RAG_ENABLED'], true);
     this.costLimitPerProject = this.parseNumber(process.env['COST_MAX_COST_PER_PROJECT'], 5);
     this.workflowRateLimitPerMinute = this.parseNonNegativeInt(
       process.env['WORKFLOW_RATE_LIMIT_PER_MINUTE'],
@@ -72,5 +85,23 @@ export class AppConfigService {
   private parseNonNegativeInt(value: string | undefined, fallback: number): number {
     const parsed = Number.parseInt(value ?? '', 10);
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  }
+
+  private parsePositiveInt(value: string | undefined, fallback: number, maximum: number): number {
+    const parsed = Number.parseInt(value ?? '', 10);
+    return Number.isFinite(parsed) && parsed > 0 && parsed <= maximum ? parsed : fallback;
+  }
+
+  private parseEmbeddingProvider(value: string | undefined): 'mock' | 'openai-compatible' {
+    if (!value || value === 'mock') return 'mock';
+    if (value === 'openai-compatible') return value;
+    throw new Error('EMBEDDING_PROVIDER must be mock or openai-compatible');
+  }
+
+  private parseBoolean(value: string | undefined, fallback: boolean): boolean {
+    if (!value) return fallback;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    throw new Error('RAG_ENABLED must be true or false');
   }
 }

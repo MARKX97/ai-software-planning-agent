@@ -110,6 +110,17 @@ describe('apiRequest', () => {
     await expect(apiRequest('/projects')).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
   });
 
+  it('sends multipart bodies without overriding the browser boundary', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: 'source-1' })));
+    vi.stubGlobal('fetch', fetchMock);
+    const body = new FormData();
+    body.append('file', new File(['# Context'], 'context.md', { type: 'text/markdown' }));
+    await apiRequest('/knowledge', { method: 'POST', body });
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.body).toBe(body);
+    expect(init?.headers).not.toHaveProperty('Content-Type');
+  });
+
   it('downloads successful responses and maps failed downloads', async () => {
     vi.stubGlobal(
       'fetch',

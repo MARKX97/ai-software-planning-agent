@@ -1,6 +1,6 @@
 # Prompt Management — System Contract
 
-> Version: 1.2.0
+> Version: 1.3.0
 > Status: Contract
 > Owner: AI Infrastructure Lead
 > Tokens: ~2,000
@@ -20,7 +20,7 @@
 | `risk-analysis.prompt.ts`           | 风险分析                 | `{{requirement}}`, `{{feasibility}}`, `{{conversationHistory}}`               |
 | `mvp-compression.prompt.ts`         | MVP 收缩                 | `{{requirement}}`, `{{risks}}`, `{{feasibility}}`, `{{conversationHistory}}`  |
 | `platform-recommendation.prompt.ts` | 平台推荐                 | `{{mvp}}`, `{{requirement}}`, `{{conversationHistory}}`                       |
-| `planning-generation.prompt.ts`     | 规划生成（11 产物共用）  | `{{context}}`, `{{artifactType}}`                                             |
+| `planning-generation.prompt.ts`     | 规划生成（11 产物共用）  | `{{context}}`, `{{artifactType}}`, `{{evidence}}`                             |
 
 ## 2. Prompt 规范
 
@@ -103,6 +103,13 @@ Orchestrator 不执行 Tool Call 循环。模型只负责生成文本和结构�
 才新增 Function Calling / Tool Use 契约。状态推进、权限校验和数据库写入仍不得由模型直接控制。
 
 用户可见的对话 Prompt 不得要求 `{ "reply": "..." }` 等 JSON 外壳；内部分析、融合和产物生成继续使用结构化输出。
+
+### 4.1 P0 固定证据注入
+
+- 仅 `planning_generation` 的 `prd` 与 `architecture` Prompt 接收编号为 `[S1]` 至 `[S8]` 的项目证据；其余产物传入明确的无证据值。
+- 证据继续由 `renderPrompt()` 放入 `untrusted-context`，不得把来源内容拼入系统指令。
+- 模型只能引用本次提供的编号；有证据时至少引用一条，无证据时不得生成 `[S#]`。
+- 应用层解析正文标记、校验编号并生成结构化引用列表；模型不负责返回引用 JSON。
 
 ## 5. Prompt 版本管理
 

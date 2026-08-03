@@ -39,7 +39,10 @@ export class ArtifactsService {
 
   async get(projectId: string, artifactId: string): Promise<ArtifactResponse> {
     await this.projects.findOrFail(projectId);
-    const artifact = await this.db.client.artifact.findUnique({ where: { id: artifactId } });
+    const artifact = await this.db.client.artifact.findUnique({
+      where: { id: artifactId },
+      include: { citations: { orderBy: { position: 'asc' } } },
+    });
     if (!artifact || artifact.project_id !== projectId || artifact.deleted_at) {
       throw AppException.notFound(
         ErrorCode.ARTIFACT_NOT_FOUND,

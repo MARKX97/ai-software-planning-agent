@@ -1,6 +1,6 @@
 # Database — System Contract
 
-> Version: 1.1.0
+> Version: 1.4.0
 > Status: Contract
 > Owner: Backend Lead
 > Tokens: ~8,000
@@ -17,6 +17,7 @@
 | 时区     | UTC            |
 | 主键策略 | UUID v4        |
 | 迁移工具 | Prisma Migrate |
+| 向量扩展 | pgvector 0.8.2 |
 
 ## 2. 表清单
 
@@ -33,6 +34,11 @@
 | `model_execution_logs` | 模型调用日志      |
 | `prompt_versions`      | Prompt 版本记录   |
 | `token_usage`          | 项目级 Token 汇总 |
+| `knowledge_sources`    | 项目知识源        |
+| `knowledge_revisions`  | 知识源索引版本    |
+| `knowledge_documents`  | 规范化文档        |
+| `knowledge_chunks`     | 检索 Chunk        |
+| `artifact_citations`   | 产物引用快照      |
 
 ## 3. 通用字段规则
 
@@ -232,21 +238,122 @@
 | `avg_latency_ms`      | INTEGER       | NULL                            |
 | `updated_at`          | TIMESTAMPTZ   | NOT NULL                        |
 
+### 4.12 knowledge_sources
+
+| 字段            | 类型         | 约束                                               |
+| --------------- | ------------ | -------------------------------------------------- |
+| `id`            | UUID         | PK                                                 |
+| `project_id`    | UUID         | FK -> projects, NOT NULL                           |
+| `kind`          | VARCHAR(30)  | NOT NULL, CHECK KnowledgeSourceKind                |
+| `name`          | VARCHAR(255) | NOT NULL                                           |
+| `mime_type`     | VARCHAR(100) | NULL                                               |
+| `source_uri`    | TEXT         | NULL                                               |
+| `content_hash`  | CHAR(64)     | NOT NULL, SHA-256 hex                              |
+| `content_text`  | TEXT         | NULL，P0 规范化原文；软删除时清除                  |
+| `status`        | VARCHAR(30)  | NOT NULL, DEFAULT `pending`, CHECK KnowledgeStatus |
+| `warning_count` | INTEGER      | NOT NULL, DEFAULT 0                                |
+| `error_code`    | VARCHAR(50)  | NULL                                               |
+| `error_message` | TEXT         | NULL，必须脱敏                                     |
+| `created_at`    | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                            |
+| `updated_at`    | TIMESTAMPTZ  | NOT NULL                                           |
+| `deleted_at`    | TIMESTAMPTZ  | NULL                                               |
+
+同一项目中，未删除来源的 `content_hash` 唯一；重复上传相同内容必须复用已有来源。
+
+### 4.13 knowledge_revisions
+
+| 字段                   | 类型         | 约束                                                  |
+| ---------------------- | ------------ | ----------------------------------------------------- |
+| `id`                   | UUID         | PK                                                    |
+| `source_id`            | UUID         | FK -> knowledge_sources, NOT NULL                     |
+| `revision`             | INTEGER      | NOT NULL，从 1 递增                                   |
+| `content_hash`         | CHAR(64)     | NOT NULL, SHA-256 hex                                 |
+| `status`               | VARCHAR(30)  | NOT NULL, DEFAULT `processing`, CHECK KnowledgeStatus |
+| `embedding_model`      | VARCHAR(100) | NULL                                                  |
+| `embedding_dimensions` | INTEGER      | NULL                                                  |
+| `indexer_version`      | VARCHAR(50)  | NOT NULL                                              |
+| `warning_count`        | INTEGER      | NOT NULL, DEFAULT 0                                   |
+| `error_code`           | VARCHAR(50)  | NULL                                                  |
+| `error_message`        | TEXT         | NULL，必须脱敏                                        |
+| `is_active`            | BOOLEAN      | NOT NULL, DEFAULT FALSE                               |
+| `created_at`           | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                               |
+| `completed_at`         | TIMESTAMPTZ  | NULL                                                  |
+
+**UNIQUE**: `(source_id, revision)`；每个来源最多一个 `is_active = TRUE` 的 revision。相同内容只有在 Embedding 模型、维度和 indexer version 也相同时才复用 active revision；失败 revision 不得成为 active，且不得阻止同配置重试。
+
+### 4.14 knowledge_documents
+
+| 字段           | 类型         | 约束                                |
+| -------------- | ------------ | ----------------------------------- |
+| `id`           | UUID         | PK                                  |
+| `source_id`    | UUID         | NOT NULL；与 revision 组成复合外键  |
+| `revision_id`  | UUID         | FK -> knowledge_revisions, NOT NULL |
+| `logical_path` | TEXT         | NOT NULL                            |
+| `title`        | VARCHAR(255) | NOT NULL                            |
+| `mime_type`    | VARCHAR(100) | NOT NULL                            |
+| `content_hash` | CHAR(64)     | NOT NULL, SHA-256 hex               |
+| `metadata`     | JSONB        | NULL，只保存解析元数据              |
+| `created_at`   | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()             |
+
+**UNIQUE**: `(revision_id, logical_path)`；复合外键保证 `revision_id` 属于同一 `source_id`。
+
+### 4.15 knowledge_chunks
+
+| 字段            | 类型        | 约束                                |
+| --------------- | ----------- | ----------------------------------- |
+| `id`            | UUID        | PK                                  |
+| `document_id`   | UUID        | FK -> knowledge_documents, NOT NULL |
+| `position`      | INTEGER     | NOT NULL，从 0 递增                 |
+| `content`       | TEXT        | NOT NULL                            |
+| `token_count`   | INTEGER     | NOT NULL                            |
+| `title_path`    | JSONB       | NULL，Markdown 标题层级             |
+| `page_number`   | INTEGER     | NULL                                |
+| `line_start`    | INTEGER     | NULL                                |
+| `line_end`      | INTEGER     | NULL                                |
+| `content_hash`  | CHAR(64)    | NOT NULL, SHA-256 hex               |
+| `embedding`     | VECTOR      | NULL，维度由 revision 记录          |
+| `search_vector` | TSVECTOR    | 由 `content` 生成                   |
+| `created_at`    | TIMESTAMPTZ | NOT NULL, DEFAULT NOW()             |
+
+**UNIQUE**: `(document_id, position)`；向量与全文查询必须通过 document/revision/source 关联在 SQL 层过滤 `project_id` 和 active revision。
+
+### 4.16 artifact_citations
+
+| 字段           | 类型         | 约束                                  |
+| -------------- | ------------ | ------------------------------------- |
+| `id`           | UUID         | PK                                    |
+| `artifact_id`  | UUID         | FK -> artifacts, NOT NULL             |
+| `source_id`    | UUID         | NOT NULL，生成时来源 ID 快照          |
+| `document_id`  | UUID         | NOT NULL，生成时文档 ID 快照          |
+| `chunk_id`     | UUID         | NOT NULL，生成时 Chunk ID 快照        |
+| `citation_key` | VARCHAR(20)  | NOT NULL，例如 `S1`                   |
+| `position`     | INTEGER      | NOT NULL，从 1 递增                   |
+| `title`        | VARCHAR(255) | NOT NULL，生成时快照                  |
+| `locator`      | TEXT         | NOT NULL，生成时快照                  |
+| `excerpt`      | TEXT         | NOT NULL，脱敏且最多 2,000 字符的快照 |
+| `content_hash` | CHAR(64)     | NOT NULL，生成时 Chunk hash           |
+| `created_at`   | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()               |
+
+**UNIQUE**: `(artifact_id, citation_key)`、`(artifact_id, chunk_id)`。三个知识实体 ID 是审计快照，不设外键；来源清理后引用仍保留。
+产物与本次实际使用的引用通过同一次 Prisma nested create 写入。向量与全文分支各在数据库包的唯一知识检索 Repository 中执行项目、active revision 和来源过滤；RRF 在同一 Repository 的纯函数中完成。
+
 ## 5. 枚举约束
 
-| 枚举               | 值                                                                                                                                                                                                                        |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| WorkflowStage      | init, requirement_analysis, requirement_clarification, multi_model_analysis, requirement_synthesis, feasibility_analysis, risk_analysis, mvp_compression, platform_recommendation, planning_generation, completed, failed |
-| ProjectStatus      | active, completed, failed                                                                                                                                                                                                 |
-| ConversationStatus | active, closed                                                                                                                                                                                                            |
-| MessageRole        | user, assistant, system                                                                                                                                                                                                   |
-| StageStatus        | pending, running, completed, failed, skipped                                                                                                                                                                              |
-| ExecutionStatus    | success, failed, timeout, cancelled                                                                                                                                                                                       |
-| CallStatus         | success, failed, timeout, rate_limited                                                                                                                                                                                    |
-| ExportStatus       | pending, processing, completed, failed                                                                                                                                                                                    |
-| ExportFormat       | markdown, pdf, html, json                                                                                                                                                                                                 |
-| ArtifactType       | requirement_report, feasibility_report, risk_report, mvp_plan, platform_recommendation, project_plan, prd, architecture, frontend_spec, backend_spec, ai_coding_rules                                                     |
-| LLMProvider        | deepseek, glm, minimax                                                                                                                                                                                                    |
+| 枚举                | 值                                                                                                                                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WorkflowStage       | init, requirement_analysis, requirement_clarification, multi_model_analysis, requirement_synthesis, feasibility_analysis, risk_analysis, mvp_compression, platform_recommendation, planning_generation, completed, failed |
+| ProjectStatus       | active, completed, failed                                                                                                                                                                                                 |
+| ConversationStatus  | active, closed                                                                                                                                                                                                            |
+| MessageRole         | user, assistant, system                                                                                                                                                                                                   |
+| StageStatus         | pending, running, completed, failed, skipped                                                                                                                                                                              |
+| ExecutionStatus     | success, failed, timeout, cancelled                                                                                                                                                                                       |
+| CallStatus          | success, failed, timeout, rate_limited                                                                                                                                                                                    |
+| ExportStatus        | pending, processing, completed, failed                                                                                                                                                                                    |
+| ExportFormat        | markdown, pdf, html, json                                                                                                                                                                                                 |
+| ArtifactType        | requirement_report, feasibility_report, risk_report, mvp_plan, platform_recommendation, project_plan, prd, architecture, frontend_spec, backend_spec, ai_coding_rules                                                     |
+| LLMProvider         | deepseek, glm, minimax                                                                                                                                                                                                    |
+| KnowledgeSourceKind | file, github_repository                                                                                                                                                                                                   |
+| KnowledgeStatus     | pending, processing, ready, ready_with_warnings, failed, deleted                                                                                                                                                          |
 
 ## 6. 外键删除策略
 
@@ -264,6 +371,11 @@
 | model_execution_logs | workflow_executions | SET NULL |
 | model_execution_logs | prompt_versions     | SET NULL |
 | token_usage          | projects            | CASCADE  |
+| knowledge_sources    | projects            | CASCADE  |
+| knowledge_revisions  | knowledge_sources   | CASCADE  |
+| knowledge_documents  | knowledge_revisions | CASCADE  |
+| knowledge_chunks     | knowledge_documents | CASCADE  |
+| artifact_citations   | artifacts           | CASCADE  |
 
 ## 7. 索引设计
 
@@ -280,6 +392,11 @@
 | model_execution_logs | `(project_id, created_at DESC)`, `(execution_id)`, `(stage)`, `(provider_name)`, `(status)` |
 | prompt_versions      | `(prompt_name, version UNIQUE)`, `(created_at DESC)`                                        |
 | token_usage          | `(project_id UNIQUE)`, `(total_cost DESC)`                                                  |
+| knowledge_sources    | `(project_id, status)`, `(project_id, content_hash)`、`(deleted_at)`                        |
+| knowledge_revisions  | `(source_id, revision UNIQUE)`、`(source_id) WHERE is_active`                               |
+| knowledge_documents  | `(source_id, revision_id)`、`(revision_id, logical_path UNIQUE)`                            |
+| knowledge_chunks     | `(document_id, position UNIQUE)`、GIN `(search_vector)`                                     |
+| artifact_citations   | `(artifact_id, position)`、`(source_id)`、`(chunk_id)`                                      |
 
 ## 8. 实现约束
 
@@ -289,6 +406,8 @@
 - 软删除查询默认过滤 `deleted_at IS NULL`。
 - `download_token_hash` 只存 hash，不存明文下载 token。
 - `prompt_text` 和 `response_text` 可能包含用户输入，日志展示接口必须走鉴权。
+- `embedding` 和 `search_vector` 只能由数据库包访问；向量 SQL 必须参数化并在 SQL 层过滤项目与 active revision。
+- 知识源内容、Chunk、Embedding 和引用 excerpt 禁止写入日志；`error_message` 只保存脱敏信息。
 
 ## 9. 版本兼容
 

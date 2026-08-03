@@ -11,7 +11,7 @@
 | HTTP integration        | Fetch + PostgreSQL                     | 完整 API 与持久化行为          |
 | E2E                     | Playwright                             | 创建、讨论、推进、产物和成本   |
 | LLM                     | Mock Provider                          | 默认确定性、无付费调用         |
-| V3 Knowledge（Planned） | 固定文档 + Mock Embedding              | 解析、Chunk、检索、隔离与引用  |
+| V3 Knowledge（P0）      | 固定文档 + Mock Embedding              | 解析、Chunk、检索、隔离与引用  |
 | V3 Graph（Planned）     | LangGraph checkpointer + Mock Tool/LLM | 分支、interrupt、恢复与幂等    |
 
 ## Commands
@@ -35,7 +35,7 @@ HTTP integration 由 CI 在 PostgreSQL 和运行中 API 上显式启用。
 - Workflow：状态转换、检查点、上下文边界、持久化状态、SSE、重试和成本边界必须有确定性测试。
 - Security/Config：认证、限流、敏感信息处理、环境变量解析和用户可见错误映射必须有测试。
 - Web：API/SSE client、关键状态组件、表单校验、异步 action、error/retry 和下载必须有组件测试或 E2E。
-- E2E：至少覆盖导航、项目创建/删除、完整工作流、四个检查点、11 类产物、下载、成本页和 API 失败恢复。
+- E2E：至少覆盖导航、项目创建/删除、知识源管理、完整工作流、四个检查点、11 类产物、引用快照、下载、成本页和 API 失败恢复。
 
 不为 re-export、常量包、Nest 模块声明、纯样式 UI 原子组件、Prisma 生成代码或 Planned V3 创建无行为断言的测试。数据库约束由 Prisma/HTTP integration 验证。
 
@@ -63,7 +63,7 @@ RUN_REAL_BAISHAN_STREAM=1 pnpm exec dotenv -e .env -- pnpm --filter @ai-planning
 
 不得在默认 CI 中打开该开关。
 
-## V3 Knowledge And Agent Graph（Planned）
+## V3 Knowledge（P0）And Agent Graph（Planned）
 
 V3 测试必须继续满足默认确定性、零外部模型费用和项目隔离。真实 Embedding 与真实 Chat 模型只允许通过独立显式 smoke-test 开关运行。
 

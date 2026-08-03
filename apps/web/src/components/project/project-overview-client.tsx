@@ -25,16 +25,7 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
 
   return (
     <PageFrame
-      actions={
-        <>
-          <ButtonLink href={`/projects/${projectId}/workflow`} variant="secondary">
-            看看进展
-          </ButtonLink>
-          <ButtonLink href={`/projects/${projectId}/artifacts`} variant="secondary">
-            看看整理好的内容
-          </ButtonLink>
-        </>
-      }
+      actions={<ProjectActions projectId={projectId} />}
       description="先回到最初那个想法。准备好后，我们会从最关键的问题开始，一步步把它变成可开工的计划。"
       eyebrow="这个想法"
       title={project?.name ?? '正在打开项目'}
@@ -125,5 +116,21 @@ export function ProjectOverviewClient({ projectId }: { projectId: string }) {
         </div>
       ) : null}
     </PageFrame>
+  );
+}
+
+function ProjectActions({ projectId }: { projectId: string }) {
+  return (
+    <>
+      <ButtonLink href={`/projects/${projectId}/workflow`} variant="secondary">
+        看看进展
+      </ButtonLink>
+      <ButtonLink href={`/projects/${projectId}/artifacts`} variant="secondary">
+        看看整理好的内容
+      </ButtonLink>
+      <ButtonLink href={`/projects/${projectId}/knowledge`} variant="quiet">
+        准备项目资料
+      </ButtonLink>
+    </>
   );
 }

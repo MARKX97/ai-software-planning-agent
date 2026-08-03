@@ -1,5 +1,3 @@
 # Active Plans
 
-## Planned
-
-- [`v3-rag-agent.md`](./v3-rag-agent.md)：项目知识库、RAG、证据引用与 LangGraph 受控编排。
+当前没有执行中的计划。V3 P1/P2 需要重新确认范围后再创建 active plan。

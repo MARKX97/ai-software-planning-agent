@@ -240,6 +240,8 @@ describe('real HTTP + PostgreSQL workflow integration', () => {
         const detailBody = bodyOf(detail);
         assert.equal(typeof detailBody['content'], 'string');
         assert.ok((detailBody['content'] as string).length > 0);
+        assert.match(detailBody['content'] as string, /未使用项目知识库证据/);
+        assert.deepEqual(detailBody['citations'], []);
         const download = await fetch(`${base}/projects/${projectId}/artifacts/${prd.id}/download`);
         assert.equal(download.status, 200);
         assert.match(download.headers.get('content-type') ?? '', /text\/markdown/);

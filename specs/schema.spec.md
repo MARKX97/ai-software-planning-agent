@@ -1,6 +1,6 @@
 # Schema — System Contract
 
-> Version: 1.1.0
+> Version: 1.3.0
 > Status: Contract
 > Owner: Backend Lead
 > Tokens: ~8,000
@@ -155,7 +155,20 @@ RiskItem: `{id, category, description, probability, impact, mitigation, continge
 
 `ArtifactQualityReport` 存于 `planning_generation` 的 `workflow_states.data_json.quality_report`，包含 `status`、产物覆盖数、检查项和自动修订记录。两者均使用共享 Zod Schema 解析持久化 JSON；解析失败的数据不得进入模型上下文或 API 响应。
 
-## 5. 版本兼容
+## 5. V3 知识库共享 Schema
+
+知识库 API 的请求、响应和工作流证据统一复用 `packages/shared/src/schemas/knowledge.schema.ts`：
+
+- `KnowledgeSource`：来源 ID、项目 ID、类型、名称、MIME、状态、warning/error、active revision 与时间戳。
+- `KnowledgeSearchRequest`：非空 query、可选来源过滤和 `top_k <= 8`。
+- `EvidenceCitation`：`sourceId`、`documentId`、`chunkId`、title、locator、脱敏 excerpt 和 SHA-256 contentHash。
+- `ArtifactCitation`：在 `EvidenceCitation` 上增加 `citationKey`，与产物正文 `[S#]` 一一对应。
+- `KnowledgeSearchResponse`：最多 8 条 citation，并显式返回 `insufficient_evidence`。
+
+这些 Schema 是 OpenAPI 的代码侧镜像；外部输入必须先通过 Zod 校验。引用 excerpt 最多 2,000 字符，content hash 必须是 64 位十六进制 SHA-256。
+`ArtifactQualityCheck.id` 增加 `citation_consistency`，用于确定性检查非法、缺失或多余引用。
+
+## 6. 版本兼容
 
 - 字段不可删除（标记 deprecated）
 - 新增字段必须可选

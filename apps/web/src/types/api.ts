@@ -9,6 +9,11 @@ export type {
   WorkflowStateResponse,
   WorkflowStatusResponse,
 } from './workflow-insights';
+export type {
+  KnowledgeSourceListResponse,
+  KnowledgeSourceResponse,
+  KnowledgeStatus,
+} from './knowledge';
 
 export interface ApiErrorBody {
   error: {
@@ -107,6 +112,18 @@ export interface ArtifactResponse {
   size_bytes: number | null;
   format: string;
   created_at: string;
+  citations?: ArtifactCitation[];
+}
+
+export interface ArtifactCitation {
+  sourceId: string;
+  documentId: string;
+  chunkId: string;
+  citationKey: string;
+  title: string;
+  locator: string;
+  excerpt: string;
+  contentHash: string;
 }
 
 export interface ArtifactListResponse {

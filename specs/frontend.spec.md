@@ -1,6 +1,6 @@
 # Frontend — System Contract
 
-> Version: 1.2.0
+> Version: 1.3.0
 > Status: Contract
 > Owner: Frontend Lead
 > Tokens: ~7,000
@@ -41,6 +41,7 @@ V1 包含 Web UI。Web UI 是用户创建项目、完成需求澄清、查看工
 | `/projects/new`                                | NewProjectPage      | 创建项目表单                   |
 | `/projects/[projectId]`                        | ProjectOverviewPage | 项目详情、当前阶段、快捷操作   |
 | `/projects/[projectId]/workflow`               | WorkflowPage        | 工作流进度、澄清对话、阶段状态 |
+| `/projects/[projectId]/knowledge`              | KnowledgePage       | 知识源上传、状态与重建         |
 | `/projects/[projectId]/artifacts`              | ArtifactsPage       | 产物列表                       |
 | `/projects/[projectId]/artifacts/[artifactId]` | ArtifactDetailPage  | 产物详情、下载                 |
 | `/projects/[projectId]/usage`                  | UsagePage           | Token 用量、模型调用日志       |
@@ -145,7 +146,23 @@ API:
 - 有决策快照时按检查点顺序展示摘要和明确决定，帮助用户核对后续阶段使用的上下文。
 - 规划生成结束后展示质量状态、产物覆盖数、检查项和已自动修订的产物；`warning` 不伪装成完全通过。
 
-### 4.5 ArtifactsPage
+### 4.5 KnowledgePage
+
+API:
+
+- `POST /projects/{project_id}/knowledge/sources`
+- `GET /projects/{project_id}/knowledge/sources`
+- `POST /projects/{project_id}/knowledge/sources/{source_id}/reindex`
+- `DELETE /projects/{project_id}/knowledge/sources/{source_id}`
+
+交互:
+
+- P0 仅接受单个 `.md` 或 `.txt` 文件，上传期间禁用重复提交。
+- 展示 `pending`、`processing`、`ready`、`ready_with_warnings` 和 `failed` 的可读状态，不只依赖颜色。
+- 失败或带 warning 的来源可重新索引；删除前必须确认，操作完成后刷新列表。
+- loading、empty、error 和 mutation error 均提供明确反馈；状态变化使用 `aria-live`。
+
+### 4.6 ArtifactsPage
 
 API:
 
@@ -159,7 +176,7 @@ API:
 - 列表不渲染完整 `content`
 - 导出任务通过 `export/{export_id}` 轮询，完成后显示下载入口
 
-### 4.6 ArtifactDetailPage
+### 4.7 ArtifactDetailPage
 
 API:
 
@@ -169,9 +186,10 @@ API:
 交互:
 
 - Markdown 内容以纯文本/安全 Markdown 渲染，不使用 `dangerouslySetInnerHTML`
+- 有引用时展示 `[S#]`、标题、定位和生成时 excerpt 快照；来源删除后快照仍可阅读
 - 下载失败显示错误提示与重试
 
-### 4.7 UsagePage
+### 4.8 UsagePage
 
 API:
 
@@ -197,11 +215,13 @@ apps/web/src/
 │   ├── layout/
 │   ├── project/
 │   ├── workflow/
+│   ├── knowledge/
 │   ├── artifact/
 │   └── usage/
 ├── features/
 │   ├── projects/
 │   ├── workflow/
+│   ├── knowledge/
 │   ├── artifacts/
 │   └── usage/
 ├── lib/
@@ -273,6 +293,7 @@ type ApiError = {
 ## 9. A11y
 
 - 表单字段必须有 label。
+- 文件上传说明必须通过 `aria-describedby` 与输入关联。
 - 可点击元素必须使用 `button` 或 `a`。
 - 流式助手气泡使用 `aria-live`/`aria-busy` 表达生成状态，错误重试按钮可被键盘访问。
 - 轮询状态变化使用可读文本，不只依赖颜色。
@@ -295,6 +316,7 @@ type ApiError = {
 - 表单校验
 - Workflow 状态展示
 - Artifact 列表过滤
+- Knowledge 上传、重建、删除和状态展示
 
 集成测试:
 
@@ -313,6 +335,8 @@ E2E:
 - 用户可以启动工作流并查看阶段进度。
 - 澄清阶段可以提交回复并继续工作流。
 - 工作流完成后可以查看 11 类产物。
+- 用户可以上传、重建和删除 Markdown/TXT 知识源，并查看索引状态。
+- 有引用的产物可以查看生成时的证据快照。
 - 用户可以导出并下载产物。
 - Token 用量和模型调用日志可查看。
 - 所有页面具备 loading、empty、error 状态。

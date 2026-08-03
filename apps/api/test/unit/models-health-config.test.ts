@@ -87,6 +87,7 @@ describe('AppConfigService', () => {
       COST_MAX_COST_PER_PROJECT: '9.5',
       WORKFLOW_RATE_LIMIT_PER_MINUTE: '0',
       DOWNLOAD_TOKEN_SECRET: '',
+      RAG_ENABLED: 'false',
     };
     const config = new AppConfigService();
     assert.deepEqual(
@@ -95,8 +96,9 @@ describe('AppConfigService', () => {
         cost: config.costLimitPerProject,
         rate: config.workflowRateLimitPerMinute,
         secret: config.downloadTokenSecret,
+        rag: config.ragEnabled,
       },
-      { port: 4100, cost: 9.5, rate: 0, secret: 'api-test-key' },
+      { port: 4100, cost: 9.5, rate: 0, secret: 'api-test-key', rag: false },
     );
   });
 
@@ -114,5 +116,15 @@ describe('AppConfigService', () => {
     assert.equal(config.costLimitPerProject, 5);
     assert.equal(config.workflowRateLimitPerMinute, 10);
     assert.match(config.downloadTokenSecret, /^[a-f0-9]{64}$/);
+  });
+
+  it('rejects an unknown Embedding provider instead of silently using Mock', () => {
+    process.env = { ...originalEnv, EMBEDDING_PROVIDER: 'typo-provider' };
+    assert.throws(() => new AppConfigService(), /EMBEDDING_PROVIDER/);
+  });
+
+  it('rejects an invalid RAG feature flag', () => {
+    process.env = { ...originalEnv, RAG_ENABLED: 'yes' };
+    assert.throws(() => new AppConfigService(), /RAG_ENABLED/);
   });
 });

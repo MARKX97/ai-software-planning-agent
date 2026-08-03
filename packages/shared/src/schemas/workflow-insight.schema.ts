@@ -30,6 +30,7 @@ export const artifactQualityCheckSchema = z.object({
     'markdown_structure',
     'substantive_content',
     'unresolved_placeholders',
+    'citation_consistency',
   ]),
   label: z.string().min(1),
   status: z.enum(['passed', 'warning']),

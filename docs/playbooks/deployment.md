@@ -15,7 +15,7 @@ pnpm dev
 
 - Web: `http://localhost:3000`
 - API health: `http://localhost:3001/api/v1/health`
-- PostgreSQL 16 必须与 `DATABASE_URL` 一致。
+- PostgreSQL 16 必须与 `DATABASE_URL` 一致；V3 使用带 pgvector 0.8.2 的 `pgvector/pgvector:0.8.2-pg16` 镜像。
 
 ## Docker Demo
 
@@ -27,17 +27,24 @@ docker compose up --build
 - Docker 镜像必须在目标 Linux 环境内执行 `prisma generate`，不得复用宿主机生成的 Prisma Engine；基础镜像必须提供 Prisma 运行时所需的 OpenSSL。
 - Web: `http://localhost:3000`；API health: `http://localhost:3001/api/v1/health`。
 - `BAISHAN_API_KEY` 为空时使用确定性 Mock；配置真实密钥时只注入 API 容器。
+- `EMBEDDING_PROVIDER` 默认是固定向量 `mock`；真实服务使用 `openai-compatible`，并单独配置 `EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL` 和 `EMBEDDING_DIMENSIONS`。
+- `RAG_ENABLED` 默认 `true`；设为 `false` 时跳过知识检索与查询 Embedding，工作流沿用 V2 无证据路径。
 - Compose 是本地演示入口，不代表生产部署方案。
 
 ## Configuration And Secrets
 
 - `.env.example` 只提供空密钥和公开示例值。
 - `.env`、`.env.local`、`.claude/settings.local.json` 不得提交。
-- `BAISHAN_API_KEY`、`BAISHAN_BASE_URL` 和下载密钥只存在 API Server 环境。
+- `BAISHAN_API_KEY`、`BAISHAN_BASE_URL`、Embedding 地址/密钥和下载密钥只存在 API Server 环境。
 - Web 只能读取 `NEXT_PUBLIC_API_BASE_URL` 和可选的 `NEXT_PUBLIC_API_KEY`。
 - 日志、诊断输出和测试 artifact 不得包含密钥、完整 Prompt 或完整模型响应。
 - `.dockerignore` 必须排除 `.env`、Git 元数据、依赖、构建输出和本地数据，禁止把本机密钥打进镜像。
 - `WORKFLOW_RATE_LIMIT_PER_MINUTE` 控制单实例模型工作流限流；设为 `0` 仅用于明确关闭本地限流。
+- 真实 Embedding smoke test 必须显式设置 `RUN_REAL_EMBEDDING=1`；默认测试和 CI 使用固定向量 Mock，不产生外部费用。
+
+```bash
+RUN_REAL_EMBEDDING=1 pnpm exec dotenv -e .env -- pnpm --filter @ai-planning/api exec tsx --test test/unit/embedding-provider.test.ts
+```
 
 ## CI
 

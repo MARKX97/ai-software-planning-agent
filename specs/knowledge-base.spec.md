@@ -1,18 +1,19 @@
-# Project Knowledge Base — Proposed Contract
+# Project Knowledge Base — P0 Contract
 
-> Version: 0.1.0
-> Status: Proposed for V3
+> Version: 0.3.0
+> Status: P0 Contract; PDF and repository sections remain proposed for P1
 > Owner: Backend Lead + AI Infrastructure Lead
 
 ## 1. 目标与非目标
 
 项目知识库为软件规划提供用户自己的文档和代码证据。它负责导入、解析、索引、检索和引用，不负责工作流推进、权限判断或自动修改代码。
 
-V3 支持：
+P0 支持：
 
-- Markdown、TXT、PDF 上传。
-- 公开 `github.com` 仓库导入，并固定到解析后的 commit SHA。
+- Markdown、TXT 上传。
 - 项目内混合检索和可追溯引用。
+
+PDF 上传与公开 `github.com` 仓库导入属于 P1 proposed scope，不属于当前交付。
 
 V3 不支持私有仓库凭据、任意 URL 抓取、网页搜索、OCR、跨项目知识共享和独立向量数据库。
 
@@ -34,7 +35,7 @@ V3 不支持私有仓库凭据、任意 URL 抓取、网页搜索、OCR、跨项
 
 仓库索引必须忽略二进制文件、符号链接逃逸、`.git`、依赖目录、构建产物、锁文件和高置信度密钥文件。服务端不得接受仓库 Token，也不得跟随到非允许域名，防止 SSRF。
 
-所有来源使用 SHA-256 内容 hash。相同项目、来源和 revision 的重复请求必须复用已有结果或返回冲突，不得产生重复 Chunk。
+所有来源使用规范化文本的 SHA-256 内容 hash。P0 将规范化上传文本保存在来源记录中以支持确定性重建，软删除时清除原文但保留 hash 和引用快照。相同项目、来源和索引配置的重复请求必须复用已有 active revision，不得产生重复 Chunk；Embedding 模型、维度或 indexer version 变化时必须创建新 revision。
 
 ## 4. 索引生命周期
 
@@ -49,6 +50,7 @@ any non-processing state -> deleted
 - 单文档解析失败时保留其他成功文档并标记 `ready_with_warnings`。
 - 来源完全不可读、Embedding 全部失败或事务提交失败时标记 `failed`。
 - 重建索引先写入新 revision；完整成功后原子切换 active revision，失败时继续使用旧 revision。
+- P0 在上传或重建请求内同步完成索引和事务提交，不引入内存任务队列；后续需要长任务时再设计持久化 worker。
 - `processing` 状态不参与检索。
 
 ## 5. 文档、Chunk 与 Embedding
@@ -62,14 +64,16 @@ Chunk 规则：
 - 每个 Chunk 保存稳定顺序、标题路径、页码或代码行范围和内容 hash。
 - Embedding 维度由配置的模型决定；切换模型或维度必须创建新 revision 并完整重建。
 
-Embedding 使用独立 Provider 配置，不默认复用白山 Chat 模型。默认测试只使用固定向量 Mock。
+Embedding 使用独立 Provider 配置，不默认复用白山 Chat 模型。revision 记录模型、维度和 indexer version。默认运行与测试只使用固定向量 Mock；真实 OpenAI-compatible Embedding 必须显式配置独立地址、密钥和模型。
 
 ## 6. 存储与检索
 
 - 继续使用 PostgreSQL 16；向量列由 `pgvector` 提供。
 - Prisma 管理来源、文档、状态和元数据；向量相似度查询集中在数据库包的单一 Repository 中，必须使用参数化 Raw SQL。
 - 每次查询必须包含 `project_id` 和 active revision 过滤，禁止先全局检索再在应用层过滤。
-- 向量检索和 PostgreSQL 全文检索各取最多 20 条，使用 Reciprocal Rank Fusion 合并，最终返回最多 8 条。
+- 向量检索和 PostgreSQL 全文检索各取最多 20 条，使用 `k=60` 的 Reciprocal Rank Fusion 合并，最终返回最多 8 条；同分时按 Chunk ID 稳定排序。
+- 向量分支只查询与当前 Embedding 模型和维度一致的 active revision；全文分支仍可检索其他 active revision。
+- P0 搜索 excerpt 在脱敏后截断到 800 字符；locator 使用 `logical_path:Lx-Ly`，后续 PDF 才使用页码。
 - 初版不使用 LLM Reranker；只有离线评测证明召回不足时才新增。
 
 检索无结果时返回空数组和 `insufficient_evidence=true`，不得伪造来源。知识库不可用时，现有 V2 工作流可以降级继续，但产物必须标记未使用项目证据。
@@ -92,6 +96,9 @@ type EvidenceCitation = {
 - 引用只允许指向本次 Graph Run 实际检索并提供给模型的 Chunk。
 - `excerpt` 是生成时快照，必须限制长度并经过敏感信息检测。
 - 引用编号、正文标记和结构化引用列表必须一一对应；缺失或多余引用使质量检查失败。
+- P0 在 `planning_generation` 开始时检索一次，并只向 `prd` 与 `architecture` 注入最多 8 条证据；查询由原始想法、已确认决定、需求融合、MVP 和平台推荐组成，截断到 2,000 字符。
+- 有证据时这两类产物必须至少使用一个合法 `[S#]`；无证据、知识库不可用或 `RAG_ENABLED=false` 时不得生成 `[S#]`，并由应用层写入“未使用项目证据”标记。
+- 结构化引用列表只保存正文实际使用的编号；引用快照与产物在同一数据库写入中创建，来源软删除后继续保留。
 
 ## 8. 安全与审计
 
@@ -102,7 +109,7 @@ type EvidenceCitation = {
 
 ## 9. Proposed API
 
-以下接口在 V3 实施阶段同步到 `contracts/openapi.yaml`；当前不属于已交付 API。
+以下接口按 P0 顺序同步到 `contracts/openapi.yaml` 和实现；搜索接口在 P0.3 完成前仍仅是机器契约。
 
 | Method | Path                                                           | 行为               |
 | ------ | -------------------------------------------------------------- | ------------------ |
@@ -123,4 +130,4 @@ type EvidenceCitation = {
 
 ## 11. 版本边界
 
-本规格为 Proposed。数据库模型、OpenAPI、Zod 类型和实现必须在对应实施阶段先更新机器契约，再写代码。
+Markdown/TXT、索引生命周期、存储、混合检索和引用属于 P0 Contract。PDF、公开仓库和代码定位仍为 P1 Proposed；对应数据库模型、OpenAPI、Zod 类型和实现继续按 execution plan 先更新机器契约再写代码。
