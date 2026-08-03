@@ -243,6 +243,9 @@ components:
           type: [string, 'null']
         source_uri:
           type: [string, 'null']
+        repository_commit:
+          type: [string, 'null']
+          pattern: '^[a-f0-9]{40}$'
         content_hash:
           type: string
           pattern: '^[a-f0-9]{64}$'
@@ -277,6 +280,16 @@ components:
         total:
           type: integer
           minimum: 0
+
+    RepositoryImportRequest:
+      type: object
+      required: [repository_url]
+      additionalProperties: false
+      properties:
+        repository_url:
+          type: string
+          format: uri
+          pattern: '^https://github\\.com/[^/\\s]+/[^/\\s]+/?$'
 
     EvidenceCitation:
       type: object
@@ -612,6 +625,30 @@ components:
           items:
             $ref: '#/components/schemas/ArtifactType'
 
+    GraphRunResponse:
+      type: object
+      required: [id, status, current_node, current_stage, checkpoint_version, waiting_for, recovery_available]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [running, interrupted, completed, failed, cancelled]
+        current_node:
+          type: string
+        current_stage:
+          $ref: '#/components/schemas/WorkflowStage'
+        checkpoint_version:
+          type: integer
+          minimum: 0
+        waiting_for:
+          type: string
+          nullable: true
+          enum: [reply, review]
+        recovery_available:
+          type: boolean
+
     WorkflowStatusResponse:
       type: object
       required:
@@ -624,6 +661,7 @@ components:
           progress,
           decision_snapshots,
           quality_report,
+          graph_run,
           updated_at,
         ]
       properties:
@@ -683,6 +721,9 @@ components:
         updated_at:
           type: string
           format: date-time
+        graph_run:
+          $ref: '#/components/schemas/GraphRunResponse'
+          nullable: true
 
     ContinueWorkflowRequest:
       type: object
@@ -697,6 +738,25 @@ components:
           minLength: 1
           maxLength: 50000
           description: 用户对澄清问题的回复
+        graph_run_id:
+          type: string
+          format: uuid
+          description: WORKFLOW_RUNNER=graph 时必填
+        checkpoint_version:
+          type: integer
+          minimum: 0
+
+    DiscussWorkflowRequest:
+      type: object
+      required: [conversation_id, message]
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        message:
+          type: string
+          minLength: 1
+          maxLength: 50000
 
     WorkflowStreamDeltaData:
       type: object
@@ -733,6 +793,13 @@ components:
           type: string
           format: uuid
           description: 当前检查点会话 ID
+        graph_run_id:
+          type: string
+          format: uuid
+          description: WORKFLOW_RUNNER=graph 时必填
+        checkpoint_version:
+          type: integer
+          minimum: 0
 
     # ─── Workflow State ───
     WorkflowStateResponse:
@@ -1523,7 +1590,7 @@ paths:
     post:
       tags: [Knowledge]
       summary: 上传项目知识源
-      description: P0 仅接受 Markdown 或 TXT；相同项目内相同内容返回已有来源。
+      description: 接受 Markdown、TXT 或含内嵌文本的 PDF；相同项目内相同内容返回已有来源。
       parameters:
         - name: project_id
           in: path
@@ -1598,6 +1665,62 @@ paths:
                 $ref: '#/components/schemas/KnowledgeSourceListResponse'
         '404':
           description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /projects/{project_id}/knowledge/sources/repositories:
+    post:
+      tags: [Knowledge]
+      summary: 导入公开 GitHub 仓库
+      description: 仅接受公开 HTTPS github.com 仓库；服务端固定首次解析出的 commit SHA，不接受凭据或重定向。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryImportRequest'
+      responses:
+        '200':
+          description: 相同仓库快照已存在，返回原知识源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeSourceResponse'
+        '201':
+          description: 仓库已导入并完成首轮索引
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeSourceResponse'
+        '400':
+          description: URL、仓库内容或来源限制无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 项目或公开仓库不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 相同来源正在处理或状态冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: GitHub 服务暂时不可用
           content:
             application/json:
               schema:
@@ -2001,7 +2124,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ContinueWorkflowRequest'
+              $ref: '#/components/schemas/DiscussWorkflowRequest'
       responses:
         '200':
           description: Agent 流式回复

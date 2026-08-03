@@ -21,24 +21,26 @@
 
 ## 2. 表清单
 
-| 表名                   | 说明              |
-| ---------------------- | ----------------- |
-| `projects`             | 项目实体          |
-| `conversations`        | 对话会话          |
-| `messages`             | 对话消息          |
-| `workflow_states`      | 工作流状态快照    |
-| `workflow_executions`  | 工作流执行历史    |
-| `analysis_results`     | 阶段分析结果      |
-| `artifacts`            | 产物实体          |
-| `exports`              | 导出任务          |
-| `model_execution_logs` | 模型调用日志      |
-| `prompt_versions`      | Prompt 版本记录   |
-| `token_usage`          | 项目级 Token 汇总 |
-| `knowledge_sources`    | 项目知识源        |
-| `knowledge_revisions`  | 知识源索引版本    |
-| `knowledge_documents`  | 规范化文档        |
-| `knowledge_chunks`     | 检索 Chunk        |
-| `artifact_citations`   | 产物引用快照      |
+| 表名                   | 说明                                       |
+| ---------------------- | ------------------------------------------ |
+| `projects`             | 项目实体                                   |
+| `conversations`        | 对话会话                                   |
+| `messages`             | 对话消息                                   |
+| `workflow_states`      | 工作流状态快照                             |
+| `workflow_executions`  | 工作流执行历史                             |
+| `analysis_results`     | 阶段分析结果                               |
+| `artifacts`            | 产物实体                                   |
+| `exports`              | 导出任务                                   |
+| `model_execution_logs` | 模型调用日志                               |
+| `prompt_versions`      | Prompt 版本记录                            |
+| `token_usage`          | 项目级 Token 汇总                          |
+| `knowledge_sources`    | 项目知识源                                 |
+| `knowledge_revisions`  | 知识源索引版本                             |
+| `knowledge_documents`  | 规范化文档                                 |
+| `knowledge_chunks`     | 检索 Chunk                                 |
+| `artifact_citations`   | 产物引用快照                               |
+| `graph_runs`           | LangGraph 运行元数据                       |
+| `checkpoints*`         | LangGraph PostgreSQL checkpointer 自管理表 |
 
 ## 3. 通用字段规则
 
@@ -126,6 +128,10 @@
 | `created_at`    | TIMESTAMPTZ | NOT NULL, DEFAULT NOW()                            |
 
 ### 4.6 analysis_results
+
+P1 的 `graph_runs` 保存 `graph_run_id`、当前 Node/Stage、恢复状态和单调递增的
+`checkpoint_version`；checkpoint payload 由 `@langchain/langgraph-checkpoint-postgres`
+在同一 PostgreSQL 数据库的自管理表中持久化。用户可见状态仍以现有工作流表为准。
 
 | 字段             | 类型         | 约束                                                |
 | ---------------- | ------------ | --------------------------------------------------- |
@@ -240,23 +246,25 @@
 
 ### 4.12 knowledge_sources
 
-| 字段            | 类型         | 约束                                               |
-| --------------- | ------------ | -------------------------------------------------- |
-| `id`            | UUID         | PK                                                 |
-| `project_id`    | UUID         | FK -> projects, NOT NULL                           |
-| `kind`          | VARCHAR(30)  | NOT NULL, CHECK KnowledgeSourceKind                |
-| `name`          | VARCHAR(255) | NOT NULL                                           |
-| `mime_type`     | VARCHAR(100) | NULL                                               |
-| `source_uri`    | TEXT         | NULL                                               |
-| `content_hash`  | CHAR(64)     | NOT NULL, SHA-256 hex                              |
-| `content_text`  | TEXT         | NULL，P0 规范化原文；软删除时清除                  |
-| `status`        | VARCHAR(30)  | NOT NULL, DEFAULT `pending`, CHECK KnowledgeStatus |
-| `warning_count` | INTEGER      | NOT NULL, DEFAULT 0                                |
-| `error_code`    | VARCHAR(50)  | NULL                                               |
-| `error_message` | TEXT         | NULL，必须脱敏                                     |
-| `created_at`    | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                            |
-| `updated_at`    | TIMESTAMPTZ  | NOT NULL                                           |
-| `deleted_at`    | TIMESTAMPTZ  | NULL                                               |
+| 字段                | 类型         | 约束                                               |
+| ------------------- | ------------ | -------------------------------------------------- |
+| `id`                | UUID         | PK                                                 |
+| `project_id`        | UUID         | FK -> projects, NOT NULL                           |
+| `kind`              | VARCHAR(30)  | NOT NULL, CHECK KnowledgeSourceKind                |
+| `name`              | VARCHAR(255) | NOT NULL                                           |
+| `mime_type`         | VARCHAR(100) | NULL                                               |
+| `source_uri`        | TEXT         | NULL                                               |
+| `content_hash`      | CHAR(64)     | NOT NULL, SHA-256 hex                              |
+| `content_text`      | TEXT         | NULL，Markdown/TXT 规范化原文；软删除时清除        |
+| `content_blob`      | BYTEA        | NULL，PDF 原始字节；软删除时清除                   |
+| `repository_commit` | VARCHAR(64)  | NULL，公开仓库 immutable commit SHA                |
+| `status`            | VARCHAR(30)  | NOT NULL, DEFAULT `pending`, CHECK KnowledgeStatus |
+| `warning_count`     | INTEGER      | NOT NULL, DEFAULT 0                                |
+| `error_code`        | VARCHAR(50)  | NULL                                               |
+| `error_message`     | TEXT         | NULL，必须脱敏                                     |
+| `created_at`        | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                            |
+| `updated_at`        | TIMESTAMPTZ  | NOT NULL                                           |
+| `deleted_at`        | TIMESTAMPTZ  | NULL                                               |
 
 同一项目中，未删除来源的 `content_hash` 唯一；重复上传相同内容必须复用已有来源。
 
@@ -283,17 +291,18 @@
 
 ### 4.14 knowledge_documents
 
-| 字段           | 类型         | 约束                                |
-| -------------- | ------------ | ----------------------------------- |
-| `id`           | UUID         | PK                                  |
-| `source_id`    | UUID         | NOT NULL；与 revision 组成复合外键  |
-| `revision_id`  | UUID         | FK -> knowledge_revisions, NOT NULL |
-| `logical_path` | TEXT         | NOT NULL                            |
-| `title`        | VARCHAR(255) | NOT NULL                            |
-| `mime_type`    | VARCHAR(100) | NOT NULL                            |
-| `content_hash` | CHAR(64)     | NOT NULL, SHA-256 hex               |
-| `metadata`     | JSONB        | NULL，只保存解析元数据              |
-| `created_at`   | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()             |
+| 字段                | 类型         | 约束                                    |
+| ------------------- | ------------ | --------------------------------------- |
+| `id`                | UUID         | PK                                      |
+| `source_id`         | UUID         | NOT NULL；与 revision 组成复合外键      |
+| `revision_id`       | UUID         | FK -> knowledge_revisions, NOT NULL     |
+| `logical_path`      | TEXT         | NOT NULL                                |
+| `title`             | VARCHAR(255) | NOT NULL                                |
+| `mime_type`         | VARCHAR(100) | NOT NULL                                |
+| `content_hash`      | CHAR(64)     | NOT NULL, SHA-256 hex                   |
+| `repository_commit` | VARCHAR(64)  | NULL，代码文档所属 immutable commit SHA |
+| `metadata`          | JSONB        | NULL，只保存解析元数据                  |
+| `created_at`        | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                 |
 
 **UNIQUE**: `(revision_id, logical_path)`；复合外键保证 `revision_id` 属于同一 `source_id`。
 
@@ -379,24 +388,24 @@
 
 ## 7. 索引设计
 
-| 表                   | 索引                                                                                        |
-| -------------------- | ------------------------------------------------------------------------------------------- |
-| projects             | `(status)`, `(current_stage)`, `(created_at DESC)`, `(deleted_at)`                          |
-| conversations        | `(project_id)`, `(project_id, status)`                                                      |
-| messages             | `(conversation_id, created_at ASC)`                                                         |
-| workflow_states      | `(project_id)`, `(project_id, stage UNIQUE)`, `(status)`                                    |
-| workflow_executions  | `(project_id, started_at DESC)`, `(project_id, stage)`, `(status)`                          |
-| analysis_results     | `(project_id, stage)`, `(execution_id)`, `(created_at DESC)`                                |
-| artifacts            | `(project_id)`, `(project_id, type)`, `(type)`, `(deleted_at)`                              |
-| exports              | `(project_id, created_at DESC)`, `(status)`, `(download_token_hash)`                        |
-| model_execution_logs | `(project_id, created_at DESC)`, `(execution_id)`, `(stage)`, `(provider_name)`, `(status)` |
-| prompt_versions      | `(prompt_name, version UNIQUE)`, `(created_at DESC)`                                        |
-| token_usage          | `(project_id UNIQUE)`, `(total_cost DESC)`                                                  |
-| knowledge_sources    | `(project_id, status)`, `(project_id, content_hash)`、`(deleted_at)`                        |
-| knowledge_revisions  | `(source_id, revision UNIQUE)`、`(source_id) WHERE is_active`                               |
-| knowledge_documents  | `(source_id, revision_id)`、`(revision_id, logical_path UNIQUE)`                            |
-| knowledge_chunks     | `(document_id, position UNIQUE)`、GIN `(search_vector)`                                     |
-| artifact_citations   | `(artifact_id, position)`、`(source_id)`、`(chunk_id)`                                      |
+| 表                   | 索引                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------- |
+| projects             | `(status)`, `(current_stage)`, `(created_at DESC)`, `(deleted_at)`                                      |
+| conversations        | `(project_id)`, `(project_id, status)`                                                                  |
+| messages             | `(conversation_id, created_at ASC)`                                                                     |
+| workflow_states      | `(project_id)`, `(project_id, stage UNIQUE)`, `(status)`                                                |
+| workflow_executions  | `(project_id, started_at DESC)`, `(project_id, stage)`, `(status)`                                      |
+| analysis_results     | `(project_id, stage)`, `(execution_id)`, `(created_at DESC)`                                            |
+| artifacts            | `(project_id)`, `(project_id, type)`, `(type)`, `(deleted_at)`                                          |
+| exports              | `(project_id, created_at DESC)`, `(status)`, `(download_token_hash)`                                    |
+| model_execution_logs | `(project_id, created_at DESC)`, `(execution_id)`, `(stage)`, `(provider_name)`, `(status)`             |
+| prompt_versions      | `(prompt_name, version UNIQUE)`, `(created_at DESC)`                                                    |
+| token_usage          | `(project_id UNIQUE)`, `(total_cost DESC)`                                                              |
+| knowledge_sources    | `(project_id, status)`, `(project_id, content_hash)`、`(project_id, repository_commit)`、`(deleted_at)` |
+| knowledge_revisions  | `(source_id, revision UNIQUE)`、`(source_id) WHERE is_active`                                           |
+| knowledge_documents  | `(source_id, revision_id)`、`(revision_id, logical_path UNIQUE)`                                        |
+| knowledge_chunks     | `(document_id, position UNIQUE)`、GIN `(search_vector)`                                                 |
+| artifact_citations   | `(artifact_id, position)`、`(source_id)`、`(chunk_id)`                                                  |
 
 ## 8. 实现约束
 

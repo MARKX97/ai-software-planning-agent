@@ -40,6 +40,13 @@ describe('API request contracts', () => {
     assert.deepEqual(listLogsQuerySchema.parse({}), { offset: 0, limit: 50 });
     assert.deepEqual(exportRequestSchema.parse({}), { format: 'markdown', artifact_types: [] });
     assert.deepEqual(listArtifactsQuerySchema.parse({}), {});
+    const resume = {
+      conversation_id: '550e8400-e29b-41d4-a716-446655440000',
+      message: 'reply',
+      graph_run_id: '660e8400-e29b-41d4-a716-446655440000',
+      checkpoint_version: 1,
+    };
+    assert.deepEqual(continueWorkflowSchema.parse(resume), resume);
   });
 
   it('rejects invalid body, path-dependent and pagination values', () => {

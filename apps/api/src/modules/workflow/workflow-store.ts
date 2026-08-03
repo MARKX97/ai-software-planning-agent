@@ -89,22 +89,33 @@ export async function buildWorkflowStatus(
   projectId: string,
 ): Promise<WorkflowStatusResponse> {
   const project = await projects.findOrFail(projectId);
-  const [completedStages, activeState, modelStatus, conversation, decisions, planningState] =
-    await Promise.all([
-      countCompletedStages(db, projectId),
-      db.client.workflowState.findUnique({
-        where: { project_id_stage: { project_id: projectId, stage: project.current_stage } },
-      }),
-      buildModelStatus(db, projectId, project.current_stage),
-      findWorkflowConversation(db, projectId, project.current_stage, project.status),
-      loadDecisionSnapshots(db, projectId),
-      db.client.workflowState.findUnique({
-        where: {
-          project_id_stage: { project_id: projectId, stage: WorkflowStage.PLANNING_GENERATION },
-        },
-        select: { data_json: true },
-      }),
-    ]);
+  const [
+    completedStages,
+    activeState,
+    modelStatus,
+    conversation,
+    decisions,
+    planningState,
+    graphRun,
+  ] = await Promise.all([
+    countCompletedStages(db, projectId),
+    db.client.workflowState.findUnique({
+      where: { project_id_stage: { project_id: projectId, stage: project.current_stage } },
+    }),
+    buildModelStatus(db, projectId, project.current_stage),
+    findWorkflowConversation(db, projectId, project.current_stage, project.status),
+    loadDecisionSnapshots(db, projectId),
+    db.client.workflowState.findUnique({
+      where: {
+        project_id_stage: { project_id: projectId, stage: WorkflowStage.PLANNING_GENERATION },
+      },
+      select: { data_json: true },
+    }),
+    db.client.graphRun.findFirst({
+      where: { project_id: projectId },
+      orderBy: { updated_at: 'desc' },
+    }),
+  ]);
   return buildStatusFromProject({
     project,
     completedStages,
@@ -113,6 +124,7 @@ export async function buildWorkflowStatus(
     conversationId: conversation?.id ?? null,
     decisionSnapshots: decisions,
     qualityReport: artifactQualityReportFromState(planningState?.data_json),
+    graphRun,
   });
 }
 

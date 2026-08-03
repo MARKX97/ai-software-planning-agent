@@ -8,6 +8,7 @@ export interface KnowledgeSourceResponse {
   name: string;
   mime_type?: string | null;
   source_uri?: string | null;
+  repository_commit?: string | null;
   content_hash: string;
   status: KnowledgeStatus;
   warning_count: number;

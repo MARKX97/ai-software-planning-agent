@@ -25,6 +25,11 @@ export const knowledgeSourceSchema = z
     name: z.string().trim().min(1).max(255),
     mime_type: z.string().nullable().optional(),
     source_uri: z.string().nullable().optional(),
+    repository_commit: z
+      .string()
+      .regex(/^[a-f0-9]{40}$/)
+      .nullable()
+      .optional(),
     content_hash: sha256Schema,
     status: knowledgeStatusSchema,
     warning_count: z.number().int().nonnegative(),
@@ -33,6 +38,15 @@ export const knowledgeSourceSchema = z
     active_revision: z.number().int().positive().nullable().optional(),
     created_at: z.string().datetime(),
     updated_at: z.string().datetime(),
+  })
+  .strict();
+
+export const repositoryImportRequestSchema = z
+  .object({
+    repository_url: z
+      .string()
+      .url()
+      .regex(/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/?$/),
   })
   .strict();
 

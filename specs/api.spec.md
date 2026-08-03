@@ -65,6 +65,7 @@
 | GET    | `/projects/{project_id}/usage/logs`                               | 模型调用日志 |
 | GET    | `/projects/{project_id}/usage/logs/{log_id}`                      | 日志详情     |
 | POST   | `/projects/{project_id}/knowledge/sources`                        | 上传知识源   |
+| POST   | `/projects/{project_id}/knowledge/sources/repositories`           | 导入公开仓库 |
 | GET    | `/projects/{project_id}/knowledge/sources`                        | 知识源列表   |
 | POST   | `/projects/{project_id}/knowledge/sources/{source_id}/reindex`    | 重新索引     |
 | DELETE | `/projects/{project_id}/knowledge/sources/{source_id}`            | 删除知识源   |
@@ -104,7 +105,7 @@
 | 502  | LLM 或导出依赖失败     |
 | 503  | 成本限制或服务不可用   |
 
-知识源创建 P0 仅接受 `.md`、`.txt` 的 `multipart/form-data`，并在请求内完成首轮索引；PDF 与公开 GitHub 仓库在 P1 才开放。重复上传同一项目内相同 SHA-256 内容返回现有来源，不重复创建记录。重新索引在请求内完成，相同内容与相同索引配置直接复用 active revision。知识检索无结果返回 `200`、空 `items` 和 `insufficient_evidence=true`。
+知识源上传接受 `.md`、`.txt`、`.pdf` 的 `multipart/form-data`，并在请求内完成首轮索引；仓库导入只接受公开 `https://github.com/<owner>/<repository>` URL。服务端解析默认分支并固定 immutable commit，拒绝凭据、非 GitHub 主机、重定向与超过文件/文本限制的仓库。重复上传或相同 repository snapshot 返回现有来源，不重复创建记录。重新索引在请求内完成，相同内容与相同索引配置直接复用 active revision。知识检索无结果返回 `200`、空 `items` 和 `insufficient_evidence=true`。
 
 知识检索对 `project_id` 和可选 `source_ids` 的交集在数据库查询内过滤，最多返回 8 条脱敏证据。产物列表继续不返回引用；产物详情新增 `citations`，只包含正文实际使用的 `[S#]` 快照，来源删除后仍可读取。
 
@@ -119,6 +120,7 @@
 - `workflow/status` 是前端轮询的唯一状态入口。
 - `workflow/status.conversation_id` 指向当前检查点会话；`waiting_for=reply` 表示 Agent 需要补充信息，`waiting_for=review` 表示可讨论或确认推进。
 - `workflow/status.decision_snapshots` 返回已确认检查点的结构化结论；`quality_report` 在规划生成完成后返回确定性质量检查结果，生成前为 `null`。
+- `workflow/status.graph_run` 返回当前节点、checkpoint 版本和可恢复状态；`continue` 与 `advance` 必须回传 `graph_run_id`、`checkpoint_version`，过期恢复返回 409。
 - `workflow/continue` 只用于需求澄清回复；其他检查点讨论使用 `workflow/discuss`，确认后使用 `workflow/advance`。
 - 三个流式接口使用 Fetch POST 读取 SSE。允许多个 `delta`，随后必须且只能有一个 `done` 或 `error`；服务端每 15 秒发送 comment heartbeat。
 - SSE 响应必须使用 `Content-Type: text/event-stream`、`Cache-Control: no-cache, no-transform` 和 `X-Accel-Buffering: no`，避免中间代理缓存或缓冲。

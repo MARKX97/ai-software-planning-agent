@@ -6,6 +6,7 @@ import { ErrorCode } from '../../common/exception/error-code.js';
 import { EmbeddingError } from './embedding.provider.js';
 import { storeIndexChunks, type EmbeddedChunk } from './knowledge-chunk-writer.js';
 import type { ParsedKnowledgeDocument } from './knowledge-parser.js';
+import { sameIndexIdentity, type IndexBeginInput } from './knowledge-index-identity.js';
 
 export interface IndexIdentity {
   readonly model: string;
@@ -13,17 +14,22 @@ export interface IndexIdentity {
   readonly version: string;
 }
 
-interface BeginInput {
-  readonly projectId: string;
-  readonly sourceId: string;
-  readonly contentHash: string;
-  readonly identity: IndexIdentity;
-}
+type BeginInput = IndexBeginInput;
 interface CompleteInput {
   readonly sourceId: string;
   readonly revisionId: string;
   readonly document: ParsedKnowledgeDocument;
   readonly chunks: readonly EmbeddedChunk[];
+  readonly warningCount: number;
+  readonly indexerVersion: string;
+}
+interface CompleteManyInput {
+  readonly sourceId: string;
+  readonly revisionId: string;
+  readonly documents: readonly {
+    document: ParsedKnowledgeDocument;
+    chunks: readonly EmbeddedChunk[];
+  }[];
   readonly warningCount: number;
   readonly indexerVersion: string;
 }
@@ -38,6 +44,15 @@ export class KnowledgeIndexStore {
   complete(input: CompleteInput): Promise<void> {
     return this.db.client.$transaction(async (tx) => {
       await storeIndexChunks(tx, input);
+      await this.activateRevision(tx, input);
+    });
+  }
+
+  completeMany(input: CompleteManyInput): Promise<void> {
+    return this.db.client.$transaction(async (tx) => {
+      for (const item of input.documents) {
+        await storeIndexChunks(tx, { ...input, ...item });
+      }
       await this.activateRevision(tx, input);
     });
   }
@@ -90,7 +105,7 @@ export class KnowledgeIndexStore {
     const active = await tx.knowledgeRevision.findFirst({
       where: { source_id: input.sourceId, is_active: true },
     });
-    const sameIndex = active?.status === 'ready' && sameIdentity(active, input);
+    const sameIndex = active?.status === 'ready' && sameIndexIdentity(active, input);
     await this.claimSource(tx, {
       sourceId: input.sourceId,
       currentStatus: source.status,
@@ -150,7 +165,7 @@ export class KnowledgeIndexStore {
 
   private async activateRevision(
     tx: Prisma.TransactionClient,
-    input: CompleteInput,
+    input: Pick<CompleteInput, 'sourceId' | 'revisionId' | 'warningCount'>,
   ): Promise<void> {
     const status = input.warningCount > 0 ? 'ready_with_warnings' : 'ready';
     const warning = input.warningCount ? 'Some chunks could not be embedded' : null;
@@ -180,21 +195,4 @@ export class KnowledgeIndexStore {
       },
     });
   }
-}
-
-function sameIdentity(
-  active: {
-    content_hash: string;
-    embedding_model: string | null;
-    embedding_dimensions: number | null;
-    indexer_version: string;
-  },
-  input: BeginInput,
-): boolean {
-  return (
-    active.content_hash === input.contentHash &&
-    active.embedding_model === input.identity.model &&
-    active.embedding_dimensions === input.identity.dimensions &&
-    active.indexer_version === input.identity.version
-  );
 }

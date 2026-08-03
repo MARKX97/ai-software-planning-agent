@@ -7,8 +7,9 @@ export interface KnowledgeChunkWrite {
   readonly content: string;
   readonly tokenCount: number;
   readonly titlePath: string[];
-  readonly lineStart: number;
-  readonly lineEnd: number;
+  readonly lineStart?: number | undefined;
+  readonly lineEnd?: number | undefined;
+  readonly pageNumber?: number | undefined;
   readonly contentHash: string;
   readonly embedding: number[];
 }
@@ -23,6 +24,7 @@ export interface KnowledgeSearchCandidate {
   readonly chunkId: string;
   readonly title: string;
   readonly logicalPath: string;
+  readonly repositoryCommit: string | null;
   readonly lineStart: number | null;
   readonly lineEnd: number | null;
   readonly pageNumber: number | null;
@@ -50,7 +52,7 @@ export async function insertKnowledgeChunks(
     await tx.$executeRaw(Prisma.sql`
       INSERT INTO "knowledge_chunks" (
         "id", "document_id", "position", "content", "token_count",
-        "title_path", "line_start", "line_end", "content_hash", "embedding"
+        "title_path", "line_start", "line_end", "page_number", "content_hash", "embedding"
       ) VALUES ${Prisma.join(values)}
     `);
   }
@@ -127,14 +129,14 @@ function chunkRow(chunk: KnowledgeChunkWrite): Prisma.Sql {
   const vector = `[${chunk.embedding.join(',')}]`;
   return Prisma.sql`(
     ${chunk.id}::uuid, ${chunk.documentId}::uuid, ${chunk.position}, ${chunk.content},
-    ${chunk.tokenCount}, ${JSON.stringify(chunk.titlePath)}::jsonb, ${chunk.lineStart},
-    ${chunk.lineEnd}, ${chunk.contentHash}, ${vector}::vector
+    ${chunk.tokenCount}, ${JSON.stringify(chunk.titlePath)}::jsonb, ${chunk.lineStart ?? null},
+    ${chunk.lineEnd ?? null}, ${chunk.pageNumber ?? null}, ${chunk.contentHash}, ${vector}::vector
   )`;
 }
 
 const candidateColumns = Prisma.sql`
   ks."id" AS "sourceId", kd."id" AS "documentId", kc."id" AS "chunkId",
-  kd."title", kd."logical_path" AS "logicalPath", kc."line_start" AS "lineStart",
+  kd."title", kd."logical_path" AS "logicalPath", kd."repository_commit" AS "repositoryCommit", kc."line_start" AS "lineStart",
   kc."line_end" AS "lineEnd", kc."page_number" AS "pageNumber",
   kc."content", kc."content_hash" AS "contentHash"
 `;

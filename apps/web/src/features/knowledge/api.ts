@@ -14,6 +14,16 @@ export function uploadKnowledgeSource(
   return apiRequest(`/projects/${projectId}/knowledge/sources`, { method: 'POST', body });
 }
 
+export function importKnowledgeRepository(
+  projectId: string,
+  repositoryUrl: string,
+): Promise<KnowledgeSourceResponse> {
+  return apiRequest(`/projects/${projectId}/knowledge/sources/repositories`, {
+    method: 'POST',
+    body: JSON.stringify({ repository_url: repositoryUrl }),
+  });
+}
+
 export function reindexKnowledgeSource(
   projectId: string,
   sourceId: string,

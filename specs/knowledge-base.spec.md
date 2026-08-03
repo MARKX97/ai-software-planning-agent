@@ -1,19 +1,18 @@
-# Project Knowledge Base — P0 Contract
+# Project Knowledge Base — P1 Contract
 
-> Version: 0.3.0
-> Status: P0 Contract; PDF and repository sections remain proposed for P1
+> Version: 1.0.0
+> Status: P1 Contract
 > Owner: Backend Lead + AI Infrastructure Lead
 
 ## 1. 目标与非目标
 
 项目知识库为软件规划提供用户自己的文档和代码证据。它负责导入、解析、索引、检索和引用，不负责工作流推进、权限判断或自动修改代码。
 
-P0 支持：
+P1 支持：
 
-- Markdown、TXT 上传。
+- Markdown、TXT、PDF 上传。
+- 仅公开 `https://github.com/<owner>/<repository>` 仓库导入；首次导入固定解析后的 commit SHA。
 - 项目内混合检索和可追溯引用。
-
-PDF 上传与公开 `github.com` 仓库导入属于 P1 proposed scope，不属于当前交付。
 
 V3 不支持私有仓库凭据、任意 URL 抓取、网页搜索、OCR、跨项目知识共享和独立向量数据库。
 
@@ -35,6 +34,8 @@ V3 不支持私有仓库凭据、任意 URL 抓取、网页搜索、OCR、跨项
 
 仓库索引必须忽略二进制文件、符号链接逃逸、`.git`、依赖目录、构建产物、锁文件和高置信度密钥文件。服务端不得接受仓库 Token，也不得跟随到非允许域名，防止 SSRF。
 
+PDF 仅提取内嵌文本，不执行 OCR；每页独立成为可切分文档，引用 locator 使用 `文件名:page-N`。仓库只通过 GitHub REST API 读取 canonical repository、默认分支和 immutable commit；每个请求禁用自动重定向，并在响应前校验 HTTPS、允许主机和路径。代码文档必须保留仓库相对路径、行范围和固定 commit，locator 使用 `path:Lx-Ly@<sha>`。
+
 所有来源使用规范化文本的 SHA-256 内容 hash。P0 将规范化上传文本保存在来源记录中以支持确定性重建，软删除时清除原文但保留 hash 和引用快照。相同项目、来源和索引配置的重复请求必须复用已有 active revision，不得产生重复 Chunk；Embedding 模型、维度或 indexer version 变化时必须创建新 revision。
 
 ## 4. 索引生命周期
@@ -50,7 +51,7 @@ any non-processing state -> deleted
 - 单文档解析失败时保留其他成功文档并标记 `ready_with_warnings`。
 - 来源完全不可读、Embedding 全部失败或事务提交失败时标记 `failed`。
 - 重建索引先写入新 revision；完整成功后原子切换 active revision，失败时继续使用旧 revision。
-- P0 在上传或重建请求内同步完成索引和事务提交，不引入内存任务队列；后续需要长任务时再设计持久化 worker。
+- P1 在上传、仓库导入或重建请求内同步完成索引和事务提交，不引入内存任务队列；后续需要长任务时再设计持久化 worker。
 - `processing` 状态不参与检索。
 
 ## 5. 文档、Chunk 与 Embedding
@@ -73,7 +74,7 @@ Embedding 使用独立 Provider 配置，不默认复用白山 Chat 模型。rev
 - 每次查询必须包含 `project_id` 和 active revision 过滤，禁止先全局检索再在应用层过滤。
 - 向量检索和 PostgreSQL 全文检索各取最多 20 条，使用 `k=60` 的 Reciprocal Rank Fusion 合并，最终返回最多 8 条；同分时按 Chunk ID 稳定排序。
 - 向量分支只查询与当前 Embedding 模型和维度一致的 active revision；全文分支仍可检索其他 active revision。
-- P0 搜索 excerpt 在脱敏后截断到 800 字符；locator 使用 `logical_path:Lx-Ly`，后续 PDF 才使用页码。
+- 搜索 excerpt 在脱敏后截断到 800 字符；PDF locator 使用页码，仓库 locator 包含文件、行范围和 immutable commit。
 - 初版不使用 LLM Reranker；只有离线评测证明召回不足时才新增。
 
 检索无结果时返回空数组和 `insufficient_evidence=true`，不得伪造来源。知识库不可用时，现有 V2 工作流可以降级继续，但产物必须标记未使用项目证据。
@@ -109,15 +110,16 @@ type EvidenceCitation = {
 
 ## 9. Proposed API
 
-以下接口按 P0 顺序同步到 `contracts/openapi.yaml` 和实现；搜索接口在 P0.3 完成前仍仅是机器契约。
+以下接口同步到 `contracts/openapi.yaml` 和实现。
 
-| Method | Path                                                           | 行为               |
-| ------ | -------------------------------------------------------------- | ------------------ |
-| POST   | `/projects/{project_id}/knowledge/sources`                     | 创建上传或仓库来源 |
-| GET    | `/projects/{project_id}/knowledge/sources`                     | 列出来源与状态     |
-| POST   | `/projects/{project_id}/knowledge/sources/{source_id}/reindex` | 重建索引           |
-| DELETE | `/projects/{project_id}/knowledge/sources/{source_id}`         | 删除来源           |
-| POST   | `/projects/{project_id}/knowledge/search`                      | 预览项目内检索     |
+| Method | Path                                                           | 行为                 |
+| ------ | -------------------------------------------------------------- | -------------------- |
+| POST   | `/projects/{project_id}/knowledge/sources`                     | 创建上传或仓库来源   |
+| POST   | `/projects/{project_id}/knowledge/sources/repositories`        | 导入公开 GitHub 仓库 |
+| GET    | `/projects/{project_id}/knowledge/sources`                     | 列出来源与状态       |
+| POST   | `/projects/{project_id}/knowledge/sources/{source_id}/reindex` | 重建索引             |
+| DELETE | `/projects/{project_id}/knowledge/sources/{source_id}`         | 删除来源             |
+| POST   | `/projects/{project_id}/knowledge/search`                      | 预览项目内检索       |
 
 ## 10. 验收与失败场景
 
@@ -130,4 +132,4 @@ type EvidenceCitation = {
 
 ## 11. 版本边界
 
-Markdown/TXT、索引生命周期、存储、混合检索和引用属于 P0 Contract。PDF、公开仓库和代码定位仍为 P1 Proposed；对应数据库模型、OpenAPI、Zod 类型和实现继续按 execution plan 先更新机器契约再写代码。
+Markdown/TXT/PDF、公开仓库、索引生命周期、存储、混合检索和引用属于 P1 Contract。动态 Agent Tool、运行时仓库检查与增量重新生成仍属于 P2 Proposed。

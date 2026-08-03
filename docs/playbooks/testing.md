@@ -4,15 +4,15 @@
 
 ## Layers
 
-| 层级                    | 工具                                   | 目标                           |
-| ----------------------- | -------------------------------------- | ------------------------------ |
-| Backend unit/contract   | `node:test` + `tsx`                    | DTO、状态机、Service、路由契约 |
-| Frontend unit/component | Vitest + Testing Library               | API client、SSE、交互状态      |
-| HTTP integration        | Fetch + PostgreSQL                     | 完整 API 与持久化行为          |
-| E2E                     | Playwright                             | 创建、讨论、推进、产物和成本   |
-| LLM                     | Mock Provider                          | 默认确定性、无付费调用         |
-| V3 Knowledge（P0）      | 固定文档 + Mock Embedding              | 解析、Chunk、检索、隔离与引用  |
-| V3 Graph（Planned）     | LangGraph checkpointer + Mock Tool/LLM | 分支、interrupt、恢复与幂等    |
+| 层级                    | 工具                              | 目标                            |
+| ----------------------- | --------------------------------- | ------------------------------- |
+| Backend unit/contract   | `node:test` + `tsx`               | DTO、状态机、Service、路由契约  |
+| Frontend unit/component | Vitest + Testing Library          | API client、SSE、交互状态       |
+| HTTP integration        | Fetch + PostgreSQL                | 完整 API 与持久化行为           |
+| E2E                     | Playwright                        | 创建、讨论、推进、产物和成本    |
+| LLM                     | Mock Provider                     | 默认确定性、无付费调用          |
+| V3 Knowledge（P0）      | 固定文档 + Mock Embedding         | 解析、Chunk、检索、隔离与引用   |
+| V3 Graph（P1）          | LangGraph checkpointer + Mock LLM | 固定分支、interrupt、恢复与幂等 |
 
 ## Commands
 
@@ -63,7 +63,7 @@ RUN_REAL_BAISHAN_STREAM=1 pnpm exec dotenv -e .env -- pnpm --filter @ai-planning
 
 不得在默认 CI 中打开该开关。
 
-## V3 Knowledge（P0）And Agent Graph（Planned）
+## V3 Knowledge And Agent Graph
 
 V3 测试必须继续满足默认确定性、零外部模型费用和项目隔离。真实 Embedding 与真实 Chat 模型只允许通过独立显式 smoke-test 开关运行。
 
@@ -96,8 +96,7 @@ V3 测试必须继续满足默认确定性、零外部模型费用和项目隔�
 ### Graph Contract And Recovery
 
 - 9 个阶段、4 个检查点、澄清上限和 11 类产物的现有回归继续通过。
-- 单阶段前三次 Tool 调用可执行，第四次确定性拒绝并进入生成或人工检查点。
-- Action Structured Output 连续校验失败时不得执行自由文本中的 Tool 指令。
+- P1 只执行固定检索；动态 Tool 调用上限与 Structured Action 验证在 P2 启用。
 - interrupt 后使用相同 `graphRunId` 恢复；过期 checkpoint 返回冲突。
 - 同一 checkpoint 重复 resume、节点重放和并行节点部分失败均不重复写消息、产物、日志、Token 或成本。
 - 用户取消传播 AbortSignal，Graph Run 标记 `cancelled`，不保存半条助手消息。

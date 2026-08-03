@@ -16,16 +16,23 @@ export type RunWorkflowRequest = z.infer<typeof runWorkflowSchema>;
 export const continueWorkflowSchema = z.object({
   conversation_id: z.string().uuid(),
   message: safeUserTextSchema(50000),
+  graph_run_id: z.string().uuid().optional(),
+  checkpoint_version: z.number().int().nonnegative().optional(),
 });
 
 export type ContinueWorkflowRequest = z.infer<typeof continueWorkflowSchema>;
 
-export const discussWorkflowSchema = continueWorkflowSchema;
+export const discussWorkflowSchema = z.object({
+  conversation_id: z.string().uuid(),
+  message: safeUserTextSchema(50000),
+});
 
 export type DiscussWorkflowRequest = z.infer<typeof discussWorkflowSchema>;
 
 export const advanceWorkflowSchema = z.object({
   conversation_id: z.string().uuid(),
+  graph_run_id: z.string().uuid().optional(),
+  checkpoint_version: z.number().int().nonnegative().optional(),
 });
 
 export type AdvanceWorkflowRequest = z.infer<typeof advanceWorkflowSchema>;

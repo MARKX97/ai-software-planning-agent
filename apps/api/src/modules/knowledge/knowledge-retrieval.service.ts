@@ -77,7 +77,10 @@ function toEvidenceCitation(row: KnowledgeSearchCandidate): EvidenceCitation {
 
 function locator(row: KnowledgeSearchCandidate): string {
   if (row.pageNumber) return `${row.logicalPath}:page-${row.pageNumber}`;
-  if (row.lineStart && row.lineEnd) return `${row.logicalPath}:L${row.lineStart}-L${row.lineEnd}`;
+  if (row.lineStart && row.lineEnd) {
+    const lines = `${row.logicalPath}:L${row.lineStart}-L${row.lineEnd}`;
+    return row.repositoryCommit ? `${lines}@${row.repositoryCommit}` : lines;
+  }
   return row.logicalPath;
 }
 

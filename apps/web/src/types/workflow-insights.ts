@@ -44,6 +44,15 @@ export interface WorkflowStatusResponse {
   error_message: string | null;
   started_at: string | null;
   updated_at: string;
+  graph_run: {
+    id: string;
+    status: string;
+    current_node: string;
+    current_stage: string;
+    checkpoint_version: number;
+    waiting_for: 'reply' | 'review' | null;
+    recovery_available: boolean;
+  } | null;
 }
 
 export interface WorkflowStateResponse {

@@ -150,6 +150,7 @@ model Project {
   model_execution_logs ModelExecutionLog[]
   token_usage          TokenUsage?
   knowledge_sources    KnowledgeSource[]
+  graph_runs           GraphRun[]
 
   @@index([status])
   @@index([current_stage])
@@ -233,6 +234,27 @@ model WorkflowExecution {
   @@index([project_id, stage])
   @@index([status])
   @@map("workflow_executions")
+}
+
+/// Durable LangGraph run metadata; checkpoint payloads live in LangGraph-owned tables.
+model GraphRun {
+  id                 String        @id @default(uuid()) @db.Uuid
+  project_id         String        @map("project_id") @db.Uuid
+  execution_id       String?       @map("execution_id") @db.Uuid
+  status             String        @db.VarChar(20)
+  current_node       String        @map("current_node") @db.VarChar(100)
+  current_stage      WorkflowStage @map("current_stage")
+  checkpoint_version Int           @default(0) @map("checkpoint_version")
+  waiting_for        String?       @map("waiting_for") @db.VarChar(20)
+  started_at         DateTime      @default(now()) @map("started_at") @db.Timestamptz
+  updated_at         DateTime      @map("updated_at") @db.Timestamptz
+  completed_at       DateTime?     @map("completed_at") @db.Timestamptz
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([project_id, updated_at(sort: Desc)])
+  @@index([project_id, status])
+  @@map("graph_runs")
 }
 
 /// Stage analysis result (structured LLM output persisted).
@@ -396,6 +418,8 @@ model KnowledgeSource {
   source_uri    String?             @map("source_uri") @db.Text
   content_hash  String              @map("content_hash") @db.Char(64)
   content_text  String?             @map("content_text") @db.Text
+  content_blob  Bytes?              @map("content_blob")
+  repository_commit String?         @map("repository_commit") @db.VarChar(64)
   status        KnowledgeStatus     @default(pending) @map("status")
   warning_count Int                 @default(0) @map("warning_count")
   error_code    String?             @map("error_code") @db.VarChar(50)
@@ -409,6 +433,7 @@ model KnowledgeSource {
 
   @@index([project_id, status])
   @@index([project_id, content_hash])
+  @@index([project_id, repository_commit])
   @@index([deleted_at])
   @@map("knowledge_sources")
 }
@@ -446,6 +471,7 @@ model KnowledgeDocument {
   title        String   @db.VarChar(255)
   mime_type    String   @map("mime_type") @db.VarChar(100)
   content_hash String   @map("content_hash") @db.Char(64)
+  repository_commit String? @map("repository_commit") @db.VarChar(64)
   metadata     Json?
   created_at   DateTime @default(now()) @map("created_at") @db.Timestamptz
 

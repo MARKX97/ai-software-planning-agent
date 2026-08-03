@@ -1,7 +1,7 @@
-# Agent Graph — Proposed Contract
+# Agent Graph — P1 Contract
 
-> Version: 0.1.0
-> Status: Proposed for V3
+> Version: 1.0.0
+> Status: P1 Contract
 > Owner: Backend Lead + AI Infrastructure Lead
 
 ## 1. 目标与边界
@@ -39,9 +39,6 @@ type PlanningGraphState = {
 START
   -> load_project_context
   -> choose_action
-       -> search_knowledge -> choose_action
-       -> read_source -> choose_action
-       -> inspect_repository -> choose_action
        -> run_stage
   -> validate_stage_result
        -> revise_once -> validate_stage_result
@@ -51,12 +48,11 @@ START
 ```
 
 - 现有 9 个业务阶段及其顺序保持不变。
-- `choose_action` 只允许返回 Tool 白名单中的结构化 Action；未知 Action 直接失败，不执行自由文本命令。
-- 单阶段最多 3 次 Tool 调用；达到上限后进入 `run_stage`，并记录证据限制。
+- P1 的 `choose_action` 只执行固定知识检索；模型动态选择 Tool 保留到 P2。
 - 单个结果最多自动修订 1 次，保持 V2 质量循环上限。
 - 需求澄清、需求融合、MVP 收缩和平台推荐继续使用人工检查点。
 
-## 4. Tool Contract
+## 4. P2 Tool Contract（P1 不启用）
 
 | Tool                | 输入                                     | 输出                     |
 | ------------------- | ---------------------------------------- | ------------------------ |
@@ -122,4 +118,4 @@ START
 
 ## 11. 版本边界
 
-本规格为 Proposed。当前 V2 状态机仍是运行时实现；只有 V3 机器契约、代码和迁移完成后，LangGraph 才成为执行来源。
+本规格为 P1 Contract。LangGraph 是默认执行来源，`WORKFLOW_RUNNER=v2` 可回退旧执行器；P2 Tool Contract 尚未启用。

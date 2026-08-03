@@ -20,9 +20,9 @@
 
 - **Status:** Active
 - **Last verified:** 2026-08-03
-- **Fact:** 当前可运行产品是 V2 确定性工作流加 V3 P0 知识证据闭环；Markdown/TXT、混合检索、PRD/Architecture 引用和最小 UI 已交付，LangGraph、PDF/仓库与动态 Tool 仍为 Planned。
-- **Evidence:** [`product-vision.md`](./product-vision.md)、[`architecture-overview.md`](./architecture-overview.md)、[`v3-rag-agent.md`](./exec-plans/completed/v3-rag-agent.md)。
-- **Impact:** 对外说明可以描述 V3 P0，但不得宣称 LangGraph、仓库感知、运行时 Tool 或完整 V3 已交付；后续阶段继续遵循 contract-first。
+- **Fact:** 当前可运行产品是 V2 用户可见工作流加 V3 P0/P1；Markdown/TXT/PDF、公开 GitHub snapshot、混合检索与引用、持久化 LangGraph 恢复和 V2 runner 回退已交付，动态 Tool 与增量重生成仍为 Planned。
+- **Evidence:** [`product-vision.md`](./product-vision.md)、[`architecture-overview.md`](./architecture-overview.md)、[`v3-p1-repository-graph.md`](./exec-plans/completed/v3-p1-repository-graph.md)。
+- **Impact:** 对外说明可以描述 V3 P0/P1，但不得宣称运行时 Tool、私有仓库或 P2 增量重生成已交付；后续阶段继续遵循 contract-first。
 
 ### MEM-002 Real Model Verification Boundary
 
@@ -47,6 +47,14 @@
 - **Fact:** GitHub Mermaid 会把 `graph` 解析为保留关键字，不能将其用作节点 ID；`agentGraph` 已通过 Mermaid 11.12 实际渲染。
 - **Evidence:** [`system-design.md`](./system-design.md) 的主流程图。
 - **Impact:** 修改 Mermaid 后必须实际解析全部图表，不能只依赖 Markdown 格式检查。
+
+### MEM-005 Docker Dependency Cache Boundary
+
+- **Status:** Active
+- **Last verified:** 2026-08-03
+- **Fact:** 当前 Dockerfile 在 `pnpm install` 前执行 `COPY . .`，任何源码变化都会使依赖层缓存失效；P1 最终构建因此重新下载完整 894 包依赖树，而不是新增了 894 个依赖。
+- **Evidence:** 根目录 [`Dockerfile`](../Dockerfile) 的 base stage 与本次 P1 生产镜像构建日志。
+- **Impact:** 功能开发阶段不得反复重建 Docker；后续单独优化 manifest/dependency layer 与 pnpm store cache 后，才恢复频繁镜像验证。
 
 ## Superseded Memory
 

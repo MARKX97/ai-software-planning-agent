@@ -1,13 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  advanceWorkflow,
-  continueWorkflow,
-  discussWorkflow,
-  runWorkflow,
-  type WorkflowStreamCallbacks,
-} from '@/features/workflow/api';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import { runWorkflow, type WorkflowStreamCallbacks } from '@/features/workflow/api';
 import { getUserErrorMessage } from '@/lib/api-client';
 import type { WorkflowStatusResponse, WorkflowStreamResponse } from '@/types/api';
+import { advanceGraphCheckpoint, submitWorkflowMessage } from './workflow-graph-actions';
 
 interface WorkflowActionsInput {
   readonly autoStart: boolean;
@@ -44,15 +39,7 @@ export function useWorkflowActions(input: WorkflowActionsInput): WorkflowActions
   const bufferRef = useRef('');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      queueMicrotask(() => {
-        if (!mountedRef.current) abortRef.current?.abort();
-      });
-    };
-  }, []);
+  useAbortOnUnmount(abortRef, mountedRef);
   useEffect(() => {
     if (input.autoStart && input.status?.current_stage === 'init' && !autoStartedRef.current) {
       autoStartedRef.current = true;
@@ -127,27 +114,35 @@ export function useWorkflowActions(input: WorkflowActionsInput): WorkflowActions
       setActionError('当前没有可继续的讨论。');
       return;
     }
-    const submit = input.status.waiting_for === 'reply' ? continueWorkflow : discussWorkflow;
+    const graphRun = input.status.graph_run;
+    if (input.status.waiting_for === 'reply' && graphRun && !graphRun.recovery_available) {
+      setActionError('当前恢复点不可用，请刷新后重试。');
+      return;
+    }
     await executeStream(
       (callbacks) =>
-        submit(input.projectId, {
+        submitWorkflowMessage({
+          projectId: input.projectId,
           conversationId: input.conversationId ?? '',
           message,
-          ...callbacks,
+          graphRun,
+          resume: input.status?.waiting_for === 'reply',
+          callbacks,
         }),
       message,
     );
   }
 
   async function advanceCheckpoint(): Promise<void> {
-    if (!input.conversationId) {
+    const graphRun = input.status?.graph_run;
+    if (!input.conversationId || (graphRun && !graphRun.recovery_available)) {
       setActionError('当前没有可确认的讨论。');
       return;
     }
     setBusy(true);
     setActionError(null);
     try {
-      await advanceWorkflow(input.projectId, input.conversationId);
+      await advanceGraphCheckpoint(input.projectId, input.conversationId, graphRun ?? null);
       await input.refresh();
     } catch (error) {
       setActionError(getUserErrorMessage(error, '暂时无法进入下一环节，请稍后重试。'));
@@ -167,4 +162,19 @@ export function useWorkflowActions(input: WorkflowActionsInput): WorkflowActions
     streamingReply,
     submitReply,
   };
+}
+
+function useAbortOnUnmount(
+  abortRef: RefObject<AbortController | null>,
+  mountedRef: RefObject<boolean>,
+): void {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      queueMicrotask(() => {
+        if (!mountedRef.current) abortRef.current?.abort();
+      });
+    };
+  }, [abortRef, mountedRef]);
 }

@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
   deleteKnowledgeSource,
+  importKnowledgeRepository,
   reindexKnowledgeSource,
   uploadKnowledgeSource,
 } from '@/features/knowledge/api';
@@ -25,16 +26,21 @@ export function useKnowledgeMutations(projectId: string) {
     mutationFn: (sourceId: string) => reindexKnowledgeSource(projectId, sourceId),
     onSuccess: () => finish('项目资料已重新索引。'),
   });
+  const repository = useMutation({
+    mutationFn: (url: string) => importKnowledgeRepository(projectId, url),
+    onSuccess: () => finish('公开仓库已完成索引，可以用于后续规划。'),
+  });
   const remove = useMutation({
     mutationFn: (sourceId: string) => deleteKnowledgeSource(projectId, sourceId),
     onSuccess: () => finish('项目资料已删除；已有产物中的引用快照仍会保留。'),
   });
   return {
     busyId: reindex.isPending ? reindex.variables : remove.isPending ? remove.variables : undefined,
-    error: upload.error ?? reindex.error ?? remove.error,
+    error: upload.error ?? repository.error ?? reindex.error ?? remove.error,
     message,
     reindex,
     remove,
+    repository,
     upload,
   };
 }

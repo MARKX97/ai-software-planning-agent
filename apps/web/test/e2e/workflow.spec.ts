@@ -21,7 +21,7 @@ test('user can create a project, finish workflow, inspect and download artifacts
 
     await page.getByRole('link', { name: '准备项目资料' }).click();
     await expect(page.getByRole('heading', { name: '项目资料库' })).toBeVisible();
-    await page.getByLabel('Markdown 或 TXT 文件').setInputFiles({
+    await page.getByLabel('Markdown、TXT 或 PDF 文件').setInputFiles({
       name: 'project-context.md',
       mimeType: 'text/markdown',
       buffer: Buffer.from(

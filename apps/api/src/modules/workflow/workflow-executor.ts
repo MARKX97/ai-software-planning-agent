@@ -13,6 +13,7 @@ import {
 import { toMessageResponse, type MessageResponse } from '../conversations/conversations.dto.js';
 import { loadPersistedStageResults } from './workflow-results.js';
 import { runPipeline } from './workflow-pipeline-runner.js';
+import type { AgentGraphService, GraphResumeInput } from './graph/agent-graph.service.js';
 import type { WorkflowStatusResponse } from './workflow-response.dto.js';
 import {
   buildWorkflowStatus,
@@ -32,6 +33,7 @@ export interface WorkflowExecutorDeps {
   readonly projects: ProjectsService;
   readonly orchestrator: LlmOrchestratorService;
   readonly knowledge?: KnowledgeRetrievalService;
+  readonly graph?: AgentGraphService;
 }
 
 export interface WorkflowExecutorInput {
@@ -42,6 +44,7 @@ export interface WorkflowExecutorInput {
   readonly startStage?: WorkflowStage;
   readonly userMessage?: string;
   readonly stream?: Pick<LLMStreamOptions, 'onDelta' | 'signal'>;
+  readonly graphResume?: GraphResumeInput;
 }
 
 export interface WorkflowExecutionResult {
@@ -55,17 +58,21 @@ export async function executeWorkflowPipeline(
 ): Promise<WorkflowExecutionResult> {
   const ctx = await buildWorkflowContext(deps.db, input);
   try {
-    const finalStage = await runPipeline(
-      ctx,
-      {
-        db: deps.db,
-        orchestrator: deps.orchestrator,
-        dataDir: deps.projects.dataDir(),
-        knowledge: deps.knowledge,
-        stream: input.stream,
-      },
-      { startStage: input.startStage },
-    );
+    const pipelineDeps = {
+      db: deps.db,
+      orchestrator: deps.orchestrator,
+      dataDir: deps.projects.dataDir(),
+      knowledge: deps.knowledge,
+      stream: input.stream,
+    };
+    const finalStage = deps.graph?.enabled
+      ? await deps.graph.execute({
+          context: ctx,
+          deps: pipelineDeps,
+          startStage: input.startStage ?? WorkflowStage.REQUIREMENT_ANALYSIS,
+          resume: input.graphResume,
+        })
+      : await runPipeline(ctx, pipelineDeps, { startStage: input.startStage });
     if (finalStage === WorkflowStage.COMPLETED) {
       await Promise.all([
         markProjectComplete(deps.db, input.projectId),

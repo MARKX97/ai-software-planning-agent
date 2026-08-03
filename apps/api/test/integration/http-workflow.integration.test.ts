@@ -83,6 +83,15 @@ function streamStatus(result: StreamResult): Record<string, unknown> {
   return status as Record<string, unknown>;
 }
 
+function graphResume(status: Record<string, unknown>) {
+  const value = status['graph_run'];
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value));
+  const run = value as Record<string, unknown>;
+  assert.equal(typeof run['id'], 'string');
+  assert.equal(typeof run['checkpoint_version'], 'number');
+  return { graph_run_id: run['id'], checkpoint_version: run['checkpoint_version'] };
+}
+
 describe('real HTTP + PostgreSQL workflow integration', () => {
   it(
     'covers all documented HTTP routes through the project workflow',
@@ -139,6 +148,7 @@ describe('real HTTP + PostgreSQL workflow integration', () => {
         const continuedOnce = await requestStream(`/projects/${projectId}/workflow/continue`, {
           conversation_id: conversationId,
           message: 'The primary user is a product manager in Shanghai.',
+          ...graphResume(runBody),
         });
         assert.equal(continuedOnce.response.status, 200);
         assert.equal(streamStatus(continuedOnce)['current_stage'], 'requirement_clarification');
@@ -146,9 +156,39 @@ describe('real HTTP + PostgreSQL workflow integration', () => {
           `/projects/${projectId}/conversations/${conversationId}/messages?offset=0&limit=20`,
         );
         assert.equal(bodyOf(multiRoundMessages)['total'], 3);
+        const executionsBeforeDuplicate = await request(
+          `/projects/${projectId}/workflow/executions?offset=0&limit=20`,
+        );
+        const usageBeforeDuplicate = await request(`/usage/tokens?project_id=${projectId}`);
+        const duplicateResume = await request(`/projects/${projectId}/workflow/continue`, {
+          method: 'POST',
+          body: JSON.stringify({
+            conversation_id: conversationId,
+            message: 'This stale checkpoint must not execute.',
+            ...graphResume(runBody),
+          }),
+        });
+        assert.equal(duplicateResume.response.status, 409);
+        const messagesAfterDuplicate = await request(
+          `/projects/${projectId}/conversations/${conversationId}/messages?offset=0&limit=20`,
+        );
+        const executionsAfterDuplicate = await request(
+          `/projects/${projectId}/workflow/executions?offset=0&limit=20`,
+        );
+        const usageAfterDuplicate = await request(`/usage/tokens?project_id=${projectId}`);
+        assert.equal(bodyOf(messagesAfterDuplicate)['total'], 3);
+        assert.equal(
+          bodyOf(executionsAfterDuplicate)['total'],
+          bodyOf(executionsBeforeDuplicate)['total'],
+        );
+        assert.equal(
+          bodyOf(usageAfterDuplicate)['total_tokens'],
+          bodyOf(usageBeforeDuplicate)['total_tokens'],
+        );
         const continuedTwice = await requestStream(`/projects/${projectId}/workflow/continue`, {
           conversation_id: conversationId,
           message: 'Success means 40 percent of users choose one recommendation.',
+          ...graphResume(streamStatus(continuedOnce)),
         });
         assert.equal(continuedTwice.response.status, 200);
         const continuedStatus = streamStatus(continuedTwice);
@@ -165,7 +205,10 @@ describe('real HTTP + PostgreSQL workflow integration', () => {
         assert.ok(requirementDiscussion.deltas.join('').length > 0);
         const synthesis = await request(`/projects/${projectId}/workflow/advance`, {
           method: 'POST',
-          body: JSON.stringify({ conversation_id: requirementsConversation }),
+          body: JSON.stringify({
+            conversation_id: requirementsConversation,
+            ...graphResume(continuedStatus),
+          }),
         });
         assert.equal(synthesis.response.status, 202);
         assert.equal(bodyOf(synthesis)['current_stage'], 'requirement_synthesis');
@@ -173,21 +216,30 @@ describe('real HTTP + PostgreSQL workflow integration', () => {
         const synthesisConversation = bodyOf(synthesis)['conversation_id'] as string;
         const mvp = await request(`/projects/${projectId}/workflow/advance`, {
           method: 'POST',
-          body: JSON.stringify({ conversation_id: synthesisConversation }),
+          body: JSON.stringify({
+            conversation_id: synthesisConversation,
+            ...graphResume(bodyOf(synthesis)),
+          }),
         });
         assert.equal(mvp.response.status, 202);
         assert.equal(bodyOf(mvp)['current_stage'], 'mvp_compression');
         const mvpConversation = bodyOf(mvp)['conversation_id'] as string;
         const platform = await request(`/projects/${projectId}/workflow/advance`, {
           method: 'POST',
-          body: JSON.stringify({ conversation_id: mvpConversation }),
+          body: JSON.stringify({
+            conversation_id: mvpConversation,
+            ...graphResume(bodyOf(mvp)),
+          }),
         });
         assert.equal(platform.response.status, 202);
         assert.equal(bodyOf(platform)['current_stage'], 'platform_recommendation');
         const platformConversation = bodyOf(platform)['conversation_id'] as string;
         const completed = await request(`/projects/${projectId}/workflow/advance`, {
           method: 'POST',
-          body: JSON.stringify({ conversation_id: platformConversation }),
+          body: JSON.stringify({
+            conversation_id: platformConversation,
+            ...graphResume(bodyOf(platform)),
+          }),
         });
         assert.equal(completed.response.status, 202);
         assert.equal(bodyOf(completed)['current_stage'], 'completed');

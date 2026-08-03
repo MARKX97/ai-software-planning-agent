@@ -129,6 +129,7 @@ API:
 - 检查点讨论消息调用 `workflow/discuss`，确认推进调用 `workflow/advance`
 - 同一回复提交按钮在请求期间禁用，防重复提交
 - `waiting_for=review` 时展示“继续讨论”和“确认，继续下一环节”两个操作
+- 页面展示 `graph_run.current_node`、恢复版本和可恢复状态；回复或确认推进时原样回传当前 `graph_run.id` 与 `checkpoint_version`。
 - 需求确认、MVP 取舍和技术方案确认均复用同一对话面板；内部分析阶段不单独打断用户
 
 流式回复:
@@ -151,13 +152,15 @@ API:
 API:
 
 - `POST /projects/{project_id}/knowledge/sources`
+- `POST /projects/{project_id}/knowledge/sources/repositories`
 - `GET /projects/{project_id}/knowledge/sources`
 - `POST /projects/{project_id}/knowledge/sources/{source_id}/reindex`
 - `DELETE /projects/{project_id}/knowledge/sources/{source_id}`
 
 交互:
 
-- P0 仅接受单个 `.md` 或 `.txt` 文件，上传期间禁用重复提交。
+- 接受单个 `.md`、`.txt` 或 `.pdf` 文件；另提供公开 GitHub 仓库 URL 导入，提交期间禁用重复提交。
+- 仓库来源展示固定 commit；代码来源引用显示文件、行范围和 commit，PDF 引用显示页码。
 - 展示 `pending`、`processing`、`ready`、`ready_with_warnings` 和 `failed` 的可读状态，不只依赖颜色。
 - 失败或带 warning 的来源可重新索引；删除前必须确认，操作完成后刷新列表。
 - loading、empty、error 和 mutation error 均提供明确反馈；状态变化使用 `aria-live`。
@@ -335,7 +338,7 @@ E2E:
 - 用户可以启动工作流并查看阶段进度。
 - 澄清阶段可以提交回复并继续工作流。
 - 工作流完成后可以查看 11 类产物。
-- 用户可以上传、重建和删除 Markdown/TXT 知识源，并查看索引状态。
+- 用户可以上传、导入、重建和删除 Markdown/TXT/PDF/公开仓库知识源，并查看索引状态与固定 commit。
 - 有引用的产物可以查看生成时的证据快照。
 - 用户可以导出并下载产物。
 - Token 用量和模型调用日志可查看。

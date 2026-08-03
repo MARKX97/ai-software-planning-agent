@@ -36,6 +36,7 @@ export class AppConfigService {
   readonly embeddingModel: string;
   readonly embeddingDimensions: number;
   readonly ragEnabled: boolean;
+  readonly workflowRunner: 'graph' | 'v2';
   /** Per-project LLM cost ceiling (CNY). */
   readonly costLimitPerProject: number;
   /** Model-producing workflow operations allowed per project/caller each minute. */
@@ -62,6 +63,7 @@ export class AppConfigService {
     this.embeddingModel = process.env['EMBEDDING_MODEL'] ?? 'mock-embedding-v1';
     this.embeddingDimensions = this.parsePositiveInt(process.env['EMBEDDING_DIMENSIONS'], 8, 4096);
     this.ragEnabled = this.parseBoolean(process.env['RAG_ENABLED'], true);
+    this.workflowRunner = this.parseWorkflowRunner(process.env['WORKFLOW_RUNNER']);
     this.costLimitPerProject = this.parseNumber(process.env['COST_MAX_COST_PER_PROJECT'], 5);
     this.workflowRateLimitPerMinute = this.parseNonNegativeInt(
       process.env['WORKFLOW_RATE_LIMIT_PER_MINUTE'],
@@ -103,5 +105,11 @@ export class AppConfigService {
     if (value === 'true') return true;
     if (value === 'false') return false;
     throw new Error('RAG_ENABLED must be true or false');
+  }
+
+  private parseWorkflowRunner(value: string | undefined): 'graph' | 'v2' {
+    if (!value || value === 'graph') return 'graph';
+    if (value === 'v2') return value;
+    throw new Error('WORKFLOW_RUNNER must be graph or v2');
   }
 }

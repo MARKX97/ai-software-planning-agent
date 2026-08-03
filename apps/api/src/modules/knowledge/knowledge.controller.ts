@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -9,11 +10,17 @@ import {
   Res,
   UploadedFile,
   UseInterceptors,
+  UsePipes,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import type { KnowledgeSource } from '@ai-planning/shared';
+import {
+  repositoryImportRequestSchema,
+  type KnowledgeSource,
+  type RepositoryImportRequest,
+} from '@ai-planning/shared';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
 import { UUID_V4_PIPE } from '../../common/pipes/uuid-validation.pipe.js';
 import { KnowledgeService } from './knowledge.service.js';
 import type { KnowledgeSourceListResponse } from './knowledge.dto.js';
@@ -26,13 +33,26 @@ export class KnowledgeController {
 
   @Post()
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024, files: 1 } }))
-  @ApiOperation({ summary: '上传并索引 Markdown 或 TXT 知识源' })
+  @ApiOperation({ summary: '上传并索引 Markdown、TXT 或 PDF 知识源' })
   async create(
     @Param('project_id', UUID_V4_PIPE) projectId: string,
     @UploadedFile() file: UploadedKnowledgeFile,
     @Res({ passthrough: true }) response: Response,
   ): Promise<KnowledgeSource> {
     const result = await this.knowledge.create(projectId, file);
+    response.status(result.created ? HttpStatus.CREATED : HttpStatus.OK);
+    return result.source;
+  }
+
+  @Post('repositories')
+  @UsePipes(new ZodValidationPipe(repositoryImportRequestSchema))
+  @ApiOperation({ summary: '导入公开 GitHub 仓库' })
+  async createRepository(
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
+    @Body() body: RepositoryImportRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<KnowledgeSource> {
+    const result = await this.knowledge.createRepository(projectId, body.repository_url);
     response.status(result.created ? HttpStatus.CREATED : HttpStatus.OK);
     return result.source;
   }

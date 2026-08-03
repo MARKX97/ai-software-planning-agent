@@ -13,10 +13,15 @@ describe('harness parsers', () => {
     ]);
   });
 
-  it('allows P0 LangChain packages only in the API workspace', () => {
+  it('allows approved V3 LangChain packages only in the API workspace', () => {
     assert.equal(isForbiddenExternal('@langchain/textsplitters', '@ai-planning/api'), false);
     assert.equal(isForbiddenExternal('@langchain/textsplitters', '@ai-planning/database'), true);
     assert.equal(isForbiddenExternal('@langchain/community', '@ai-planning/api'), true);
+    assert.equal(isForbiddenExternal('@langchain/langgraph', '@ai-planning/api'), false);
+    assert.equal(
+      isForbiddenExternal('@langchain/langgraph-checkpoint-postgres', '@ai-planning/api'),
+      false,
+    );
     assert.equal(isForbiddenExternal('redis', '@ai-planning/api'), true);
   });
 

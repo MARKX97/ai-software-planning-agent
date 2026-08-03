@@ -29,6 +29,7 @@ docker compose up --build
 - `BAISHAN_API_KEY` 为空时使用确定性 Mock；配置真实密钥时只注入 API 容器。
 - `EMBEDDING_PROVIDER` 默认是固定向量 `mock`；真实服务使用 `openai-compatible`，并单独配置 `EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL` 和 `EMBEDDING_DIMENSIONS`。
 - `RAG_ENABLED` 默认 `true`；设为 `false` 时跳过知识检索与查询 Embedding，工作流沿用 V2 无证据路径。
+- `WORKFLOW_RUNNER` 默认 `graph`；迁移期设为 `v2` 可回退旧 runner。Graph checkpoint 与业务库使用同一 `DATABASE_URL`。
 - Compose 是本地演示入口，不代表生产部署方案。
 
 ## Configuration And Secrets

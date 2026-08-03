@@ -62,6 +62,7 @@ const status = {
   error_message: null,
   started_at: null,
   updated_at: '2026-07-13T00:00:00.000Z',
+  graph_run: null,
 } satisfies WorkflowStatusResponse;
 
 describe('WorkflowSse', () => {

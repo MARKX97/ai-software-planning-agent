@@ -88,6 +88,7 @@ describe('AppConfigService', () => {
       WORKFLOW_RATE_LIMIT_PER_MINUTE: '0',
       DOWNLOAD_TOKEN_SECRET: '',
       RAG_ENABLED: 'false',
+      WORKFLOW_RUNNER: 'v2',
     };
     const config = new AppConfigService();
     assert.deepEqual(
@@ -97,8 +98,9 @@ describe('AppConfigService', () => {
         rate: config.workflowRateLimitPerMinute,
         secret: config.downloadTokenSecret,
         rag: config.ragEnabled,
+        runner: config.workflowRunner,
       },
-      { port: 4100, cost: 9.5, rate: 0, secret: 'api-test-key', rag: false },
+      { port: 4100, cost: 9.5, rate: 0, secret: 'api-test-key', rag: false, runner: 'v2' },
     );
   });
 
@@ -126,5 +128,10 @@ describe('AppConfigService', () => {
   it('rejects an invalid RAG feature flag', () => {
     process.env = { ...originalEnv, RAG_ENABLED: 'yes' };
     assert.throws(() => new AppConfigService(), /RAG_ENABLED/);
+  });
+
+  it('rejects an invalid workflow runner', () => {
+    process.env = { ...originalEnv, WORKFLOW_RUNNER: 'legacy' };
+    assert.throws(() => new AppConfigService(), /WORKFLOW_RUNNER/);
   });
 });

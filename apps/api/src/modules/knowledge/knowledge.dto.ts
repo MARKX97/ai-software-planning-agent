@@ -20,6 +20,7 @@ export function toKnowledgeSourceResponse(
     name: source.name,
     mime_type: source.mime_type,
     source_uri: source.source_uri,
+    repository_commit: source.repository_commit,
     content_hash: source.content_hash,
     status: source.status,
     warning_count: source.warning_count,

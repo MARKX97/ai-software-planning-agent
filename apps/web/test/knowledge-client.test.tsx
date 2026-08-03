@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { KnowledgeClient } from '@/components/knowledge/knowledge-client';
 import {
   deleteKnowledgeSource,
+  importKnowledgeRepository,
   listKnowledgeSources,
   reindexKnowledgeSource,
   uploadKnowledgeSource,
@@ -13,6 +14,7 @@ import {
 
 vi.mock('@/features/knowledge/api', () => ({
   deleteKnowledgeSource: vi.fn(),
+  importKnowledgeRepository: vi.fn(),
   listKnowledgeSources: vi.fn(),
   reindexKnowledgeSource: vi.fn(),
   uploadKnowledgeSource: vi.fn(),
@@ -45,6 +47,7 @@ describe('KnowledgeClient', () => {
     vi.clearAllMocks();
     vi.mocked(listKnowledgeSources).mockResolvedValue({ items: [source], total: 1 });
     vi.mocked(uploadKnowledgeSource).mockResolvedValue(source);
+    vi.mocked(importKnowledgeRepository).mockResolvedValue(source);
     vi.mocked(reindexKnowledgeSource).mockResolvedValue(source);
     vi.mocked(deleteKnowledgeSource).mockResolvedValue();
   });
@@ -54,9 +57,20 @@ describe('KnowledgeClient', () => {
     renderClient();
     expect(await screen.findByText('可用，但有提醒')).toBeInTheDocument();
     const file = new File(['# Context'], 'context.md', { type: 'text/markdown' });
-    await userEvent.upload(screen.getByLabelText('Markdown 或 TXT 文件'), file);
+    await userEvent.upload(screen.getByLabelText('Markdown、TXT 或 PDF 文件'), file);
     await userEvent.click(screen.getByRole('button', { name: '上传并索引' }));
     await waitFor(() => expect(uploadKnowledgeSource).toHaveBeenCalledWith('project-1', file));
+    await userEvent.type(
+      screen.getByLabelText('公开 GitHub 仓库'),
+      'https://github.com/acme/sample',
+    );
+    await userEvent.click(screen.getByRole('button', { name: '导入仓库' }));
+    await waitFor(() =>
+      expect(importKnowledgeRepository).toHaveBeenCalledWith(
+        'project-1',
+        'https://github.com/acme/sample',
+      ),
+    );
     await userEvent.click(screen.getByRole('button', { name: '重新索引' }));
     await waitFor(() =>
       expect(reindexKnowledgeSource).toHaveBeenCalledWith('project-1', 'source-1'),

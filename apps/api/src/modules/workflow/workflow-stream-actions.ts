@@ -27,12 +27,14 @@ import {
 } from './workflow-execution-state.js';
 import { WorkflowSse } from './workflow-sse.js';
 import { syncProjectBudget } from './workflow-budget.js';
+import type { AgentGraphService } from './graph/agent-graph.service.js';
 
 export interface WorkflowStreamDeps {
   readonly db: PrismaService;
   readonly projects: ProjectsService;
   readonly orchestrator: LlmOrchestratorService;
   readonly knowledge?: KnowledgeRetrievalService;
+  readonly graph?: AgentGraphService;
 }
 
 interface StreamInput<T> {
@@ -77,6 +79,12 @@ export async function streamContinue(
   assertCanContinueWorkflow(project);
   assertWorkflowInteraction(status, input.body.conversation_id, 'reply');
   await syncProjectBudget(deps, input.projectId);
+  const graphResume = deps.graph?.resumeInput({
+    graphRunId: input.body.graph_run_id,
+    checkpointVersion: input.body.checkpoint_version,
+    stage: WorkflowStage.REQUIREMENT_ANALYSIS,
+  });
+  if (graphResume) await deps.graph?.reserveResume(input.projectId, graphResume);
   const execution = await createExecution(deps.db, input.projectId);
   await updateProjectStage(deps.db, input.projectId, WorkflowStage.REQUIREMENT_ANALYSIS);
   input.stream.open();
@@ -88,6 +96,7 @@ export async function streamContinue(
       conversationId: input.body.conversation_id,
       startStage: WorkflowStage.REQUIREMENT_ANALYSIS,
       userMessage: input.body.message,
+      graphResume,
       stream: streamOptions(input.stream),
     }),
   );

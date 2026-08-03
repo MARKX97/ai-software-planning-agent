@@ -33,6 +33,7 @@ import { buildWorkflowStatus, createExecution } from './workflow-store.js';
 import { streamContinue, streamDiscuss, streamRun } from './workflow-stream-actions.js';
 import type { WorkflowSse } from './workflow-sse.js';
 import { syncProjectBudget } from './workflow-budget.js';
+import { AgentGraphService } from './graph/agent-graph.service.js';
 
 export type { ExecutionLogsListResponse } from './workflow-history.js';
 
@@ -40,6 +41,9 @@ export type { ExecutionLogsListResponse } from './workflow-history.js';
 export class WorkflowService {
   @Inject(KnowledgeRetrievalService)
   private readonly knowledge!: KnowledgeRetrievalService;
+
+  @Inject(AgentGraphService)
+  private readonly graph!: AgentGraphService;
 
   constructor(
     private readonly db: PrismaService,
@@ -80,6 +84,12 @@ export class WorkflowService {
       project.current_stage as WorkflowStage,
     );
     await syncProjectBudget(this.deps(), projectId);
+    const graphResume = this.graph.resumeInput({
+      graphRunId: input.graph_run_id,
+      checkpointVersion: input.checkpoint_version,
+      stage: nextStage,
+    });
+    if (graphResume) await this.graph.reserveResume(projectId, graphResume);
     await confirmCheckpointDecision(this.db, {
       projectId,
       conversationId: input.conversation_id,
@@ -92,6 +102,7 @@ export class WorkflowService {
       originalIdea: project.original_idea,
       conversationId: input.conversation_id,
       startStage: nextStage,
+      graphResume,
     });
     return result.status;
   }
@@ -132,6 +143,7 @@ export class WorkflowService {
       projects: this.projects,
       orchestrator: this.orchestrator,
       knowledge: this.knowledge,
+      graph: this.graph,
     };
   }
 }

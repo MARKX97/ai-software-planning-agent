@@ -27,6 +27,7 @@ export async function storeIndexChunks(
       title: input.document.title,
       mime_type: input.document.mimeType,
       content_hash: input.document.contentHash,
+      repository_commit: input.document.repositoryCommit,
       metadata: {
         indexerVersion: input.indexerVersion,
         parsedChunks: input.document.chunks.length,
@@ -44,6 +45,7 @@ export async function storeIndexChunks(
       titlePath: chunk.titlePath,
       lineStart: chunk.lineStart,
       lineEnd: chunk.lineEnd,
+      pageNumber: chunk.pageNumber,
       contentHash: chunk.contentHash,
       embedding,
     })),

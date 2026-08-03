@@ -137,7 +137,7 @@ V3 P0 详细行为以 `specs/knowledge-base.spec.md` 为准；`specs/agent-graph
 | `apps/api`                  | `config`, `database`, `llm-orchestrator`, `shared` |
 | `apps/web`                  | 无；通过 HTTP 访问 API                             |
 
-P0 仅允许 `apps/api` 直接依赖 `@langchain/core` 和 `@langchain/textsplitters`；上传文本 Loader 基于 Core 的 `BaseDocumentLoader`，不为 P0 引入已 deprecated 的 `@langchain/community` 或 Agent 聚合包。其他 workspace 与 LangGraph 继续禁止，后续阶段按 execution plan 单独放行。
+P1 允许 `apps/api` 直接依赖 `@langchain/core`、`@langchain/textsplitters`、`@langchain/langgraph` 和 `@langchain/langgraph-checkpoint-postgres`；其他 workspace 与 Agent 聚合包继续禁止。
 
 API 中只有以下位置可以 import `LlmOrchestratorService`：
 

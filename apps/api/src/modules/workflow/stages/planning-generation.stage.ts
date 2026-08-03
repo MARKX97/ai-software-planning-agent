@@ -100,5 +100,8 @@ function evidenceQuery(ctx: WorkflowContext): string {
     mvp: ctx.resultsByStage.mvp_compression?.structuredOutput,
     platform: ctx.resultsByStage.platform_recommendation?.structuredOutput,
   };
-  return JSON.stringify(relevant).slice(0, 2_000);
+  return `Repository impact evidence: directories, dependencies, interfaces, data structures, affected files and incremental changes. ${JSON.stringify(relevant)}`.slice(
+    0,
+    2_000,
+  );
 }

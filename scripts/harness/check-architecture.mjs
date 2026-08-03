@@ -53,7 +53,12 @@ const forbiddenPackages = [
 ];
 
 const approvedExternal = {
-  '@ai-planning/api': new Set(['@langchain/core', '@langchain/textsplitters']),
+  '@ai-planning/api': new Set([
+    '@langchain/core',
+    '@langchain/langgraph',
+    '@langchain/langgraph-checkpoint-postgres',
+    '@langchain/textsplitters',
+  ]),
 };
 
 export function isForbiddenExternal(name, workspace) {

@@ -28,6 +28,14 @@ export class KnowledgeIndexerService {
     return this.parser.parse(file);
   }
 
+  parseRepositoryFile(
+    path: string,
+    content: string,
+    commit: string,
+  ): Promise<ParsedKnowledgeDocument> {
+    return this.parser.parseRepositoryFile(path, content, commit);
+  }
+
   async index(
     projectId: string,
     sourceId: string,
@@ -60,6 +68,49 @@ export class KnowledgeIndexerService {
         sourceId,
         revision: revision.number,
         chunks: embedded.items.length,
+        startedAt,
+      });
+    } catch (error) {
+      await this.store.fail(sourceId, revision.id, error);
+      this.log({ projectId, sourceId, revision: revision.number, result: 'failed', startedAt });
+      throw AppException.internal('Knowledge indexing failed', ErrorCode.KNOWLEDGE_INDEXING_FAILED);
+    }
+  }
+
+  async indexMany(input: {
+    projectId: string;
+    sourceId: string;
+    documents: readonly ParsedKnowledgeDocument[];
+    contentHash: string;
+  }): Promise<void> {
+    const identity = this.identity();
+    const { projectId, sourceId, documents, contentHash } = input;
+    const revision = await this.store.begin({ projectId, sourceId, contentHash, identity });
+    if (!revision) return;
+    const startedAt = Date.now();
+    try {
+      const documentByChunk = new Map(
+        documents.flatMap((document, index) => document.chunks.map((chunk) => [chunk, index])),
+      );
+      const embedded = await this.embed(documents.flatMap((document) => document.chunks));
+      const items = documents.map((document) => ({ document, chunks: [] as EmbeddedChunk[] }));
+      embedded.items.forEach((item) => items[documentByChunk.get(item.chunk)!]?.chunks.push(item));
+      const warningCount = embedded.warningCount;
+      if (items.every((item) => item.chunks.length === 0)) {
+        throw embedded.lastError ?? new EmbeddingError('EMBEDDING_FAILED');
+      }
+      await this.store.completeMany({
+        sourceId,
+        revisionId: revision.id,
+        documents: items,
+        warningCount,
+        indexerVersion: INDEXER_VERSION,
+      });
+      this.log({
+        projectId,
+        sourceId,
+        revision: revision.number,
+        chunks: items.reduce((sum, item) => sum + item.chunks.length, 0),
         startedAt,
       });
     } catch (error) {

@@ -20,6 +20,7 @@ export function WorkflowStatusPanels({
   return (
     <>
       <ProgressPanel status={status} />
+      <GraphRecoveryPanel status={status} />
       <ModelFailurePanel modelStatus={status.model_status} />
 
       <DecisionSnapshotsPanel snapshots={status.decision_snapshots} />
@@ -53,6 +54,16 @@ export function WorkflowStatusPanels({
         </Card>
       ) : null}
     </>
+  );
+}
+
+function GraphRecoveryPanel({ status }: { status: WorkflowStatusResponse }) {
+  if (!status.graph_run) return null;
+  return (
+    <p className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+      执行节点：{status.graph_run.current_node} · 恢复版本 {status.graph_run.checkpoint_version}
+      {status.graph_run.recovery_available ? ' · 可恢复' : ''}
+    </p>
   );
 }
 

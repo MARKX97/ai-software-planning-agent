@@ -19,6 +19,11 @@ const streamResult = {
   assistant_message: { id: 'message-1', conversation_id: 'conversation-1' },
   status: { current_stage: 'requirement_clarification' },
 } as never;
+const graphRun = {
+  id: '11111111-1111-4111-8111-111111111111',
+  checkpoint_version: 2,
+  recovery_available: true,
+};
 
 function setup(
   waitingFor: 'reply' | 'review' | null = 'reply',
@@ -31,7 +36,11 @@ function setup(
       autoStart: false,
       projectId: 'project-1',
       conversationId,
-      status: { current_stage: 'requirement_clarification', waiting_for: waitingFor } as never,
+      status: {
+        current_stage: 'requirement_clarification',
+        waiting_for: waitingFor,
+        graph_run: graphRun,
+      } as never,
       refresh,
       onDone,
     }),
@@ -65,7 +74,12 @@ describe('useWorkflowActions', () => {
     await act(() => hook.result.current.submitReply());
     expect(continueWorkflow).toHaveBeenCalledWith(
       'project-1',
-      expect.objectContaining({ conversationId: 'conversation-1', message: 'answer' }),
+      expect.objectContaining({
+        conversationId: 'conversation-1',
+        message: 'answer',
+        graphRunId: graphRun.id,
+        checkpointVersion: 2,
+      }),
     );
     expect(hook.onDone).toHaveBeenCalledWith(streamResult);
     expect(hook.refresh).toHaveBeenCalled();
@@ -89,7 +103,12 @@ describe('useWorkflowActions', () => {
     expect(missing.result.current.actionError).toBe('当前没有可确认的讨论。');
     const hook = setup('review');
     await act(() => hook.result.current.advanceCheckpoint());
-    expect(advanceWorkflow).toHaveBeenCalledWith('project-1', 'conversation-1');
+    expect(advanceWorkflow).toHaveBeenCalledWith({
+      projectId: 'project-1',
+      conversationId: 'conversation-1',
+      graphRunId: graphRun.id,
+      checkpointVersion: 2,
+    });
     expect(hook.refresh).toHaveBeenCalled();
   });
 });

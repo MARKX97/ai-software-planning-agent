@@ -43,7 +43,11 @@ export function KnowledgeClient({ projectId }: { projectId: string }) {
       eyebrow="项目证据"
       title="项目资料库"
     >
-      <KnowledgeUploadCard busy={actions.upload.isPending} onUpload={actions.upload.mutateAsync} />
+      <KnowledgeUploadCard
+        busy={actions.upload.isPending || actions.repository.isPending}
+        onImportRepository={actions.repository.mutateAsync}
+        onUpload={actions.upload.mutateAsync}
+      />
       <KnowledgeFeedback error={actions.error} message={actions.message} />
       <KnowledgeSourceList
         busyId={actions.busyId}

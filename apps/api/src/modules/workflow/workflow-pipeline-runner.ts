@@ -53,6 +53,12 @@ export interface PipelineRunOptions {
   readonly startStage?: WorkflowStage;
 }
 
+export interface PipelineStageResult {
+  readonly stage: WorkflowStage;
+  readonly nextStage: WorkflowStage;
+  readonly waitingFor: 'reply' | 'review' | null;
+}
+
 /** Run the pipeline until completion or until clarification needs user input. */
 export async function runPipeline(
   ctx: WorkflowContext,
@@ -60,47 +66,50 @@ export async function runPipeline(
   options: PipelineRunOptions = {},
 ): Promise<WorkflowStage> {
   const stateMachine = new WorkflowStateMachine();
-  const stageDeps: StageDeps = {
+  let currentStage = options.startStage ?? pickStartingStage(ctx);
+  while (!stateMachine.isTerminal(currentStage)) {
+    const step = await runPipelineStage(ctx, deps, currentStage);
+    if (step.waitingFor) return currentStage;
+    currentStage = step.nextStage;
+  }
+  await updateProjectStage(deps.db, ctx.projectId, currentStage);
+  return currentStage;
+}
+
+export async function runPipelineStage(
+  ctx: WorkflowContext,
+  deps: PipelineRunDeps,
+  currentStage: WorkflowStage,
+): Promise<PipelineStageResult> {
+  const stateMachine = new WorkflowStateMachine();
+  const registry = createStageRegistry({
     orchestrator: deps.orchestrator,
     db: deps.db,
     dataDir: deps.dataDir,
     knowledge: deps.knowledge,
     stream: deps.stream,
-  };
-  const registry = createStageRegistry(stageDeps);
-  let currentStage = options.startStage ?? pickStartingStage(ctx);
-  while (!stateMachine.isTerminal(currentStage)) {
-    const processor = registry.get(currentStage);
-    if (!processor) {
-      throw new Error(`No processor registered for stage '${currentStage}'`);
-    }
-    await updateProjectStage(deps.db, ctx.projectId, currentStage);
-    await markStageRunning(deps.db, ctx.projectId, currentStage, stateMachine);
-    const result = await runStage(processor, ctx);
-    ctx.resultsByStage[currentStage] = result;
-    await persistAnalysisResult(deps.db, ctx.projectId, ctx.executionId, currentStage, result);
-    await markStageCompleted(deps.db, ctx.projectId, currentStage, result, stateMachine);
-    if (currentStage === WorkflowStage.REQUIREMENT_SYNTHESIS) {
-      await updateRequirementText(deps.db, ctx.projectId, result);
-    }
-    const waitingFor = waitingForUser(currentStage, result, ctx.clarificationRound);
-    if (waitingFor) {
-      await updateProjectStage(deps.db, ctx.projectId, currentStage);
-      await markStageWaiting(
-        deps.db,
-        ctx.projectId,
-        currentStage,
-        result,
-        stateMachine,
-        waitingFor,
-      );
-      return currentStage;
-    }
-    const next = decideNextStage(stateMachine, currentStage, result);
-    currentStage = next;
-  }
+  } satisfies StageDeps);
+  const processor = registry.get(currentStage);
+  if (!processor) throw new Error(`No processor registered for stage '${currentStage}'`);
   await updateProjectStage(deps.db, ctx.projectId, currentStage);
-  return currentStage;
+  await markStageRunning(deps.db, ctx.projectId, currentStage, stateMachine);
+  const result = await runStage(processor, ctx);
+  ctx.resultsByStage[currentStage] = result;
+  await persistAnalysisResult(deps.db, ctx.projectId, ctx.executionId, currentStage, result);
+  await markStageCompleted(deps.db, ctx.projectId, currentStage, result, stateMachine);
+  if (currentStage === WorkflowStage.REQUIREMENT_SYNTHESIS) {
+    await updateRequirementText(deps.db, ctx.projectId, result);
+  }
+  const waitingFor = waitingForUser(currentStage, result, ctx.clarificationRound);
+  if (waitingFor) {
+    await updateProjectStage(deps.db, ctx.projectId, currentStage);
+    await markStageWaiting(deps.db, ctx.projectId, currentStage, result, stateMachine, waitingFor);
+  }
+  return {
+    stage: currentStage,
+    nextStage: decideNextStage(stateMachine, currentStage, result),
+    waitingFor,
+  };
 }
 
 function pickStartingStage(ctx: WorkflowContext): WorkflowStage {

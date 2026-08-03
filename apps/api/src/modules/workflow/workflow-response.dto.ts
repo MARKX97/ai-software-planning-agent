@@ -12,6 +12,7 @@ import {
 import { WorkflowStage } from '@ai-planning/shared';
 import type { ArtifactQualityReport, DecisionSnapshot } from '@ai-planning/shared';
 import { workflowInteraction } from './workflow-checkpoints.js';
+import { toGraphRunResponse, type GraphRunResponse } from './graph/graph-run.dto.js';
 
 export interface WorkflowStatusResponse {
   project_id: string;
@@ -29,7 +30,10 @@ export interface WorkflowStatusResponse {
   error_message: string | null;
   started_at: string | null;
   updated_at: string;
+  graph_run: GraphRunResponse | null;
 }
+
+export type { GraphRunResponse } from './graph/graph-run.dto.js';
 
 export interface WorkflowStateResponse {
   id: string;
@@ -168,6 +172,7 @@ export function buildStatusFromProject(input: {
   readonly conversationId?: string | null;
   readonly decisionSnapshots?: DecisionSnapshot[];
   readonly qualityReport?: ArtifactQualityReport | null;
+  readonly graphRun?: Parameters<typeof toGraphRunResponse>[0];
 }): WorkflowStatusResponse {
   const interaction = workflowInteraction(input.activeState?.data_json);
   return {
@@ -189,6 +194,7 @@ export function buildStatusFromProject(input: {
     error_message: input.project.error_message,
     started_at: input.project.started_at?.toISOString() ?? null,
     updated_at: input.project.updated_at.toISOString(),
+    graph_run: toGraphRunResponse(input.graphRun),
   };
 }
 

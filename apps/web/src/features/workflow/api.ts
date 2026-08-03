@@ -18,6 +18,11 @@ export interface WorkflowMessageStreamInput extends WorkflowStreamCallbacks {
   readonly message: string;
 }
 
+export interface WorkflowResumeStreamInput extends WorkflowMessageStreamInput {
+  readonly graphRunId?: string;
+  readonly checkpointVersion?: number;
+}
+
 export function runWorkflow(
   projectId: string,
   callbacks: WorkflowStreamCallbacks,
@@ -56,11 +61,17 @@ export function listConversationMessages(
 
 export function continueWorkflow(
   projectId: string,
-  input: WorkflowMessageStreamInput,
+  input: WorkflowResumeStreamInput,
 ): Promise<WorkflowStreamResponse> {
   return apiEventStream<WorkflowStreamResponse>(`/projects/${projectId}/workflow/continue`, {
     method: 'POST',
-    body: { conversation_id: input.conversationId, message: input.message },
+    body: {
+      conversation_id: input.conversationId,
+      message: input.message,
+      ...(input.graphRunId
+        ? { graph_run_id: input.graphRunId, checkpoint_version: input.checkpointVersion }
+        : {}),
+    },
     onDelta: input.onDelta,
     signal: input.signal,
   });
@@ -78,12 +89,19 @@ export function discussWorkflow(
   });
 }
 
-export function advanceWorkflow(
-  projectId: string,
-  conversationId: string,
-): Promise<WorkflowStatusResponse> {
-  return apiRequest<WorkflowStatusResponse>(`/projects/${projectId}/workflow/advance`, {
+export function advanceWorkflow(input: {
+  projectId: string;
+  conversationId: string;
+  graphRunId?: string;
+  checkpointVersion?: number;
+}): Promise<WorkflowStatusResponse> {
+  return apiRequest<WorkflowStatusResponse>(`/projects/${input.projectId}/workflow/advance`, {
     method: 'POST',
-    body: { conversation_id: conversationId },
+    body: {
+      conversation_id: input.conversationId,
+      ...(input.graphRunId
+        ? { graph_run_id: input.graphRunId, checkpoint_version: input.checkpointVersion }
+        : {}),
+    },
   });
 }

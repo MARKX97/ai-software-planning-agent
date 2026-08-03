@@ -83,6 +83,8 @@ describe('feature API clients', () => {
     await continueWorkflow('project-1', {
       conversationId: 'conversation-1',
       message: 'reply',
+      graphRunId: 'graph-run-1',
+      checkpointVersion: 2,
       ...callbacks,
     });
     await discussWorkflow('project-1', {
@@ -90,7 +92,12 @@ describe('feature API clients', () => {
       message: 'follow up',
       ...callbacks,
     });
-    await advanceWorkflow('project-1', 'conversation-1');
+    await advanceWorkflow({
+      projectId: 'project-1',
+      conversationId: 'conversation-1',
+      graphRunId: 'graph-run-1',
+      checkpointVersion: 2,
+    });
     await listConversationMessages('project-1', 'conversation-1');
     await getTokenUsage('project-1');
     await listModelLogs('project-1', 10, 5);
@@ -106,7 +113,12 @@ describe('feature API clients', () => {
     });
     expect(apiEventStream).toHaveBeenNthCalledWith(2, '/projects/project-1/workflow/continue', {
       method: 'POST',
-      body: { conversation_id: 'conversation-1', message: 'reply' },
+      body: {
+        conversation_id: 'conversation-1',
+        message: 'reply',
+        graph_run_id: 'graph-run-1',
+        checkpoint_version: 2,
+      },
       ...callbacks,
     });
     expect(apiEventStream).toHaveBeenNthCalledWith(3, '/projects/project-1/workflow/discuss', {
@@ -116,7 +128,11 @@ describe('feature API clients', () => {
     });
     expect(apiRequest).toHaveBeenNthCalledWith(1, '/projects/project-1/workflow/advance', {
       method: 'POST',
-      body: { conversation_id: 'conversation-1' },
+      body: {
+        conversation_id: 'conversation-1',
+        graph_run_id: 'graph-run-1',
+        checkpoint_version: 2,
+      },
     });
     expect(apiRequest).toHaveBeenNthCalledWith(
       2,
