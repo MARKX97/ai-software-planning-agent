@@ -250,11 +250,38 @@ model GraphRun {
   updated_at         DateTime      @map("updated_at") @db.Timestamptz
   completed_at       DateTime?     @map("completed_at") @db.Timestamptz
 
-  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  project    Project    @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  tool_steps ToolStep[]
 
   @@index([project_id, updated_at(sort: Desc)])
   @@index([project_id, status])
   @@map("graph_runs")
+}
+
+/// P2 read-only Tool audit. The unique call number makes Graph node replay idempotent.
+model ToolStep {
+  id             String        @id @default(uuid()) @db.Uuid
+  graph_run_id   String        @map("graph_run_id") @db.Uuid
+  execution_id   String?       @map("execution_id") @db.Uuid
+  stage          WorkflowStage @map("stage")
+  node           String        @db.VarChar(100)
+  tool           String        @db.VarChar(64)
+  call_number    Int           @map("call_number")
+  status         String        @db.VarChar(20)
+  arguments_json Json          @map("arguments_json")
+  result_json    Json?         @map("result_json")
+  result_count   Int           @default(0) @map("result_count")
+  duration_ms    Int?          @map("duration_ms")
+  error_code     String?       @map("error_code") @db.VarChar(50)
+  created_at     DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updated_at     DateTime      @map("updated_at") @db.Timestamptz
+
+  graph_run GraphRun @relation(fields: [graph_run_id], references: [id], onDelete: Cascade)
+
+  @@unique([graph_run_id, stage, call_number])
+  @@index([graph_run_id, created_at])
+  @@index([execution_id])
+  @@map("tool_steps")
 }
 
 /// Stage analysis result (structured LLM output persisted).
@@ -410,23 +437,23 @@ model TokenUsage {
 }
 
 model KnowledgeSource {
-  id            String              @id @default(uuid()) @db.Uuid
-  project_id    String              @map("project_id") @db.Uuid
-  kind          KnowledgeSourceKind @map("kind")
-  name          String              @db.VarChar(255)
-  mime_type     String?             @map("mime_type") @db.VarChar(100)
-  source_uri    String?             @map("source_uri") @db.Text
-  content_hash  String              @map("content_hash") @db.Char(64)
-  content_text  String?             @map("content_text") @db.Text
-  content_blob  Bytes?              @map("content_blob")
-  repository_commit String?         @map("repository_commit") @db.VarChar(64)
-  status        KnowledgeStatus     @default(pending) @map("status")
-  warning_count Int                 @default(0) @map("warning_count")
-  error_code    String?             @map("error_code") @db.VarChar(50)
-  error_message String?             @map("error_message") @db.Text
-  created_at    DateTime            @default(now()) @map("created_at") @db.Timestamptz
-  updated_at    DateTime            @map("updated_at") @db.Timestamptz
-  deleted_at    DateTime?           @map("deleted_at") @db.Timestamptz
+  id                String              @id @default(uuid()) @db.Uuid
+  project_id        String              @map("project_id") @db.Uuid
+  kind              KnowledgeSourceKind @map("kind")
+  name              String              @db.VarChar(255)
+  mime_type         String?             @map("mime_type") @db.VarChar(100)
+  source_uri        String?             @map("source_uri") @db.Text
+  content_hash      String              @map("content_hash") @db.Char(64)
+  content_text      String?             @map("content_text") @db.Text
+  content_blob      Bytes?              @map("content_blob")
+  repository_commit String?             @map("repository_commit") @db.VarChar(64)
+  status            KnowledgeStatus     @default(pending) @map("status")
+  warning_count     Int                 @default(0) @map("warning_count")
+  error_code        String?             @map("error_code") @db.VarChar(50)
+  error_message     String?             @map("error_message") @db.Text
+  created_at        DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updated_at        DateTime            @map("updated_at") @db.Timestamptz
+  deleted_at        DateTime?           @map("deleted_at") @db.Timestamptz
 
   project   Project             @relation(fields: [project_id], references: [id], onDelete: Cascade)
   revisions KnowledgeRevision[]
@@ -464,16 +491,16 @@ model KnowledgeRevision {
 }
 
 model KnowledgeDocument {
-  id           String   @id @default(uuid()) @db.Uuid
-  source_id    String   @map("source_id") @db.Uuid
-  revision_id  String   @map("revision_id") @db.Uuid
-  logical_path String   @map("logical_path") @db.Text
-  title        String   @db.VarChar(255)
-  mime_type    String   @map("mime_type") @db.VarChar(100)
-  content_hash String   @map("content_hash") @db.Char(64)
-  repository_commit String? @map("repository_commit") @db.VarChar(64)
-  metadata     Json?
-  created_at   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id                String   @id @default(uuid()) @db.Uuid
+  source_id         String   @map("source_id") @db.Uuid
+  revision_id       String   @map("revision_id") @db.Uuid
+  logical_path      String   @map("logical_path") @db.Text
+  title             String   @db.VarChar(255)
+  mime_type         String   @map("mime_type") @db.VarChar(100)
+  content_hash      String   @map("content_hash") @db.Char(64)
+  repository_commit String?  @map("repository_commit") @db.VarChar(64)
+  metadata          Json?
+  created_at        DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   revision KnowledgeRevision @relation(fields: [source_id, revision_id], references: [source_id, id], onDelete: Cascade)
   chunks   KnowledgeChunk[]

@@ -31,7 +31,7 @@ export class MultiModelAnalysisStage implements StageProcessor {
     const analysis = ctx.resultsByStage[WorkflowStage.REQUIREMENT_ANALYSIS]?.structuredOutput;
     const requirementText = analysis ? JSON.stringify(analysis) : ctx.originalIdea;
     const prompt = renderPrompt(MULTI_MODEL_ANALYSIS_PROMPT, {
-      requirement: requirementText,
+      requirement: [requirementText, ctx.agentContext].filter(Boolean).join('\n\n'),
     });
     const byProvider = await this.deps.orchestrator.callMulti(prompt, {
       outputSchema: multiModelAnalysisSchema,

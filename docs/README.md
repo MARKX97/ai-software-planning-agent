@@ -18,8 +18,8 @@
 | Prompt 与模型路由             | [`prompt.spec.md`](../specs/prompt.spec.md), [`model-routing.spec.md`](../specs/model-routing.spec.md)     | Prompt 或模型选择        |
 | Provider 与 Orchestrator      | [`provider.spec.md`](../specs/provider.spec.md), [`orchestrator.spec.md`](../specs/orchestrator.spec.md)   | LLM 基础层               |
 | Frontend                      | [`frontend.spec.md`](../specs/frontend.spec.md)                                                            | 页面和交互               |
-| V3 项目知识库（P1 Contract）  | [`knowledge-base.spec.md`](../specs/knowledge-base.spec.md)                                                | 文档、仓库、检索与引用   |
-| V3 Agent Graph（P1 Contract） | [`agent-graph.spec.md`](../specs/agent-graph.spec.md)                                                      | LangGraph、Tool 与恢复   |
+| V3 项目知识库（P2 Contract）  | [`knowledge-base.spec.md`](../specs/knowledge-base.spec.md)                                                | 文档、仓库、检索与引用   |
+| V3 Agent Graph（P2 Contract） | [`agent-graph.spec.md`](../specs/agent-graph.spec.md)                                                      | LangGraph、Tool 与恢复   |
 
 JSON Schema 位于 [`contracts/schemas/llm/`](../contracts/schemas/llm/)，与 `packages/shared/src/schemas/llm/` 的 Zod Schema 共同约束模型结构化输出。
 
@@ -43,6 +43,7 @@ Agent 每次开始任务时读取 Active Memory；只有出现可复用的新事
 - 复杂任务：在 [`exec-plans/active/`](./exec-plans/active/README.md) 创建执行计划。
 - V3 P0 RAG：[`v3-rag-agent.md`](./exec-plans/completed/v3-rag-agent.md)。
 - V3 P1：[`v3-p1-repository-graph.md`](./exec-plans/completed/v3-p1-repository-graph.md)（PDF/公开仓库与可恢复 Graph）。
+- V3 P2：[`v3-p2-controlled-tools.md`](./exec-plans/active/v3-p2-controlled-tools.md)（受控 Tool、轨迹与增量重生成，实施中）。
 - 完成记录：移动到 [`exec-plans/completed/`](./exec-plans/completed/README.md)。
 - 临时豁免：登记在 [`tech-debt.md`](./tech-debt.md)，并同步机器基线。
 

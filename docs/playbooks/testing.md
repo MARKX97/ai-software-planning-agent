@@ -13,6 +13,7 @@
 | LLM                     | Mock Provider                     | 默认确定性、无付费调用          |
 | V3 Knowledge（P0）      | 固定文档 + Mock Embedding         | 解析、Chunk、检索、隔离与引用   |
 | V3 Graph（P1）          | LangGraph checkpointer + Mock LLM | 固定分支、interrupt、恢复与幂等 |
+| V3 Tool（P2）           | 共享 Zod + Mock LLM/Embedding     | 白名单、隔离、限次、审计与重放  |
 
 ## Commands
 
@@ -96,7 +97,7 @@ V3 测试必须继续满足默认确定性、零外部模型费用和项目隔�
 ### Graph Contract And Recovery
 
 - 9 个阶段、4 个检查点、澄清上限和 11 类产物的现有回归继续通过。
-- P1 只执行固定检索；动态 Tool 调用上限与 Structured Action 验证在 P2 启用。
+- P2 Structured Action 每阶段一次选择 0..3 个只读 Tool；关闭 `AGENT_ACTIONS_ENABLED` 时回归 P1 固定检索。
 - interrupt 后使用相同 `graphRunId` 恢复；过期 checkpoint 返回冲突。
 - 同一 checkpoint 重复 resume、节点重放和并行节点部分失败均不重复写消息、产物、日志、Token 或成本。
 - 用户取消传播 AbortSignal，Graph Run 标记 `cancelled`，不保存半条助手消息。
@@ -108,6 +109,7 @@ V3 测试必须继续满足默认确定性、零外部模型费用和项目隔�
 - 上传、公开仓库导入、重新索引和删除均有键盘可达操作和明确确认。
 - 产物 `[S1]` 可以打开证据抽屉，来源不可用时仍显示历史快照和状态说明。
 - Graph 轨迹展示当前 Node、Tool 次数、检索摘要和 interrupt 原因，不暴露 Prompt、密钥或完整文档。
+- 来源变化后只重生成服务端计算的受影响产物，未受影响产物的 ID、内容和更新时间保持不变。
 - RAG feature flag 关闭时，V2 页面、SSE 和工作流 E2E 不变。
 
 ### Release Gates

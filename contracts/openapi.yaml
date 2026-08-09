@@ -25,7 +25,7 @@ info:
     - ID 格式: UUID v4
     - 分页: `offset` + `limit` (默认 20, 最大 100)
     - 错误格式: `{ error: { code, message, details } }`
-  version: '1.6.0'
+  version: '1.7.0'
   contact:
     name: AI Planning Agent Team
 
@@ -131,6 +131,7 @@ components:
                 - WORKFLOW_ALREADY_RUNNING
                 - WORKFLOW_NOT_RUNNING
                 - WORKFLOW_STAGE_NOT_CLARIFICATION
+                - REGENERATION_NOT_REQUIRED
                 - LLM_TIMEOUT
                 - LLM_NETWORK_ERROR
                 - LLM_CANCELLED
@@ -627,7 +628,18 @@ components:
 
     GraphRunResponse:
       type: object
-      required: [id, status, current_node, current_stage, checkpoint_version, waiting_for, recovery_available]
+      required:
+        [
+          id,
+          status,
+          current_node,
+          current_stage,
+          checkpoint_version,
+          waiting_for,
+          recovery_available,
+          tool_call_count,
+          tool_steps,
+        ]
       properties:
         id:
           type: string
@@ -648,6 +660,72 @@ components:
           enum: [reply, review]
         recovery_available:
           type: boolean
+        tool_call_count:
+          type: integer
+          minimum: 0
+        retrieval_summary:
+          type: [string, 'null']
+          description: 脱敏后的 Tool 结果数量摘要
+        interrupt_reason:
+          type: [string, 'null']
+          enum: [reply, review, null]
+        tool_steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToolStepResponse'
+
+    ToolStepResponse:
+      type: object
+      required: [id, node, stage, tool, call_number, status, result_count, duration_ms, error_code, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        node:
+          type: string
+        stage:
+          $ref: '#/components/schemas/WorkflowStage'
+        tool:
+          type: string
+          description: 白名单 Tool 名；被拒绝的未知候选会保留脱敏名称用于审计
+        call_number:
+          type: integer
+          minimum: 1
+          description: 1..3 可执行；更大的尝试只会以 rejected 记录
+        status:
+          type: string
+          enum: [running, success, failed, rejected]
+        result_count:
+          type: integer
+          minimum: 0
+        duration_ms:
+          type: [integer, 'null']
+          minimum: 0
+        summary:
+          type: [string, 'null']
+          maxLength: 300
+        error_code:
+          type: [string, 'null']
+        created_at:
+          type: string
+          format: date-time
+
+    RegenerationImpact:
+      type: object
+      required: [affected_artifacts, source_ids]
+      properties:
+        affected_artifacts:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/ArtifactType'
+        source_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
 
     WorkflowStatusResponse:
       type: object
@@ -662,6 +740,7 @@ components:
           decision_snapshots,
           quality_report,
           graph_run,
+          regeneration,
           updated_at,
         ]
       properties:
@@ -724,6 +803,11 @@ components:
         graph_run:
           $ref: '#/components/schemas/GraphRunResponse'
           nullable: true
+        regeneration:
+          oneOf:
+            - $ref: '#/components/schemas/RegenerationImpact'
+            - type: 'null'
+          description: 当前知识变化影响；为空表示无需增量重生成
 
     ContinueWorkflowRequest:
       type: object
@@ -2225,6 +2309,52 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /projects/{project_id}/workflow/regenerate:
+    post:
+      tags: [Workflow]
+      summary: 重新生成受知识变化影响的产物
+      description: |
+        服务端根据 active knowledge revision、引用快照和固定产物依赖计算目标集合，
+        复用 planning_generation Graph stage，只替换受影响产物。客户端不能传入目标类型。
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: 增量重生成完成后的工作流状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowStatusResponse'
+        '404':
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 项目未完成、无需重生成或已有工作流正在执行
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: 模型工作流操作频率超限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: 项目成本已达到配置上限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /projects/{project_id}/workflow/states:
     get:
       tags: [Workflow]
@@ -3015,6 +3145,7 @@ paths:
 # POST   /projects/{project_id}/workflow/continue        继续工作流
 # POST   /projects/{project_id}/workflow/discuss          讨论当前检查点
 # POST   /projects/{project_id}/workflow/advance          确认进入下一环节
+# POST   /projects/{project_id}/workflow/regenerate       增量重生成受影响产物
 # GET    /projects/{project_id}/workflow/states           阶段状态快照
 # GET    /projects/{project_id}/workflow/executions       执行历史
 # GET    /projects/{project_id}/workflow/executions/{eid} 执行详情

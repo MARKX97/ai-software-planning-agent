@@ -133,6 +133,7 @@ export function WorkflowClient({
               busy={actions.busy}
               failureMessage={failureMessage}
               onStart={() => void actions.startWorkflow()}
+              onRegenerate={() => void actions.regenerateArtifacts()}
               status={status}
             />
 

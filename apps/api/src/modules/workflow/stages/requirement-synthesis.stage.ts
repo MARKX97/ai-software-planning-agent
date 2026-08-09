@@ -24,7 +24,7 @@ export class RequirementSynthesisStage implements StageProcessor {
     const synthesizer = new RequirementSynthesizer(this.deps.orchestrator);
     const result = await synthesizer.synthesize({
       projectId: ctx.projectId,
-      originalIdea: ctx.originalIdea,
+      originalIdea: [ctx.originalIdea, ctx.agentContext].filter(Boolean).join('\n\n'),
       modelOutputs: (multiResult?.structuredOutput ?? {}) as Record<string, unknown>,
     });
     await logModelCall(this.deps.db, {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { WorkflowStatusPanels } from '../src/components/workflow/workflow-status-panels';
 import type { WorkflowStatusResponse } from '../src/types/api';
@@ -12,6 +12,7 @@ describe('WorkflowStatusPanels V2 insights', () => {
         busy={false}
         failureMessage={null}
         onStart={vi.fn()}
+        onRegenerate={vi.fn()}
         status={status}
       />,
     );
@@ -20,6 +21,57 @@ describe('WorkflowStatusPanels V2 insights', () => {
     expect(screen.getByText('首版不做团队协作')).toBeInTheDocument();
     expect(screen.getByText('产物需要复核')).toBeInTheDocument();
     expect(screen.getByText(/已生成 10\/11 类产物/)).toBeInTheDocument();
+  });
+
+  it('shows redacted Tool trace and regenerates only the reported impact', () => {
+    const onRegenerate = vi.fn();
+    render(
+      <WorkflowStatusPanels
+        actionError={null}
+        busy={false}
+        failureMessage={null}
+        onRegenerate={onRegenerate}
+        onStart={vi.fn()}
+        status={{
+          ...status,
+          graph_run: {
+            id: '550e8400-e29b-41d4-a716-446655440000',
+            status: 'completed',
+            current_node: 'end',
+            current_stage: 'completed',
+            checkpoint_version: 4,
+            waiting_for: null,
+            recovery_available: false,
+            tool_call_count: 1,
+            retrieval_summary: '1 次 Tool · 2 条结果',
+            interrupt_reason: null,
+            tool_steps: [
+              {
+                id: '550e8400-e29b-41d4-a716-446655440001',
+                node: 'choose_action',
+                stage: 'planning_generation',
+                tool: 'searchKnowledge',
+                call_number: 1,
+                status: 'success',
+                result_count: 2,
+                duration_ms: 4,
+                summary: '2 条知识证据',
+                error_code: null,
+                created_at: '2026-08-10T00:00:00.000Z',
+              },
+            ],
+          },
+          regeneration: {
+            affected_artifacts: ['prd', 'backend_spec'],
+            source_ids: ['550e8400-e29b-41d4-a716-446655440002'],
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText(/1 次 Tool · 2 条结果/)).toBeInTheDocument();
+    expect(screen.getByText(/PRD、后端规格/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '更新受影响产物' }));
+    expect(onRegenerate).toHaveBeenCalledOnce();
   });
 });
 
@@ -62,4 +114,5 @@ const status: WorkflowStatusResponse = {
   started_at: '2026-07-22T00:00:00.000Z',
   updated_at: '2026-07-22T00:01:00.000Z',
   graph_run: null,
+  regeneration: null,
 };

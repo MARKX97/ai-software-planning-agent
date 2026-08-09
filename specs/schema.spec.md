@@ -1,6 +1,6 @@
 # Schema — System Contract
 
-> Version: 1.3.0
+> Version: 1.4.0
 > Status: Contract
 > Owner: Backend Lead
 > Tokens: ~8,000
@@ -120,6 +120,13 @@ RiskItem: `{id, category, description, probability, impact, mitigation, continge
 | `api_endpoints`         | array  | 是   |
 | `development_guide`     | string | 是   |
 | `ai_coding_prompt`      | string | 是   |
+
+### 2.10 AgentActionPlan
+
+`choose_action` 返回 `{ actions: AgentToolAction[] }`，`actions` 最多 3 项。Action 使用 `tool`
+discriminator，只允许 `searchKnowledge`、`readSource`、`inspectRepository`、`getArtifact`；每个
+`input.projectId` 必须是 UUID，并在服务端与当前项目比对。locator/path 拒绝绝对路径、反斜杠、
+编码分隔符和 `..` 路径段。所有对象均拒绝额外字段。
 
 ## 3. 枚举定义
 

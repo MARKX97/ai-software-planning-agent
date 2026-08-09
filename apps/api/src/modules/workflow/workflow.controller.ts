@@ -107,6 +107,16 @@ export class WorkflowController {
     return this.workflow.advance(projectId, body);
   }
 
+  @Post('projects/:project_id/workflow/regenerate')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: '增量重生成受知识变化影响的产物' })
+  @UseGuards(WorkflowRateLimitGuard)
+  async regenerate(
+    @Param('project_id', UUID_V4_PIPE) projectId: string,
+  ): Promise<WorkflowStatusResponse> {
+    return this.workflow.regenerate(projectId);
+  }
+
   @Get('projects/:project_id/workflow/states')
   @ApiOperation({ summary: '获取工作流各阶段状态' })
   async listStates(

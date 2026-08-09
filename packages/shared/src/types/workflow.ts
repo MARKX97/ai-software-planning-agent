@@ -28,6 +28,8 @@ export interface WorkflowContext {
   readonly originalIdea: string;
   readonly conversationHistory: string;
   readonly confirmedDecisions: readonly DecisionSnapshot[];
+  readonly agentContext?: string;
+  readonly regenerationTargets?: readonly string[];
   clarificationRound: number;
   readonly resultsByStage: Record<WorkflowStage, StageResult>;
 }

@@ -105,3 +105,9 @@ export function advanceWorkflow(input: {
     },
   });
 }
+
+export function regenerateWorkflow(projectId: string): Promise<WorkflowStatusResponse> {
+  return apiRequest<WorkflowStatusResponse>(`/projects/${projectId}/workflow/regenerate`, {
+    method: 'POST',
+  });
+}

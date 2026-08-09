@@ -1,6 +1,6 @@
 # Database — System Contract
 
-> Version: 1.4.0
+> Version: 1.5.0
 > Status: Contract
 > Owner: Backend Lead
 > Tokens: ~8,000
@@ -40,6 +40,7 @@
 | `knowledge_chunks`     | 检索 Chunk                                 |
 | `artifact_citations`   | 产物引用快照                               |
 | `graph_runs`           | LangGraph 运行元数据                       |
+| `tool_steps`           | P2 Tool 调用审计与幂等结果                 |
 | `checkpoints*`         | LangGraph PostgreSQL checkpointer 自管理表 |
 
 ## 3. 通用字段规则
@@ -132,6 +133,10 @@
 P1 的 `graph_runs` 保存 `graph_run_id`、当前 Node/Stage、恢复状态和单调递增的
 `checkpoint_version`；checkpoint payload 由 `@langchain/langgraph-checkpoint-postgres`
 在同一 PostgreSQL 数据库的自管理表中持久化。用户可见状态仍以现有工作流表为准。
+
+P2 的 `tool_steps` 每行记录一次尝试：`graph_run_id`、`execution_id`、`stage`、`node`、
+`tool`、`call_number`、脱敏参数摘要、内部限长结果、结果数、耗时、状态和错误码。
+`(graph_run_id, stage, call_number)` 唯一，Graph 重放复用该行，不重复执行 Tool。
 
 | 字段             | 类型         | 约束                                                |
 | ---------------- | ------------ | --------------------------------------------------- |

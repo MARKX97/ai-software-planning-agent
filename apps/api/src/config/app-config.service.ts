@@ -37,6 +37,7 @@ export class AppConfigService {
   readonly embeddingDimensions: number;
   readonly ragEnabled: boolean;
   readonly workflowRunner: 'graph' | 'v2';
+  readonly agentActionsEnabled: boolean;
   /** Per-project LLM cost ceiling (CNY). */
   readonly costLimitPerProject: number;
   /** Model-producing workflow operations allowed per project/caller each minute. */
@@ -62,8 +63,13 @@ export class AppConfigService {
     this.embeddingApiKey = process.env['EMBEDDING_API_KEY'] ?? '';
     this.embeddingModel = process.env['EMBEDDING_MODEL'] ?? 'mock-embedding-v1';
     this.embeddingDimensions = this.parsePositiveInt(process.env['EMBEDDING_DIMENSIONS'], 8, 4096);
-    this.ragEnabled = this.parseBoolean(process.env['RAG_ENABLED'], true);
+    this.ragEnabled = this.parseBoolean('RAG_ENABLED', process.env['RAG_ENABLED'], true);
     this.workflowRunner = this.parseWorkflowRunner(process.env['WORKFLOW_RUNNER']);
+    this.agentActionsEnabled = this.parseBoolean(
+      'AGENT_ACTIONS_ENABLED',
+      process.env['AGENT_ACTIONS_ENABLED'],
+      true,
+    );
     this.costLimitPerProject = this.parseNumber(process.env['COST_MAX_COST_PER_PROJECT'], 5);
     this.workflowRateLimitPerMinute = this.parseNonNegativeInt(
       process.env['WORKFLOW_RATE_LIMIT_PER_MINUTE'],
@@ -100,11 +106,11 @@ export class AppConfigService {
     throw new Error('EMBEDDING_PROVIDER must be mock or openai-compatible');
   }
 
-  private parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  private parseBoolean(name: string, value: string | undefined, fallback: boolean): boolean {
     if (!value) return fallback;
     if (value === 'true') return true;
     if (value === 'false') return false;
-    throw new Error('RAG_ENABLED must be true or false');
+    throw new Error(`${name} must be true or false`);
   }
 
   private parseWorkflowRunner(value: string | undefined): 'graph' | 'v2' {

@@ -34,6 +34,7 @@ import { streamContinue, streamDiscuss, streamRun } from './workflow-stream-acti
 import type { WorkflowSse } from './workflow-sse.js';
 import { syncProjectBudget } from './workflow-budget.js';
 import { AgentGraphService } from './graph/agent-graph.service.js';
+import { regenerateAffectedArtifacts } from './workflow-regeneration.js';
 
 export type { ExecutionLogsListResponse } from './workflow-history.js';
 
@@ -105,6 +106,10 @@ export class WorkflowService {
       graphResume,
     });
     return result.status;
+  }
+
+  async regenerate(projectId: string): Promise<WorkflowStatusResponse> {
+    return regenerateAffectedArtifacts(this.deps(), projectId);
   }
 
   async listStates(projectId: string): Promise<WorkflowStateListResponse> {

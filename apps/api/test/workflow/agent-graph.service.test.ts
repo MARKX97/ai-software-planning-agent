@@ -18,7 +18,11 @@ describe('AgentGraphService resume guard', () => {
         },
       },
     };
-    const service = new AgentGraphService({ workflowRunner: 'graph' } as never, db as never);
+    const service = new AgentGraphService(
+      { workflowRunner: 'graph' } as never,
+      db as never,
+      {} as never,
+    );
     const resume = service.resumeInput({
       graphRunId: '11111111-1111-4111-8111-111111111111',
       checkpointVersion: 3,
@@ -33,7 +37,11 @@ describe('AgentGraphService resume guard', () => {
   });
 
   it('keeps the V2 rollback path independent from graph metadata', () => {
-    const service = new AgentGraphService({ workflowRunner: 'v2' } as never, {} as never);
+    const service = new AgentGraphService(
+      { workflowRunner: 'v2' } as never,
+      {} as never,
+      {} as never,
+    );
     assert.equal(service.resumeInput({ stage: WorkflowStage.REQUIREMENT_ANALYSIS }), undefined);
   });
 });

@@ -89,6 +89,7 @@ describe('AppConfigService', () => {
       DOWNLOAD_TOKEN_SECRET: '',
       RAG_ENABLED: 'false',
       WORKFLOW_RUNNER: 'v2',
+      AGENT_ACTIONS_ENABLED: 'false',
     };
     const config = new AppConfigService();
     assert.deepEqual(
@@ -99,8 +100,17 @@ describe('AppConfigService', () => {
         secret: config.downloadTokenSecret,
         rag: config.ragEnabled,
         runner: config.workflowRunner,
+        actions: config.agentActionsEnabled,
       },
-      { port: 4100, cost: 9.5, rate: 0, secret: 'api-test-key', rag: false, runner: 'v2' },
+      {
+        port: 4100,
+        cost: 9.5,
+        rate: 0,
+        secret: 'api-test-key',
+        rag: false,
+        runner: 'v2',
+        actions: false,
+      },
     );
   });
 
@@ -133,5 +143,10 @@ describe('AppConfigService', () => {
   it('rejects an invalid workflow runner', () => {
     process.env = { ...originalEnv, WORKFLOW_RUNNER: 'legacy' };
     assert.throws(() => new AppConfigService(), /WORKFLOW_RUNNER/);
+  });
+
+  it('rejects an invalid Agent Action flag', () => {
+    process.env = { ...originalEnv, AGENT_ACTIONS_ENABLED: 'yes' };
+    assert.throws(() => new AppConfigService(), /AGENT_ACTIONS_ENABLED/);
   });
 });

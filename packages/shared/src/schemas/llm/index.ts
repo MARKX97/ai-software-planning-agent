@@ -16,3 +16,4 @@ export * from './risk-analysis.schema.js';
 export * from './mvp-plan.schema.js';
 export * from './platform-recommendation.schema.js';
 export * from './project-plan.schema.js';
+export * from './agent-action.schema.js';

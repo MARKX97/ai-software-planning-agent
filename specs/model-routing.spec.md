@@ -1,6 +1,6 @@
 # Model Routing — System Contract
 
-> Version: 1.2.0
+> Version: 1.3.0
 > Status: Contract
 > Owner: AI Infrastructure Lead
 > Tokens: ~2,000
@@ -9,17 +9,18 @@
 
 ## 1. 阶段模型路由
 
-| 阶段                      | 调用方式         | 模型                                             | 理由                |
-| ------------------------- | ---------------- | ------------------------------------------------ | ------------------- |
-| requirement_analysis      | callSingle       | **deepseek**                                     | 高质量分析          |
-| requirement_clarification | callSingleStream | **glm**                                          | 用户可见实时对话    |
-| multi_model_analysis      | callMulti        | **全部 3 模型**                                  | 核心价值：多视角    |
-| requirement_synthesis     | callSingle       | **deepseek**                                     | 强推理              |
-| feasibility_analysis      | callSingle       | **glm**                                          | 性价比              |
-| risk_analysis             | callSingle       | **deepseek**                                     | 强判断力            |
-| mvp_compression           | callSingle       | **deepseek**                                     | 强判断力            |
-| platform_recommendation   | callSingle       | **glm**                                          | 性价比              |
-| planning_generation       | callSingle × 11  | **deepseek** (PRD/Architecture) + **glm** (其余) | 核心产物用 DeepSeek |
+| 阶段                      | 调用方式         | 模型                                             | 理由                       |
+| ------------------------- | ---------------- | ------------------------------------------------ | -------------------------- |
+| requirement_analysis      | callSingle       | **deepseek**                                     | 高质量分析                 |
+| requirement_clarification | callSingleStream | **glm**                                          | 用户可见实时对话           |
+| multi_model_analysis      | callMulti        | **全部 3 模型**                                  | 核心价值：多视角           |
+| requirement_synthesis     | callSingle       | **deepseek**                                     | 强推理                     |
+| feasibility_analysis      | callSingle       | **glm**                                          | 性价比                     |
+| risk_analysis             | callSingle       | **deepseek**                                     | 强判断力                   |
+| mvp_compression           | callSingle       | **deepseek**                                     | 强判断力                   |
+| platform_recommendation   | callSingle       | **glm**                                          | 性价比                     |
+| planning_generation       | callSingle × 11  | **deepseek** (PRD/Architecture) + **glm** (其余) | 核心产物用 DeepSeek        |
+| choose_action             | callSingle       | **glm**                                          | 低温结构化只读 Action 选择 |
 
 需求澄清以及需求范围、MVP、技术方案检查点讨论使用 `callSingleStreamWithFallback(glm -> minimax -> deepseek)`。仅在当前 Provider 尚未输出 delta 时降级；这些对话调用不改变对应阶段的结构化产出路由。
 
@@ -59,6 +60,7 @@
 5. 避免所有阶段都调用 3 个模型
 6. 仅用户直接看到的对话回复走流式；内部结构化分析保持非流式
 7. 对话降级顺序固定为 GLM、MiniMax、DeepSeek；输出开始后禁止切换模型
+8. P2 Action 每阶段最多调用一次 GLM；结构化校验失败只允许一次修复调用
 ```
 
 ## 5. 成本对比

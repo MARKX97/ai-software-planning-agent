@@ -28,6 +28,11 @@ export type ExecuteGraphStage = (
   context: WorkflowContext,
   stage: WorkflowStage,
 ) => Promise<PipelineStageResult>;
+export type PrepareGraphStage = (
+  graphRunId: string,
+  context: WorkflowContext,
+  stage: WorkflowStage,
+) => Promise<WorkflowContext>;
 
 const stageNames = [
   WorkflowStage.REQUIREMENT_ANALYSIS,
@@ -44,7 +49,12 @@ const stageNames = [
 export function createPlanningGraph(
   checkpointer: BaseCheckpointSaver,
   executeStage: ExecuteGraphStage,
+  prepareStage: PrepareGraphStage = async (_graphRunId, context) => context,
 ) {
+  const chooseAction = async (state: PlanningGraphState) => ({
+    context: await prepareStage(state.graphRunId, state.context, state.stage),
+    currentNode: 'choose_action',
+  });
   const runStage = async (state: PlanningGraphState) => {
     const result = await executeStage(state.context, state.stage);
     return {
@@ -69,11 +79,12 @@ export function createPlanningGraph(
       waitingFor: null,
     };
   };
-  const route = (state: PlanningGraphState): string => {
+  const routeAfterStage = (state: PlanningGraphState): string => {
     if (state.waitingFor) return 'human_interrupt';
-    return state.stage === WorkflowStage.COMPLETED ? END : state.stage;
+    return state.stage === WorkflowStage.COMPLETED ? END : 'choose_action';
   };
   const builder = new StateGraph(PlanningState)
+    .addNode('choose_action', chooseAction)
     .addNode('human_interrupt', humanInterrupt)
     .addNode(WorkflowStage.REQUIREMENT_ANALYSIS, runStage)
     .addNode(WorkflowStage.REQUIREMENT_CLARIFICATION, runStage)
@@ -84,11 +95,14 @@ export function createPlanningGraph(
     .addNode(WorkflowStage.MVP_COMPRESSION, runStage)
     .addNode(WorkflowStage.PLATFORM_RECOMMENDATION, runStage)
     .addNode(WorkflowStage.PLANNING_GENERATION, runStage);
-  builder.addConditionalEdges(START, (state) => state.stage);
+  builder.addEdge(START, 'choose_action');
+  builder.addConditionalEdges('choose_action', (state) => state.stage);
   for (const stage of stageNames) {
-    builder.addConditionalEdges(stage, route);
+    builder.addConditionalEdges(stage, routeAfterStage);
   }
-  builder.addConditionalEdges('human_interrupt', route);
+  builder.addConditionalEdges('human_interrupt', (state) =>
+    state.stage === WorkflowStage.COMPLETED ? END : 'choose_action',
+  );
   return builder.compile({ checkpointer });
 }
 

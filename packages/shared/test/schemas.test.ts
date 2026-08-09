@@ -9,6 +9,7 @@ import {
   mvpPlanSchema,
   platformRecommendationSchema,
   projectPlanSchema,
+  agentActionPlanSchema,
 } from '../src/schemas/llm/index.js';
 
 const validRequirementPoint = {
@@ -159,5 +160,30 @@ describe('llm schemas', () => {
       ai_coding_prompt: 'prompt',
     });
     assert.ok(r.success);
+  });
+
+  it('enforces the P2 Tool whitelist, safe paths, and three-call limit', () => {
+    const projectId = '550e8400-e29b-41d4-a716-446655440000';
+    const sourceId = '550e8400-e29b-41d4-a716-446655440001';
+    const action = {
+      tool: 'inspectRepository',
+      input: { projectId, sourceId, path: 'apps/api/src' },
+    };
+    assert.equal(agentActionPlanSchema.safeParse({ actions: [action] }).success, true);
+    assert.equal(
+      agentActionPlanSchema.safeParse({
+        actions: [{ ...action, input: { ...action.input, path: '../secret' } }],
+      }).success,
+      false,
+    );
+    assert.equal(
+      agentActionPlanSchema.safeParse({ actions: Array.from({ length: 4 }, () => action) }).success,
+      false,
+    );
+    assert.equal(
+      agentActionPlanSchema.safeParse({ actions: [{ tool: 'runCommand', input: { projectId } }] })
+        .success,
+      false,
+    );
   });
 });

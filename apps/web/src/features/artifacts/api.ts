@@ -17,6 +17,20 @@ export const ARTIFACT_TYPES = [
 
 export type ArtifactType = (typeof ARTIFACT_TYPES)[number];
 
+export const ARTIFACT_TYPE_LABELS: Record<ArtifactType, string> = {
+  requirement_report: '需求报告',
+  feasibility_report: '可行性报告',
+  risk_report: '风险报告',
+  mvp_plan: 'MVP 计划',
+  platform_recommendation: '平台推荐',
+  project_plan: '项目计划',
+  prd: 'PRD',
+  architecture: '架构设计',
+  frontend_spec: '前端规格',
+  backend_spec: '后端规格',
+  ai_coding_rules: 'AI 编码规则',
+};
+
 export function listArtifacts(projectId: string, type?: string): Promise<ArtifactListResponse> {
   return apiRequest<ArtifactListResponse>(`/projects/${projectId}/artifacts`, {
     query: { type },

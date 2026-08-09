@@ -1,14 +1,14 @@
-# Project Knowledge Base — P1 Contract
+# Project Knowledge Base — P2 Contract
 
-> Version: 1.0.0
-> Status: P1 Contract
+> Version: 2.0.0
+> Status: P2 Contract
 > Owner: Backend Lead + AI Infrastructure Lead
 
 ## 1. 目标与非目标
 
 项目知识库为软件规划提供用户自己的文档和代码证据。它负责导入、解析、索引、检索和引用，不负责工作流推进、权限判断或自动修改代码。
 
-P1 支持：
+知识来源支持：
 
 - Markdown、TXT、PDF 上传。
 - 仅公开 `https://github.com/<owner>/<repository>` 仓库导入；首次导入固定解析后的 commit SHA。
@@ -108,7 +108,7 @@ type EvidenceCitation = {
 - 工具参数使用 Zod 校验；路径读取必须限定在已索引来源内并拒绝 `..`、绝对路径和符号链接逃逸。
 - 日志记录 `project_id`、`source_id`、revision、处理结果、Chunk 数和耗时，不记录完整文档、Embedding 或密钥。
 
-## 9. Proposed API
+## 9. API
 
 以下接口同步到 `contracts/openapi.yaml` 和实现。
 
@@ -121,7 +121,21 @@ type EvidenceCitation = {
 | DELETE | `/projects/{project_id}/knowledge/sources/{source_id}`         | 删除来源             |
 | POST   | `/projects/{project_id}/knowledge/search`                      | 预览项目内检索       |
 
-## 10. 验收与失败场景
+P2 不增加开放的 Tool HTTP 接口。四个 Agent Tool 只能由当前 Graph 内部调用。工作流状态返回
+脱敏 Tool 轨迹和当前来源影响；`POST /projects/{project_id}/workflow/regenerate` 由服务端计算并
+重新生成受影响的产物类型，客户端不得传入或扩大目标集合。
+
+## 10. 增量影响与重生成
+
+- 新 ready 来源晚于最近一次完整规划时，`prd` 与 `architecture` 及其下游规格被标记为受影响。
+- 已引用来源被删除，或引用的 Chunk 不再属于 active revision 时，直接引用产物被标记为受影响。
+- 依赖闭包固定为：`prd -> architecture/frontend_spec/backend_spec/project_plan/ai_coding_rules`，
+  `architecture -> frontend_spec/backend_spec/project_plan/ai_coding_rules`。
+- 重生成复用 `planning_generation` Graph stage，只替换受影响类型；其他 active artifact 的 ID、
+  内容、文件和更新时间保持不变。
+- 同内容重新索引不产生影响；并发重生成只允许一个请求获得项目状态抢占。
+
+## 11. 验收与失败场景
 
 - 相同输入重复索引产生相同 Chunk 顺序和 hash。
 - 任意检索结果均属于请求项目和 active revision。
@@ -130,6 +144,7 @@ type EvidenceCitation = {
 - 删除来源后新检索不可命中，历史产物引用快照仍可查看。
 - 恶意 Prompt、路径穿越、重定向到非允许域名和疑似密钥文件均被拒绝或隔离。
 
-## 11. 版本边界
+## 12. 版本边界
 
-Markdown/TXT/PDF、公开仓库、索引生命周期、存储、混合检索和引用属于 P1 Contract。动态 Agent Tool、运行时仓库检查与增量重新生成仍属于 P2 Proposed。
+Markdown/TXT/PDF、公开仓库、索引生命周期、存储、混合检索、引用、受控 Agent Tool 读取与
+增量重生成属于 P2 Contract。私有仓库、任意网页读取和自动修改代码仍不在范围内。

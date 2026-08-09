@@ -14,6 +14,7 @@ import { ArtifactFileStore } from '../artifact-generation/artifact-file-store.js
 import type { StageDeps } from './stage-deps.js';
 import type { StageProcessor } from './stage-processor.js';
 import { logModelCall } from './model-call-log.js';
+import { ARTIFACT_TYPES } from './model-routing.js';
 
 export class PlanningGenerationStage implements StageProcessor {
   readonly stage = WorkflowStage.PLANNING_GENERATION;
@@ -23,7 +24,8 @@ export class PlanningGenerationStage implements StageProcessor {
   async execute(ctx: WorkflowContext): Promise<StageResult> {
     const store = new ArtifactFileStore(this.deps.db, this.deps.dataDir);
     const generator = new ArtifactGenerator(this.deps.orchestrator, store);
-    const result = await generator.generateAll(ctx, await this.loadEvidence(ctx));
+    const targets = regenerationTargets(ctx);
+    const result = await generator.generateAll(ctx, await this.loadEvidence(ctx), targets);
     for (const item of result.successes) {
       for (const call of item.calls) await this.logCall(ctx, item.provider, call);
     }
@@ -31,6 +33,9 @@ export class PlanningGenerationStage implements StageProcessor {
       for (const call of item.calls) await this.logCall(ctx, item.provider, call);
     }
     if (result.successes.length === 0) throw new Error('All artifact generations failed');
+    if (ctx.regenerationTargets && result.failures.length > 0) {
+      throw new Error('Incremental artifact generation failed');
+    }
     return toStageResult(this.stage, result);
   }
 
@@ -68,6 +73,12 @@ export class PlanningGenerationStage implements StageProcessor {
       attemptNumber: call.attemptNumber,
     });
   }
+}
+
+function regenerationTargets(ctx: WorkflowContext) {
+  if (!ctx.regenerationTargets) return ARTIFACT_TYPES;
+  const requested = new Set(ctx.regenerationTargets);
+  return ARTIFACT_TYPES.filter((type) => requested.has(type));
 }
 
 function toStageResult(

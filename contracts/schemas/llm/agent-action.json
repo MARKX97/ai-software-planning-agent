@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-planning.local/schemas/llm/agent-action.json",
+  "title": "AgentActionPlan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["actions"],
+  "properties": {
+    "actions": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/searchKnowledge" },
+          { "$ref": "#/$defs/readSource" },
+          { "$ref": "#/$defs/inspectRepository" },
+          { "$ref": "#/$defs/getArtifact" }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "projectId": { "type": "string", "format": "uuid" },
+    "safeLocator": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+    },
+    "searchKnowledge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "input"],
+      "properties": {
+        "tool": { "const": "searchKnowledge" },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["projectId", "query"],
+          "properties": {
+            "projectId": { "$ref": "#/$defs/projectId" },
+            "query": { "type": "string", "minLength": 1, "maxLength": 2000 },
+            "sourceIds": {
+              "type": "array",
+              "maxItems": 50,
+              "uniqueItems": true,
+              "items": { "type": "string", "format": "uuid" }
+            },
+            "topK": { "type": "integer", "minimum": 1, "maximum": 8, "default": 8 }
+          }
+        }
+      }
+    },
+    "readSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "input"],
+      "properties": {
+        "tool": { "const": "readSource" },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["projectId", "documentId", "locator"],
+          "properties": {
+            "projectId": { "$ref": "#/$defs/projectId" },
+            "documentId": { "type": "string", "format": "uuid" },
+            "locator": { "$ref": "#/$defs/safeLocator" }
+          }
+        }
+      }
+    },
+    "inspectRepository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "input"],
+      "properties": {
+        "tool": { "const": "inspectRepository" },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["projectId", "sourceId"],
+          "anyOf": [{ "required": ["path"] }, { "required": ["query"] }],
+          "properties": {
+            "projectId": { "$ref": "#/$defs/projectId" },
+            "sourceId": { "type": "string", "format": "uuid" },
+            "path": { "$ref": "#/$defs/safeLocator" },
+            "query": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          }
+        }
+      }
+    },
+    "getArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "input"],
+      "properties": {
+        "tool": { "const": "getArtifact" },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["projectId", "artifactType"],
+          "properties": {
+            "projectId": { "$ref": "#/$defs/projectId" },
+            "artifactType": {
+              "type": "string",
+              "enum": [
+                "requirement_report",
+                "feasibility_report",
+                "risk_report",
+                "mvp_plan",
+                "platform_recommendation",
+                "project_plan",
+                "prd",
+                "architecture",
+                "frontend_spec",
+                "backend_spec",
+                "ai_coding_rules"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

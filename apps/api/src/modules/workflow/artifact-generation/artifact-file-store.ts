@@ -50,6 +50,14 @@ export class ArtifactFileStore {
     }
   }
 
+  async activeTypes(projectId: string): Promise<ArtifactType[]> {
+    const rows = await this.db.client.artifact.findMany({
+      where: { project_id: projectId, deleted_at: null },
+      select: { type: true },
+    });
+    return rows.map((row) => row.type);
+  }
+
   private async replaceActiveArtifact(
     input: StoreArtifactInput,
     id: string,

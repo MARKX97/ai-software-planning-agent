@@ -1,6 +1,6 @@
 # Frontend — System Contract
 
-> Version: 1.3.0
+> Version: 1.4.0
 > Status: Contract
 > Owner: Frontend Lead
 > Tokens: ~7,000
@@ -130,6 +130,8 @@ API:
 - 同一回复提交按钮在请求期间禁用，防重复提交
 - `waiting_for=review` 时展示“继续讨论”和“确认，继续下一环节”两个操作
 - 页面展示 `graph_run.current_node`、恢复版本和可恢复状态；回复或确认推进时原样回传当前 `graph_run.id` 与 `checkpoint_version`。
+- 页面展示 `graph_run.tool_steps` 的 Tool 名称、阶段、状态、结果数和脱敏摘要，以及检索摘要和 interrupt 原因；不展示完整参数、来源正文或 Prompt。
+- `workflow/status.regeneration` 非空时展示受影响产物，并允许调用无请求体的 `workflow/regenerate`；请求期间禁用重复操作，成功后刷新状态和产物。
 - 需求确认、MVP 取舍和技术方案确认均复用同一对话面板；内部分析阶段不单独打断用户
 
 流式回复:
@@ -156,6 +158,7 @@ API:
 - `GET /projects/{project_id}/knowledge/sources`
 - `POST /projects/{project_id}/knowledge/sources/{source_id}/reindex`
 - `DELETE /projects/{project_id}/knowledge/sources/{source_id}`
+- `GET /projects/{project_id}/workflow/status`（来源影响提示）
 
 交互:
 

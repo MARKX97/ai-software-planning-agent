@@ -1,6 +1,6 @@
 # API — System Contract
 
-> Version: 1.6.0
+> Version: 1.7.0
 > Status: Contract Summary
 > Owner: Backend Lead + Frontend Lead
 > Machine Contract: `contracts/openapi.yaml`
@@ -48,6 +48,7 @@
 | POST   | `/projects/{project_id}/workflow/continue`                        | 继续工作流   |
 | POST   | `/projects/{project_id}/workflow/discuss`                         | 讨论检查点   |
 | POST   | `/projects/{project_id}/workflow/advance`                         | 确认并推进   |
+| POST   | `/projects/{project_id}/workflow/regenerate`                      | 增量重生成   |
 | GET    | `/projects/{project_id}/workflow/states`                          | 阶段状态     |
 | GET    | `/projects/{project_id}/workflow/executions`                      | 执行历史     |
 | GET    | `/projects/{project_id}/workflow/executions/{execution_id}`       | 执行详情     |
@@ -87,8 +88,8 @@
 - LLM 调用只允许白名单模块通过 `LlmOrchestratorService`。
 - `run`、`workflow/continue`、`workflow/discuss` 返回 `200 text/event-stream`；`workflow/advance` 仍返回 `202 application/json`。
 - Controller 只绑定 SSE headers 和输出，模型调用与持久化仍由 Workflow Service/Stage 完成。
-- `run`、`workflow/continue`、`workflow/discuss`、`workflow/advance` 在进入业务逻辑前执行按项目和调用方计数的固定窗口限流；默认每分钟 10 次，超限返回 `429 RATE_LIMITED`。
-- 四个模型工作流操作在创建 execution 或打开 SSE 前读取持久化项目成本；达到配置上限时返回 `503 COST_LIMIT_EXCEEDED`。
+- `run`、`workflow/continue`、`workflow/discuss`、`workflow/advance`、`workflow/regenerate` 在进入业务逻辑前执行按项目和调用方计数的固定窗口限流；默认每分钟 10 次，超限返回 `429 RATE_LIMITED`。
+- 五个模型工作流操作在创建 execution 或打开 SSE 前读取持久化项目成本；达到配置上限时返回 `503 COST_LIMIT_EXCEEDED`。
 
 ### 4.3 Error
 
@@ -121,6 +122,9 @@
 - `workflow/status.conversation_id` 指向当前检查点会话；`waiting_for=reply` 表示 Agent 需要补充信息，`waiting_for=review` 表示可讨论或确认推进。
 - `workflow/status.decision_snapshots` 返回已确认检查点的结构化结论；`quality_report` 在规划生成完成后返回确定性质量检查结果，生成前为 `null`。
 - `workflow/status.graph_run` 返回当前节点、checkpoint 版本和可恢复状态；`continue` 与 `advance` 必须回传 `graph_run_id`、`checkpoint_version`，过期恢复返回 409。
+- `workflow/status.graph_run` 同时返回脱敏 Tool 轨迹、调用次数、检索摘要和 interrupt 原因；不得返回完整 Tool 参数、来源内容或 Prompt。
+- `workflow/status.regeneration` 由服务端根据 active revision、引用快照和产物依赖计算；为空表示无需重生成。
+- `workflow/regenerate` 无请求体，只在项目已完成且存在影响时执行服务端计算的产物集合；并发调用返回 409，未受影响产物保持不变。
 - `workflow/continue` 只用于需求澄清回复；其他检查点讨论使用 `workflow/discuss`，确认后使用 `workflow/advance`。
 - 三个流式接口使用 Fetch POST 读取 SSE。允许多个 `delta`，随后必须且只能有一个 `done` 或 `error`；服务端每 15 秒发送 comment heartbeat。
 - SSE 响应必须使用 `Content-Type: text/event-stream`、`Cache-Control: no-cache, no-transform` 和 `X-Accel-Buffering: no`，避免中间代理缓存或缓冲。

@@ -11,27 +11,13 @@ import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { ListSkeleton } from '@/components/ui/skeleton';
 import {
   ARTIFACT_TYPES,
+  ARTIFACT_TYPE_LABELS,
   exportPrd,
   getExport,
   getExportDownload,
   listArtifacts,
-  type ArtifactType,
 } from '@/features/artifacts/api';
 import { formatBytes, formatDateTime } from '@/lib/format';
-
-const displayNames: Record<ArtifactType, string> = {
-  requirement_report: '需求报告',
-  feasibility_report: '可行性报告',
-  risk_report: '风险报告',
-  mvp_plan: 'MVP 计划',
-  platform_recommendation: '平台推荐',
-  project_plan: '项目计划',
-  prd: 'PRD',
-  architecture: '架构设计',
-  frontend_spec: '前端规格',
-  backend_spec: '后端规格',
-  ai_coding_rules: 'AI 编码规则',
-};
 
 export function ArtifactsClient({ projectId }: { projectId: string }) {
   const [type, setType] = useState('');
@@ -138,7 +124,7 @@ export function ArtifactsClient({ projectId }: { projectId: string }) {
             onClick={() => setType(artifactType)}
             type="button"
           >
-            {displayNames[artifactType]}
+            {ARTIFACT_TYPE_LABELS[artifactType]}
           </button>
         ))}
       </div>

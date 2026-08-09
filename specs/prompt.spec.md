@@ -1,6 +1,6 @@
 # Prompt Management — System Contract
 
-> Version: 1.3.0
+> Version: 1.4.0
 > Status: Contract
 > Owner: AI Infrastructure Lead
 > Tokens: ~2,000
@@ -21,6 +21,7 @@
 | `mvp-compression.prompt.ts`         | MVP 收缩                 | `{{requirement}}`, `{{risks}}`, `{{feasibility}}`, `{{conversationHistory}}`  |
 | `platform-recommendation.prompt.ts` | 平台推荐                 | `{{mvp}}`, `{{requirement}}`, `{{conversationHistory}}`                       |
 | `planning-generation.prompt.ts`     | 规划生成（11 产物共用）  | `{{context}}`, `{{artifactType}}`, `{{evidence}}`                             |
+| `agent-action.prompt.ts`            | P2 只读 Tool Action 选择 | `{{stage}}`, `{{projectId}}`, `{{context}}`, `{{catalog}}`                    |
 
 ## 2. Prompt 规范
 
@@ -32,18 +33,19 @@ apps/api/src/prompts/<name>.prompt.ts
 
 ### 2.2 命名规范
 
-| 阶段       | 文件名                              | 导出常量                         |
-| ---------- | ----------------------------------- | -------------------------------- |
-| 需求分析   | `requirement-analysis.prompt.ts`    | `REQUIREMENT_ANALYSIS_PROMPT`    |
-| 需求澄清   | `clarification.prompt.ts`           | `CLARIFICATION_PROMPT`           |
-| 多模型分析 | `multi-model-analysis.prompt.ts`    | `MULTI_MODEL_ANALYSIS_PROMPT`    |
-| 需求融合   | `synthesis.prompt.ts`               | `SYNTHESIS_PROMPT`               |
-| 检查点讨论 | `checkpoint-discussion.prompt.ts`   | `CHECKPOINT_DISCUSSION_PROMPT`   |
-| 可行性分析 | `feasibility-analysis.prompt.ts`    | `FEASIBILITY_ANALYSIS_PROMPT`    |
-| 风险分析   | `risk-analysis.prompt.ts`           | `RISK_ANALYSIS_PROMPT`           |
-| MVP 收缩   | `mvp-compression.prompt.ts`         | `MVP_COMPRESSION_PROMPT`         |
-| 平台推荐   | `platform-recommendation.prompt.ts` | `PLATFORM_RECOMMENDATION_PROMPT` |
-| 规划生成   | `planning-generation.prompt.ts`     | `PLANNING_GENERATION_PROMPT`     |
+| 阶段        | 文件名                              | 导出常量                         |
+| ----------- | ----------------------------------- | -------------------------------- |
+| 需求分析    | `requirement-analysis.prompt.ts`    | `REQUIREMENT_ANALYSIS_PROMPT`    |
+| 需求澄清    | `clarification.prompt.ts`           | `CLARIFICATION_PROMPT`           |
+| 多模型分析  | `multi-model-analysis.prompt.ts`    | `MULTI_MODEL_ANALYSIS_PROMPT`    |
+| 需求融合    | `synthesis.prompt.ts`               | `SYNTHESIS_PROMPT`               |
+| 检查点讨论  | `checkpoint-discussion.prompt.ts`   | `CHECKPOINT_DISCUSSION_PROMPT`   |
+| 可行性分析  | `feasibility-analysis.prompt.ts`    | `FEASIBILITY_ANALYSIS_PROMPT`    |
+| 风险分析    | `risk-analysis.prompt.ts`           | `RISK_ANALYSIS_PROMPT`           |
+| MVP 收缩    | `mvp-compression.prompt.ts`         | `MVP_COMPRESSION_PROMPT`         |
+| 平台推荐    | `platform-recommendation.prompt.ts` | `PLATFORM_RECOMMENDATION_PROMPT` |
+| 规划生成    | `planning-generation.prompt.ts`     | `PLANNING_GENERATION_PROMPT`     |
+| Tool Action | `agent-action.prompt.ts`            | `AGENT_ACTION_PROMPT`            |
 
 ### 2.3 变量注入
 
@@ -72,22 +74,23 @@ apps/api/src/prompts/<name>.prompt.ts
 
 ## 3. Structured Output Schema 映射
 
-| 阶段                    | Schema 文件                                          |
-| ----------------------- | ---------------------------------------------------- |
-| requirement_analysis    | `contracts/schemas/llm/requirement-analysis.json`    |
-| multi_model_analysis    | `contracts/schemas/llm/multi-model-analysis.json`    |
-| requirement_synthesis   | `contracts/schemas/llm/synthesized-requirement.json` |
-| feasibility_analysis    | `contracts/schemas/llm/feasibility-assessment.json`  |
-| risk_analysis           | `contracts/schemas/llm/risk-analysis.json`           |
-| mvp_compression         | `contracts/schemas/llm/mvp-plan.json`                |
-| platform_recommendation | `contracts/schemas/llm/platform-recommendation.json` |
-| planning_generation     | `contracts/schemas/llm/project-plan.json`            |
+| 阶段                    | Schema 文件                                            |
+| ----------------------- | ------------------------------------------------------ |
+| requirement_analysis    | `contracts/schemas/llm/requirement-analysis.json`      |
+| multi_model_analysis    | `contracts/schemas/llm/multi-model-analysis.json`      |
+| requirement_synthesis   | `contracts/schemas/llm/synthesized-requirement.json`   |
+| feasibility_analysis    | `contracts/schemas/llm/feasibility-assessment.json`    |
+| risk_analysis           | `contracts/schemas/llm/risk-analysis.json`             |
+| mvp_compression         | `contracts/schemas/llm/mvp-plan.json`                  |
+| platform_recommendation | `contracts/schemas/llm/platform-recommendation.json`   |
+| planning_generation     | `contracts/schemas/llm/project-plan.json`              |
+| choose_action           | `contracts/schemas/llm/agent-action.json` + shared Zod |
 
 ## 4. LLM 交互边界
 
-MVP 不使用模型原生 Function Calling / Tool Use。Provider 请求不发送 `tools`、`tool_choice`，
-Orchestrator 不执行 Tool Call 循环。模型只负责生成文本和结构化输出，工作流推进、数据写入与
-错误处理由应用层确定性执行。
+Provider 请求不发送原生 `tools` 或 `tool_choice`，Orchestrator 不执行开放式 Tool Call 循环。
+P2 的 `choose_action` 使用普通 Structured Output 一次返回 0..3 个白名单只读 Action；共享 Zod
+校验后由应用层确定性执行。工作流推进、数据库写入与错误处理仍不由模型控制。
 
 模型配置中的 `function_calling` 仅表示 Provider 具备该能力，不表示本项目已启用。
 
@@ -99,8 +102,8 @@ Orchestrator 不执行 Tool Call 循环。模型只负责生成文本和结构�
 | 保存产物     | Artifact 生成流程校验结果后持久化                                      | 固定产物类型与生成结果         |
 | 记录错误     | Adapter、Orchestrator 与 Workflow 统一映射并记录                       | 运行时异常与执行状态           |
 
-仅当后续需求要求模型根据上下文动态选择外部能力，并需要把执行结果回传模型继续推理时，
-才新增 Function Calling / Tool Use 契约。状态推进、权限校验和数据库写入仍不得由模型直接控制。
+Tool 结果只作为后续阶段 Prompt 的 `untrusted-context`；来源中的自由文本不能触发第二轮 Action、
+改变白名单、项目 ID、权限或状态转换。
 
 用户可见的对话 Prompt 不得要求 `{ "reply": "..." }` 等 JSON 外壳；内部分析、融合和产物生成继续使用结构化输出。
 
@@ -110,6 +113,14 @@ Orchestrator 不执行 Tool Call 循环。模型只负责生成文本和结构�
 - 证据继续由 `renderPrompt()` 放入 `untrusted-context`，不得把来源内容拼入系统指令。
 - 模型只能引用本次提供的编号；有证据时至少引用一条，无证据时不得生成 `[S#]`。
 - 应用层解析正文标记、校验编号并生成结构化引用列表；模型不负责返回引用 JSON。
+
+### 4.2 P2 Structured Action
+
+- Action Plan 由 `agentActionPlanSchema` 严格校验，一次最多 3 个 Action，不接受额外字段。
+- 模型必须返回 Tool 名称和完整输入；`projectId` 不一致、未知 Tool、路径穿越或第四个 Action
+  在读取前拒绝。连续两次结构化校验失败时当前阶段受控失败。
+- Tool 输出经过脱敏和长度限制后进入阶段 Prompt；不把 Tool 输出重新送回 Action 选择模型，
+  因而不存在开放式 ReAct 循环。
 
 ## 5. Prompt 版本管理
 

@@ -21,6 +21,8 @@ const status: WorkflowStatusResponse = {
   error_message: null,
   started_at: null,
   updated_at: '2026-07-09T00:00:00.000Z',
+  graph_run: null,
+  regeneration: null,
 };
 
 describe('StageRail', () => {

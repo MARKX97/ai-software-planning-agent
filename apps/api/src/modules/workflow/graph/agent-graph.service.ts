@@ -9,6 +9,7 @@ import { AppException } from '../../../common/exception/app-exception.js';
 import { ErrorCode } from '../../../common/exception/error-code.js';
 import { runPipelineStage, type PipelineRunDeps } from '../workflow-pipeline-runner.js';
 import { createPlanningGraph, type PlanningGraphState } from './planning-graph.js';
+import { AgentActionService } from './agent-action.service.js';
 
 export interface GraphResumeInput {
   readonly graphRunId: string;
@@ -31,6 +32,7 @@ export class AgentGraphService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly config: AppConfigService,
     private readonly db: PrismaService,
+    private readonly actions: AgentActionService,
   ) {}
 
   get enabled(): boolean {
@@ -44,8 +46,10 @@ export class AgentGraphService implements OnModuleInit, OnModuleDestroy {
   async execute(input: GraphExecutionInput): Promise<WorkflowStage> {
     const { context, deps, startStage, resume } = input;
     const checkpointer = await this.checkpointSaver();
-    const graph = createPlanningGraph(checkpointer, (ctx, stage) =>
-      runPipelineStage(ctx, deps, stage),
+    const graph = createPlanningGraph(
+      checkpointer,
+      (ctx, stage) => runPipelineStage(ctx, deps, stage),
+      (graphRunId, ctx, stage) => this.actions.prepare({ graphRunId, context: ctx, stage }),
     );
     const run = resume
       ? await this.attachResume(context.projectId, context.executionId, resume)

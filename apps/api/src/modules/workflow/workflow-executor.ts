@@ -45,6 +45,7 @@ export interface WorkflowExecutorInput {
   readonly userMessage?: string;
   readonly stream?: Pick<LLMStreamOptions, 'onDelta' | 'signal'>;
   readonly graphResume?: GraphResumeInput;
+  readonly regenerationTargets?: readonly string[];
 }
 
 export interface WorkflowExecutionResult {
@@ -111,6 +112,7 @@ export async function buildWorkflowContext(
       appendCurrentMessage(conversation.history, input.userMessage),
     ),
     confirmedDecisions: conversation.confirmedDecisions,
+    regenerationTargets: input.regenerationTargets,
     clarificationRound: conversation.clarificationRound + (input.userMessage ? 1 : 0),
     resultsByStage,
   };

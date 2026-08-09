@@ -5,6 +5,7 @@ import {
   advanceWorkflow,
   continueWorkflow,
   discussWorkflow,
+  regenerateWorkflow,
   runWorkflow,
 } from '../src/features/workflow/api';
 
@@ -12,6 +13,7 @@ vi.mock('../src/features/workflow/api', () => ({
   advanceWorkflow: vi.fn(),
   continueWorkflow: vi.fn(),
   discussWorkflow: vi.fn(),
+  regenerateWorkflow: vi.fn(),
   runWorkflow: vi.fn(),
 }));
 
@@ -55,6 +57,7 @@ describe('useWorkflowActions', () => {
     vi.mocked(continueWorkflow).mockResolvedValue(streamResult);
     vi.mocked(discussWorkflow).mockResolvedValue(streamResult);
     vi.mocked(advanceWorkflow).mockResolvedValue({} as never);
+    vi.mocked(regenerateWorkflow).mockResolvedValue({} as never);
   });
 
   it('validates empty and inactive replies before making a request', async () => {
@@ -110,5 +113,13 @@ describe('useWorkflowActions', () => {
       checkpointVersion: 2,
     });
     expect(hook.refresh).toHaveBeenCalled();
+  });
+
+  it('regenerates affected artifacts and refreshes status', async () => {
+    const hook = setup('review');
+    await act(() => hook.result.current.regenerateArtifacts());
+    expect(regenerateWorkflow).toHaveBeenCalledWith('project-1');
+    expect(hook.refresh).toHaveBeenCalled();
+    expect(hook.result.current.busy).toBe(false);
   });
 });

@@ -52,6 +52,26 @@ export interface WorkflowStatusResponse {
     checkpoint_version: number;
     waiting_for: 'reply' | 'review' | null;
     recovery_available: boolean;
+    tool_call_count: number;
+    retrieval_summary: string | null;
+    interrupt_reason: 'reply' | 'review' | null;
+    tool_steps: Array<{
+      id: string;
+      node: string;
+      stage: string;
+      tool: string;
+      call_number: number;
+      status: 'running' | 'success' | 'failed' | 'rejected';
+      result_count: number;
+      duration_ms: number | null;
+      summary: string | null;
+      error_code: string | null;
+      created_at: string;
+    }>;
+  } | null;
+  regeneration: {
+    affected_artifacts: string[];
+    source_ids: string[];
   } | null;
 }
 

@@ -141,6 +141,7 @@ const demoResponses: Array<[string, (provider: string, prompt: string) => unknow
 
 /** Return deterministic, coherent content for local end-to-end demos. */
 export function mockContent(provider: string, prompt: string): string {
+  if (prompt.includes('AGENT_ACTION_SELECTION')) return JSON.stringify({ actions: [] });
   if (prompt.includes('Artifact type to generate:')) return mockArtifact(prompt);
   if (prompt.includes('WORKFLOW_CHECKPOINT_DISCUSSION')) return mockCheckpointDiscussion(prompt);
   if (prompt.includes('WORKFLOW_REQUIREMENT_CLARIFICATION')) return mockClarification(prompt);

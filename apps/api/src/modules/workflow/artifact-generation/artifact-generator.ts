@@ -65,20 +65,25 @@ export class ArtifactGenerator {
   async generateAll(
     ctx: WorkflowContext,
     evidence: readonly EvidenceCitation[] = [],
+    targetTypes: readonly ArtifactType[] = ARTIFACT_TYPES,
   ): Promise<ArtifactGenerationResult> {
     const context = this.buildContextJson(ctx);
     const results = await Promise.all(
-      ARTIFACT_TYPES.map((type) =>
+      targetTypes.map((type) =>
         this.generateOne(ctx, context, { type, evidence: numberedEvidence(type, evidence) }),
       ),
     );
     const successes = results.filter((r): r is ArtifactGenerationSuccess => 'response' in r);
     const failures = results.filter((r): r is ArtifactGenerationFailure => 'error' in r);
+    const failedTypes = new Set(failures.map((item) => item.type));
+    const generatedTypes = (await this.store.activeTypes(ctx.projectId)).filter(
+      (type) => !failedTypes.has(type),
+    );
     return {
       successes,
       failures,
       qualityReport: buildArtifactQualityReport({
-        generatedTypes: successes.map((item) => item.type),
+        generatedTypes,
         failures,
         revisedTypes: successes.filter((item) => item.revised).map((item) => item.type),
       }),
@@ -165,6 +170,7 @@ export class ArtifactGenerator {
       mvp: ctx.resultsByStage.mvp_compression?.structuredOutput,
       platform: ctx.resultsByStage.platform_recommendation?.structuredOutput,
       confirmed_decisions: ctx.confirmedDecisions,
+      agent_evidence: ctx.agentContext,
     };
     return JSON.stringify(context);
   }

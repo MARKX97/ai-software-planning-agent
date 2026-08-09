@@ -1,7 +1,7 @@
-# Agent Graph — P1 Contract
+# Agent Graph — P2 Contract
 
-> Version: 1.0.0
-> Status: P1 Contract
+> Version: 2.0.0
+> Status: P2 Contract
 > Owner: Backend Lead + AI Infrastructure Lead
 
 ## 1. 目标与边界
@@ -39,6 +39,7 @@ type PlanningGraphState = {
 START
   -> load_project_context
   -> choose_action
+       -> execute_tools (0..3)
        -> run_stage
   -> validate_stage_result
        -> revise_once -> validate_stage_result
@@ -48,11 +49,12 @@ START
 ```
 
 - 现有 9 个业务阶段及其顺序保持不变。
-- P1 的 `choose_action` 只执行固定知识检索；模型动态选择 Tool 保留到 P2。
+- `choose_action` 每阶段最多产生一次结构化 Action Plan，包含 0..3 个白名单 Tool；
+  `AGENT_ACTIONS_ENABLED=false` 时跳过该节点并保留 P1 固定检索路径。
 - 单个结果最多自动修订 1 次，保持 V2 质量循环上限。
 - 需求澄清、需求融合、MVP 收缩和平台推荐继续使用人工检查点。
 
-## 4. P2 Tool Contract（P1 不启用）
+## 4. P2 Tool Contract
 
 | Tool                | 输入                                     | 输出                     |
 | ------------------- | ---------------------------------------- | ------------------------ |
@@ -62,8 +64,11 @@ START
 | `getArtifact`       | `projectId`, artifactType                | 已持久化的前序产物       |
 
 - Tool 输入必须通过共享 Zod Schema 校验并由服务端覆盖 `projectId`，不得信任模型提供的项目 ID。
+- 模型提交的 `projectId` 与服务端项目不一致时在读取前拒绝并审计；实际查询始终只使用服务端项目 ID。
 - Tool 只能读取当前项目数据，不得写数据库、推进阶段或调用模型。
 - 每次调用记录 `graph_run_id`、node、tool、参数摘要、结果数量、耗时、状态和错误码。
+- Action Plan 使用严格的 Zod discriminated union，一次最多 3 个 Action；未知 Tool、第四个 Action
+  或不安全路径无法进入执行器。结构化输出失败可重试一次，连续失败则当前阶段失败。
 - `requestHumanInput` 使用 LangGraph interrupt 实现，不作为可任意执行的外部 Tool。
 
 ## 5. LLM 与路由边界
@@ -85,7 +90,8 @@ START
 
 - 现有 `run`、`continue`、`discuss` SSE 行为保持不变；LangGraph Node 产生的文本仍通过现有 Workflow SSE 适配层发送。
 - `done` 继续作为消息与工作流状态持久化后的成功提交点。
-- 状态响应在 V3 增加 Graph Run、当前 Node、Tool 调用次数、检索摘要和 interrupt 原因；机器契约在实施阶段更新。
+- 状态响应返回 Graph Run、当前 Node、Tool 调用次数、脱敏检索摘要、interrupt 原因和 Tool 轨迹；
+  不返回完整参数、来源内容、Prompt 或内部异常。
 - 内部检索与非用户可见分析不逐 Chunk 推送，只暴露脱敏的阶段状态。
 
 ## 8. 成本与限制
@@ -115,7 +121,9 @@ START
 - Agent 无法通过知识内容改变项目 ID、模型调用链或合法状态转换。
 - Graph 轨迹能够关联模型日志、检索证据、Token 和成本。
 - 没有知识源时可以完成原有 Mock Eval。
+- 相同 `graph_run_id + stage + call_number` 重放复用已有 Tool 结果，不重复写审计记录或产生调用成本。
 
 ## 11. 版本边界
 
-本规格为 P1 Contract。LangGraph 是默认执行来源，`WORKFLOW_RUNNER=v2` 可回退旧执行器；P2 Tool Contract 尚未启用。
+本规格为 P2 Contract。LangGraph 是默认执行来源；`AGENT_ACTIONS_ENABLED=false` 回退 P1
+固定检索 Graph，`WORKFLOW_RUNNER=v2` 继续作为旧执行器的最终回退。

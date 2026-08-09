@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { runWorkflow, type WorkflowStreamCallbacks } from '@/features/workflow/api';
+import {
+  regenerateWorkflow,
+  runWorkflow,
+  type WorkflowStreamCallbacks,
+} from '@/features/workflow/api';
 import { getUserErrorMessage } from '@/lib/api-client';
 import type { WorkflowStatusResponse, WorkflowStreamResponse } from '@/types/api';
 import { advanceGraphCheckpoint, submitWorkflowMessage } from './workflow-graph-actions';
@@ -23,6 +27,7 @@ interface WorkflowActions {
   readonly pendingUserMessage: string | null;
   readonly setAnswer: (value: string) => void;
   readonly startWorkflow: () => Promise<void>;
+  readonly regenerateArtifacts: () => Promise<void>;
   readonly streamingReply: string | null;
   readonly submitReply: () => Promise<void>;
 }
@@ -151,12 +156,26 @@ export function useWorkflowActions(input: WorkflowActionsInput): WorkflowActions
     }
   }
 
+  async function regenerateArtifacts(): Promise<void> {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await regenerateWorkflow(input.projectId);
+      await input.refresh();
+    } catch (error) {
+      setActionError(getUserErrorMessage(error, '受影响的产物暂时无法更新，请稍后重试。'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return {
     actionError,
     advanceCheckpoint,
     answer,
     busy,
     pendingUserMessage,
+    regenerateArtifacts,
     setAnswer,
     startWorkflow,
     streamingReply,

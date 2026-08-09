@@ -8,6 +8,7 @@ import { buildStatusFromProject, type WorkflowStatusResponse } from './workflow-
 import { workflowFailureMessage } from './workflow-execution-state.js';
 import { loadDecisionSnapshots } from './workflow-decisions.js';
 import { artifactQualityReportFromState } from './artifact-generation/artifact-quality.js';
+import { loadRegenerationImpact } from './artifact-generation/artifact-impact.js';
 export async function createExecution(
   db: PrismaService,
   projectId: string,
@@ -97,6 +98,7 @@ export async function buildWorkflowStatus(
     decisions,
     planningState,
     graphRun,
+    regeneration,
   ] = await Promise.all([
     countCompletedStages(db, projectId),
     db.client.workflowState.findUnique({
@@ -114,7 +116,9 @@ export async function buildWorkflowStatus(
     db.client.graphRun.findFirst({
       where: { project_id: projectId },
       orderBy: { updated_at: 'desc' },
+      include: { tool_steps: { orderBy: { created_at: 'asc' }, take: 50 } },
     }),
+    loadRegenerationImpact(db, projectId),
   ]);
   return buildStatusFromProject({
     project,
@@ -125,6 +129,7 @@ export async function buildWorkflowStatus(
     decisionSnapshots: decisions,
     qualityReport: artifactQualityReportFromState(planningState?.data_json),
     graphRun,
+    regeneration,
   });
 }
 
