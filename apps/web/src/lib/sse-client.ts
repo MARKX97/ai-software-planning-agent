@@ -20,7 +20,7 @@ export async function apiEventStream<T>(path: string, options: StreamRequestOpti
   });
   if (!response.ok) throw await parseApiError(response);
   if (!response.body || !response.headers.get('content-type')?.includes('text/event-stream')) {
-    throw new ApiClientError('服务返回了无法识别的数据，请稍后重试。', 'INVALID_RESPONSE', 0);
+    throw invalidStreamResponse('服务返回了无法识别的数据，请稍后重试。');
   }
   return consumeEvents(response.body, options);
 }
@@ -47,7 +47,7 @@ async function consumeEvents<T>(
     }
     if (next.done) break;
   }
-  throw new ApiClientError('回复意外中断，请重试。', 'INVALID_RESPONSE', 0);
+  throw invalidStreamResponse('回复意外中断，请重试。');
 }
 
 function parseEvent<T>(
@@ -79,17 +79,21 @@ function parseJson(data: string): unknown {
   try {
     return JSON.parse(data);
   } catch {
-    throw new ApiClientError('服务返回了无法识别的数据，请稍后重试。', 'INVALID_RESPONSE', 0);
+    throw invalidStreamResponse('服务返回了无法识别的数据，请稍后重试。');
   }
 }
 
 function streamError(data: ErrorEventData): ApiClientError {
   const code = data.error?.code ?? 'API_ERROR';
-  return new ApiClientError(
-    data.error?.message ?? '回复生成失败，请稍后重试。',
+  return new ApiClientError({
+    message: data.error?.message ?? '回复生成失败，请稍后重试。',
     code,
-    200,
-    data.error?.details,
-    data.retryable,
-  );
+    status: 200,
+    details: data.error?.details,
+    retryable: data.retryable,
+  });
+}
+
+function invalidStreamResponse(message: string): ApiClientError {
+  return new ApiClientError({ message, code: 'INVALID_RESPONSE', status: 0 });
 }

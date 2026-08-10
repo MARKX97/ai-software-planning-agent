@@ -59,12 +59,15 @@ export async function markProjectComplete(db: PrismaService, projectId: string):
   });
 }
 
-export async function markFailed(
-  db: PrismaService,
-  projectId: string,
-  executionId: string,
-  error: unknown,
-): Promise<void> {
+interface MarkFailedInput {
+  readonly db: PrismaService;
+  readonly projectId: string;
+  readonly executionId: string;
+  readonly error: unknown;
+}
+
+export async function markFailed(input: MarkFailedInput): Promise<void> {
+  const { db, projectId, executionId, error } = input;
   const message = workflowFailureMessage(error);
   await db.client.workflowExecution.update({
     where: { id: executionId },

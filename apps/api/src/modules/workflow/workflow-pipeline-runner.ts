@@ -92,18 +92,25 @@ export async function runPipelineStage(
   const processor = registry.get(currentStage);
   if (!processor) throw new Error(`No processor registered for stage '${currentStage}'`);
   await updateProjectStage(deps.db, ctx.projectId, currentStage);
-  await markStageRunning(deps.db, ctx.projectId, currentStage, stateMachine);
+  const stateInput = { db: deps.db, projectId: ctx.projectId, stage: currentStage, stateMachine };
+  await markStageRunning(stateInput);
   const result = await runStage(processor, ctx);
   ctx.resultsByStage[currentStage] = result;
-  await persistAnalysisResult(deps.db, ctx.projectId, ctx.executionId, currentStage, result);
-  await markStageCompleted(deps.db, ctx.projectId, currentStage, result, stateMachine);
+  await persistAnalysisResult({
+    db: deps.db,
+    projectId: ctx.projectId,
+    executionId: ctx.executionId,
+    stage: currentStage,
+    result,
+  });
+  await markStageCompleted({ ...stateInput, result });
   if (currentStage === WorkflowStage.REQUIREMENT_SYNTHESIS) {
     await updateRequirementText(deps.db, ctx.projectId, result);
   }
   const waitingFor = waitingForUser(currentStage, result, ctx.clarificationRound);
   if (waitingFor) {
     await updateProjectStage(deps.db, ctx.projectId, currentStage);
-    await markStageWaiting(deps.db, ctx.projectId, currentStage, result, stateMachine, waitingFor);
+    await markStageWaiting({ ...stateInput, result, waitingFor });
   }
   return {
     stage: currentStage,

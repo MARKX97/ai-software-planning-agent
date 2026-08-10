@@ -27,12 +27,7 @@ describe('OpenAICompatibleAdapter.stream', () => {
         { status: 200 },
       );
     };
-    const adapter = new OpenAICompatibleAdapter(
-      'test',
-      'https://x',
-      'k',
-      fetch as unknown as typeof globalThis.fetch,
-    );
+    const adapter = testAdapter(fetch);
     const deltas: string[] = [];
     const result = await adapter.stream(request, 1000, {
       onDelta: (content) => deltas.push(content),
@@ -46,12 +41,7 @@ describe('OpenAICompatibleAdapter.stream', () => {
 
   it('rejects malformed SSE data', async () => {
     const fetch = async () => new Response('data: nope\n\n', { status: 200 });
-    const adapter = new OpenAICompatibleAdapter(
-      'test',
-      'https://x',
-      'k',
-      fetch as unknown as typeof globalThis.fetch,
-    );
+    const adapter = testAdapter(fetch);
     await assert.rejects(
       () => adapter.stream(request, 1000, { onDelta: () => {} }),
       LLMNetworkError,
@@ -63,12 +53,7 @@ describe('OpenAICompatibleAdapter.stream', () => {
       new Response('data: {"choices":[{"delta":{"content":"hi"}}]}\n\ndata: [DONE]\n\n', {
         status: 200,
       });
-    const adapter = new OpenAICompatibleAdapter(
-      'test',
-      'https://x',
-      'k',
-      fetch as unknown as typeof globalThis.fetch,
-    );
+    const adapter = testAdapter(fetch);
     const result = await adapter.stream(request, 1000, { onDelta: () => {} });
     assert.equal(result.content, 'hi');
     assert.deepEqual(result.usage, { inputTokens: 0, outputTokens: 0, cachedTokens: 0 });
@@ -81,12 +66,7 @@ describe('OpenAICompatibleAdapter.stream', () => {
           reject(new DOMException('aborted', 'AbortError')),
         );
       });
-    const adapter = new OpenAICompatibleAdapter(
-      'test',
-      'https://x',
-      'k',
-      pendingFetch as unknown as typeof globalThis.fetch,
-    );
+    const adapter = testAdapter(pendingFetch);
     await assert.rejects(() => adapter.stream(request, 1, { onDelta: () => {} }), LLMTimeoutError);
 
     const controller = new AbortController();
@@ -100,12 +80,7 @@ describe('OpenAICompatibleAdapter.stream', () => {
 
   it('maps stream gateway failures before parsing the body', async () => {
     const fetch = async () => new Response('{}', { status: 503 });
-    const adapter = new OpenAICompatibleAdapter(
-      'test',
-      'https://x',
-      'k',
-      fetch as unknown as typeof globalThis.fetch,
-    );
+    const adapter = testAdapter(fetch);
     await assert.rejects(
       () => adapter.stream(request, 1000, { onDelta: () => {} }),
       LLMNetworkError,
@@ -113,11 +88,11 @@ describe('OpenAICompatibleAdapter.stream', () => {
   });
 
   it('receives a real Baishan delta, DONE and final usage', { skip: !runReal }, async () => {
-    const adapter = new OpenAICompatibleAdapter(
-      'baishan',
-      process.env['BAISHAN_BASE_URL'] ?? '',
-      process.env['BAISHAN_API_KEY'] ?? '',
-    );
+    const adapter = new OpenAICompatibleAdapter({
+      name: 'baishan',
+      baseUrl: process.env['BAISHAN_BASE_URL'] ?? '',
+      apiKey: process.env['BAISHAN_API_KEY'] ?? '',
+    });
     const deltas: string[] = [];
     const result = await adapter.stream(
       {
@@ -133,3 +108,12 @@ describe('OpenAICompatibleAdapter.stream', () => {
     assert.ok(result.usage.outputTokens > 0);
   });
 });
+
+function testAdapter(fetchImpl: typeof globalThis.fetch): OpenAICompatibleAdapter {
+  return new OpenAICompatibleAdapter({
+    name: 'test',
+    baseUrl: 'https://x',
+    apiKey: 'k',
+    fetchImpl,
+  });
+}

@@ -33,6 +33,13 @@ docker compose up --build
 - `AGENT_ACTIONS_ENABLED` 默认 `true`；设为 `false` 时跳过 P2 Action/Tool，保留 P1 固定检索 Graph。
 - Compose 是本地演示入口，不代表生产部署方案。
 
+### Dependency Cache
+
+- Dockerfile 先复制根目录与各 workspace 的依赖清单，再执行 `pnpm install`，最后复制源码；普通源码变化不会使依赖层失效。
+- BuildKit 使用持久化的 pnpm store cache。依赖清单或 lockfile 变化时仍会重新执行 install，但已下载且未变化的包可从 store 复用。
+- 构建日志中的约 894 个包是 pnpm 为整个 monorepo 解析的生产、开发、传递和可选依赖总树，不表示一次功能改动新增了 894 个直接依赖。
+- `package.json`、workspace package manifest、`pnpm-lock.yaml`、`pnpm-workspace.yaml` 或基础镜像变化会按预期使依赖层失效。
+
 ## Configuration And Secrets
 
 - `.env.example` 只提供空密钥和公开示例值。

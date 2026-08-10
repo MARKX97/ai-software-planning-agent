@@ -111,7 +111,11 @@ async function fetchApi(url: string, init: RequestInit): Promise<Response> {
     return await fetch(url, init);
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') throw error;
-    throw new ApiClientError(USER_ERROR_MESSAGES['NETWORK_ERROR'], 'NETWORK_ERROR', 0);
+    throw new ApiClientError({
+      message: USER_ERROR_MESSAGES['NETWORK_ERROR'],
+      code: 'NETWORK_ERROR',
+      status: 0,
+    });
   }
 }
 
@@ -124,12 +128,12 @@ export async function parseApiError(response: Response): Promise<ApiClientError>
   }
   const error = parsed?.error;
   const code = error?.code ?? 'API_ERROR';
-  return new ApiClientError(
-    userMessage(code, response.status),
+  return new ApiClientError({
+    message: userMessage(code, response.status),
     code,
-    response.status,
-    error?.details,
-  );
+    status: response.status,
+    details: error?.details,
+  });
 }
 
 export async function apiFetch(path: string, options: RequestOptions = {}): Promise<Response> {
@@ -161,11 +165,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   try {
     return (await response.json()) as T;
   } catch {
-    throw new ApiClientError(
-      USER_ERROR_MESSAGES['INVALID_RESPONSE'],
-      'INVALID_RESPONSE',
-      response.status,
-    );
+    throw new ApiClientError({
+      message: USER_ERROR_MESSAGES['INVALID_RESPONSE'],
+      code: 'INVALID_RESPONSE',
+      status: response.status,
+    });
   }
 }
 

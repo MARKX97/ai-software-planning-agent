@@ -110,22 +110,25 @@ export async function appendCheckpointIntroduction(
   conversationId: string,
   stage: WorkflowStage,
 ): Promise<Message> {
-  return appendAgentReply(
+  return appendAgentReply({
     db,
     conversationId,
-    checkpointIntroduction(stage),
+    content: checkpointIntroduction(stage),
     stage,
-    'checkpoint_intro',
-  );
+    kind: 'checkpoint_intro',
+  });
 }
 
-export async function appendAgentReply(
-  db: PrismaService,
-  conversationId: string,
-  content: string,
-  stage: WorkflowStage,
-  kind = 'workflow_discussion',
-): Promise<Message> {
+interface AgentReplyInput {
+  readonly db: PrismaService;
+  readonly conversationId: string;
+  readonly content: string;
+  readonly stage: WorkflowStage;
+  readonly kind?: string;
+}
+
+export async function appendAgentReply(input: AgentReplyInput): Promise<Message> {
+  const { db, conversationId, content, stage, kind = 'workflow_discussion' } = input;
   return appendWorkflowInteraction(db, {
     conversationId,
     assistantContent: content,

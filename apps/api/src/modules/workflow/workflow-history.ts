@@ -69,12 +69,17 @@ export async function getWorkflowExecution(
   return toWorkflowExecutionDetailResponse(execution, logs.length, logs);
 }
 
+interface ExecutionLogsInput {
+  readonly db: PrismaService;
+  readonly projectId: string;
+  readonly executionId: string;
+  readonly query: ListExecutionLogsQuery;
+}
+
 export async function listWorkflowExecutionLogs(
-  db: PrismaService,
-  projectId: string,
-  executionId: string,
-  query: ListExecutionLogsQuery,
+  input: ExecutionLogsInput,
 ): Promise<ExecutionLogsListResponse> {
+  const { db, projectId, executionId, query } = input;
   await findExecutionOrFail(db, projectId, executionId);
   const where = { execution_id: executionId };
   const [rows, total] = await Promise.all([

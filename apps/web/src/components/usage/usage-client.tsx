@@ -42,83 +42,101 @@ export function UsageClient({ projectId }: { projectId: string }) {
       {usage ? (
         <>
           <BudgetNotice usage={usage} />
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {[
-              { label: '总成本', value: formatCurrency(usage.total_cost) },
-              { label: '总 Token', value: formatNumber(usage.total_tokens) },
-              { label: '问过几次', value: formatNumber(usage.call_count) },
-              {
-                label: '成功率',
-                value: usage.success_rate === null ? '暂无' : `${usage.success_rate}%`,
-              },
-            ].map((item) => (
-              <Card key={item.label}>
-                <CardBody>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                    {item.label}
-                  </p>
-                  <p className="mt-2 text-2xl font-black text-slate-950">{item.value}</p>
-                </CardBody>
-              </Card>
-            ))}
-          </section>
-
-          <section className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <h2 className="text-base font-bold text-slate-950">谁出了多少力</h2>
-              </CardHeader>
-              <CardBody className="grid gap-3">
-                {usage.by_provider.length === 0 ? (
-                  <p className="text-sm text-slate-600">还没有调用记录。</p>
-                ) : (
-                  usage.by_provider.map((item) => (
-                    <div className="grid gap-1" key={item.provider_name}>
-                      <div className="flex justify-between gap-3 text-sm">
-                        <span className="font-semibold text-slate-800">{item.provider_name}</span>
-                        <span className="text-slate-600">{formatCurrency(item.total_cost)}</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-slate-200">
-                        <div
-                          className="h-2 rounded-full bg-cyan-700"
-                          style={{
-                            width: `${usage.total_cost > 0 ? Math.max(4, (item.total_cost / usage.total_cost) * 100) : 0}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardBody>
-            </Card>
-            <Card>
-              <CardHeader>
-                <h2 className="text-base font-bold text-slate-950">每一步花了多少</h2>
-              </CardHeader>
-              <CardBody className="grid gap-3">
-                {usage.by_stage.length === 0 ? (
-                  <p className="text-sm text-slate-600">还没有成本记录。</p>
-                ) : (
-                  usage.by_stage.map((item) => (
-                    <div
-                      className="flex items-center justify-between gap-3 text-sm"
-                      key={item.stage}
-                    >
-                      <span className="font-medium text-slate-700">{stageName(item.stage)}</span>
-                      <span className="font-semibold text-slate-950">
-                        {formatCurrency(item.total_cost)}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </CardBody>
-            </Card>
-          </section>
+          <UsageMetrics usage={usage} />
+          <UsageBreakdown usage={usage} />
         </>
       ) : null}
 
       <UsageLogTable projectId={projectId} />
     </PageFrame>
+  );
+}
+
+function UsageMetrics({ usage }: { usage: TokenUsageDetailResponse }) {
+  const items = [
+    { label: '总成本', value: formatCurrency(usage.total_cost) },
+    { label: '总 Token', value: formatNumber(usage.total_tokens) },
+    { label: '问过几次', value: formatNumber(usage.call_count) },
+    { label: '成功率', value: usage.success_rate === null ? '暂无' : `${usage.success_rate}%` },
+  ];
+  return (
+    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {items.map((item) => (
+        <Card key={item.label}>
+          <CardBody>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+              {item.label}
+            </p>
+            <p className="mt-2 text-2xl font-black text-slate-950">{item.value}</p>
+          </CardBody>
+        </Card>
+      ))}
+    </section>
+  );
+}
+
+function UsageBreakdown({ usage }: { usage: TokenUsageDetailResponse }) {
+  return (
+    <section className="grid gap-4 lg:grid-cols-2">
+      <ProviderUsage usage={usage} />
+      <StageUsage usage={usage} />
+    </section>
+  );
+}
+
+function ProviderUsage({ usage }: { usage: TokenUsageDetailResponse }) {
+  return (
+    <Card>
+      <CardHeader>
+        <h2 className="text-base font-bold text-slate-950">谁出了多少力</h2>
+      </CardHeader>
+      <CardBody className="grid gap-3">
+        {usage.by_provider.length === 0 ? (
+          <p className="text-sm text-slate-600">还没有调用记录。</p>
+        ) : (
+          usage.by_provider.map((item) => (
+            <div className="grid gap-1" key={item.provider_name}>
+              <div className="flex justify-between gap-3 text-sm">
+                <span className="font-semibold text-slate-800">{item.provider_name}</span>
+                <span className="text-slate-600">{formatCurrency(item.total_cost)}</span>
+              </div>
+              <div className="h-2 rounded-full bg-slate-200">
+                <div
+                  className="h-2 rounded-full bg-cyan-700"
+                  style={{
+                    width: `${usage.total_cost > 0 ? Math.max(4, (item.total_cost / usage.total_cost) * 100) : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+          ))
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
+function StageUsage({ usage }: { usage: TokenUsageDetailResponse }) {
+  return (
+    <Card>
+      <CardHeader>
+        <h2 className="text-base font-bold text-slate-950">每一步花了多少</h2>
+      </CardHeader>
+      <CardBody className="grid gap-3">
+        {usage.by_stage.length === 0 ? (
+          <p className="text-sm text-slate-600">还没有成本记录。</p>
+        ) : (
+          usage.by_stage.map((item) => (
+            <div className="flex items-center justify-between gap-3 text-sm" key={item.stage}>
+              <span className="font-medium text-slate-700">{stageName(item.stage)}</span>
+              <span className="font-semibold text-slate-950">
+                {formatCurrency(item.total_cost)}
+              </span>
+            </div>
+          ))
+        )}
+      </CardBody>
+    </Card>
   );
 }
 

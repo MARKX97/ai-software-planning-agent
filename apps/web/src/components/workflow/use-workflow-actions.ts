@@ -1,14 +1,11 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
-import {
-  regenerateWorkflow,
-  runWorkflow,
-  type WorkflowStreamCallbacks,
-} from '@/features/workflow/api';
+import { useEffect, useRef, type RefObject } from 'react';
+import { regenerateWorkflow, runWorkflow } from '@/features/workflow/api';
 import { getUserErrorMessage } from '@/lib/api-client';
 import type { WorkflowStatusResponse, WorkflowStreamResponse } from '@/types/api';
 import { advanceGraphCheckpoint, submitWorkflowMessage } from './workflow-graph-actions';
+import { useWorkflowStream, type WorkflowStreamState } from './use-workflow-stream';
 
-interface WorkflowActionsInput {
+export interface WorkflowActionsInput {
   readonly autoStart: boolean;
   readonly projectId: string;
   readonly conversationId: string | null;
@@ -17,9 +14,7 @@ interface WorkflowActionsInput {
   readonly onDone: (result: WorkflowStreamResponse) => void;
 }
 
-type StreamCall = (callbacks: WorkflowStreamCallbacks) => Promise<WorkflowStreamResponse>;
-
-interface WorkflowActions {
+export interface WorkflowActions {
   readonly actionError: string | null;
   readonly advanceCheckpoint: () => Promise<void>;
   readonly answer: string;
@@ -33,179 +28,95 @@ interface WorkflowActions {
 }
 
 export function useWorkflowActions(input: WorkflowActionsInput): WorkflowActions {
-  const [busy, setBusy] = useState(false);
-  const [answer, setAnswer] = useState('');
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
-  const [streamingReply, setStreamingReply] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const mountedRef = useRef(false);
+  const stream = useWorkflowStream(input);
   const autoStartedRef = useRef(false);
-  const bufferRef = useRef('');
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useAbortOnUnmount(abortRef, mountedRef);
-  useAutoStart(input, autoStartedRef, startWorkflow);
-
-  function queueDelta(content: string): void {
-    bufferRef.current += content;
-    if (timerRef.current) return;
-    timerRef.current = setTimeout(flushDeltas, 50);
-  }
-
-  function flushDeltas(): void {
-    const content = bufferRef.current;
-    bufferRef.current = '';
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = null;
-    if (content) setStreamingReply((current) => `${current ?? ''}${content}`);
-  }
-
-  function resetStream(userMessage: string | null): void {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = null;
-    bufferRef.current = '';
-    setPendingUserMessage(userMessage);
-    setStreamingReply('');
-  }
-
-  async function executeStream(call: StreamCall, userMessage: string | null): Promise<void> {
-    const controller = new AbortController();
-    abortRef.current?.abort();
-    abortRef.current = controller;
-    setBusy(true);
-    setActionError(null);
-    resetStream(userMessage);
-    try {
-      const result = await call({ onDelta: queueDelta, signal: controller.signal });
-      flushDeltas();
-      input.onDone(result);
-      if (userMessage) setAnswer('');
-      setPendingUserMessage(null);
-      setStreamingReply(null);
-      try {
-        await input.refresh();
-      } catch (error) {
-        setActionError(getUserErrorMessage(error, '回复已保存，但刷新记录失败，请稍后重试。'));
-      }
-    } catch (error) {
-      flushDeltas();
-      if (!(error instanceof Error && error.name === 'AbortError')) {
-        setActionError(getUserErrorMessage(error, '回复生成失败，请稍后重试。'));
-        await input.refresh().catch(() => undefined);
-      }
-    } finally {
-      if (abortRef.current === controller) abortRef.current = null;
-      setBusy(false);
-    }
-  }
-
   async function startWorkflow(): Promise<void> {
-    await executeStream((callbacks) => runWorkflow(input.projectId, callbacks), null);
+    await stream.execute((callbacks) => runWorkflow(input.projectId, callbacks), null);
   }
-
-  async function submitReply(): Promise<void> {
-    const message = answer.trim();
-    if (!message) {
-      setActionError('请输入澄清回复。');
-      return;
-    }
-    if (!input.conversationId || !input.status?.waiting_for) {
-      setActionError('当前没有可继续的讨论。');
-      return;
-    }
-    const graphRun = input.status.graph_run;
-    if (input.status.waiting_for === 'reply' && graphRun && !graphRun.recovery_available) {
-      setActionError('当前恢复点不可用，请刷新后重试。');
-      return;
-    }
-    await executeStream(
-      (callbacks) =>
-        submitWorkflowMessage({
-          projectId: input.projectId,
-          conversationId: input.conversationId ?? '',
-          message,
-          graphRun,
-          resume: input.status?.waiting_for === 'reply',
-          callbacks,
-        }),
-      message,
-    );
-  }
-
-  async function advanceCheckpoint(): Promise<void> {
-    const graphRun = input.status?.graph_run;
-    if (!input.conversationId || (graphRun && !graphRun.recovery_available)) {
-      setActionError('当前没有可确认的讨论。');
-      return;
-    }
-    setBusy(true);
-    setActionError(null);
-    try {
-      await advanceGraphCheckpoint(input.projectId, input.conversationId, graphRun ?? null);
-      await input.refresh();
-    } catch (error) {
-      setActionError(getUserErrorMessage(error, '暂时无法进入下一环节，请稍后重试。'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
+  useAutoStart(input, autoStartedRef, startWorkflow);
   return {
-    actionError,
-    advanceCheckpoint,
-    answer,
-    busy,
-    pendingUserMessage,
-    regenerateArtifacts: () => runRegeneration(input, setBusy, setActionError),
-    setAnswer,
+    actionError: stream.actionError,
+    advanceCheckpoint: () => advanceCheckpoint(input, stream),
+    answer: stream.answer,
+    busy: stream.busy,
+    pendingUserMessage: stream.pendingUserMessage,
+    regenerateArtifacts: () => runRegeneration(input, stream),
+    setAnswer: stream.setAnswer,
     startWorkflow,
-    streamingReply,
-    submitReply,
+    streamingReply: stream.streamingReply,
+    submitReply: () => submitReply(input, stream),
   };
 }
 
-function useAutoStart(
+async function submitReply(
   input: WorkflowActionsInput,
-  autoStartedRef: RefObject<boolean>,
-  startWorkflow: () => Promise<void>,
-): void {
-  useEffect(() => {
-    if (input.autoStart && input.status?.current_stage === 'init' && !autoStartedRef.current) {
-      autoStartedRef.current = true;
-      void startWorkflow();
-    }
-  }, [input.autoStart, input.status?.current_stage]);
+  stream: WorkflowStreamState,
+): Promise<void> {
+  const message = stream.answer.trim();
+  if (!message) return stream.setActionError('请输入澄清回复。');
+  if (!input.conversationId || !input.status?.waiting_for)
+    return stream.setActionError('当前没有可继续的讨论。');
+  const graphRun = input.status.graph_run;
+  if (input.status.waiting_for === 'reply' && graphRun && !graphRun.recovery_available)
+    return stream.setActionError('当前恢复点不可用，请刷新后重试。');
+  await stream.execute(
+    (callbacks) =>
+      submitWorkflowMessage({
+        projectId: input.projectId,
+        conversationId: input.conversationId ?? '',
+        message,
+        graphRun,
+        resume: input.status?.waiting_for === 'reply',
+        callbacks,
+      }),
+    message,
+  );
+}
+
+async function advanceCheckpoint(
+  input: WorkflowActionsInput,
+  stream: WorkflowStreamState,
+): Promise<void> {
+  const graphRun = input.status?.graph_run;
+  if (!input.conversationId || (graphRun && !graphRun.recovery_available))
+    return stream.setActionError('当前没有可确认的讨论。');
+  stream.setBusy(true);
+  stream.setActionError(null);
+  try {
+    await advanceGraphCheckpoint(input.projectId, input.conversationId, graphRun ?? null);
+    await input.refresh();
+  } catch (error) {
+    stream.setActionError(getUserErrorMessage(error, '暂时无法进入下一环节，请稍后重试。'));
+  } finally {
+    stream.setBusy(false);
+  }
 }
 
 async function runRegeneration(
   input: WorkflowActionsInput,
-  setBusy: (value: boolean) => void,
-  setActionError: (value: string | null) => void,
+  stream: WorkflowStreamState,
 ): Promise<void> {
-  setBusy(true);
-  setActionError(null);
+  stream.setBusy(true);
+  stream.setActionError(null);
   try {
     await regenerateWorkflow(input.projectId);
     await input.refresh();
   } catch (error) {
-    setActionError(getUserErrorMessage(error, '受影响的产物暂时无法更新，请稍后重试。'));
+    stream.setActionError(getUserErrorMessage(error, '受影响的产物暂时无法更新，请稍后重试。'));
   } finally {
-    setBusy(false);
+    stream.setBusy(false);
   }
 }
 
-function useAbortOnUnmount(
-  abortRef: RefObject<AbortController | null>,
-  mountedRef: RefObject<boolean>,
+function useAutoStart(
+  input: WorkflowActionsInput,
+  started: RefObject<boolean>,
+  start: () => Promise<void>,
 ): void {
   useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      queueMicrotask(() => {
-        if (!mountedRef.current) abortRef.current?.abort();
-      });
-    };
-  }, [abortRef, mountedRef]);
+    if (input.autoStart && input.status?.current_stage === 'init' && !started.current) {
+      started.current = true;
+      void start();
+    }
+  }, [input.autoStart, input.status?.current_stage]);
 }

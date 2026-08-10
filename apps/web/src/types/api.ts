@@ -29,13 +29,7 @@ export class ApiClientError extends Error {
   readonly details?: Record<string, unknown>;
   readonly retryable?: boolean;
 
-  constructor(
-    message: string,
-    code: string,
-    status: number,
-    details?: Record<string, unknown>,
-    retryable?: boolean,
-  ) {
+  constructor({ message, code, status, details, retryable }: ApiClientErrorInput) {
     super(message);
     this.name = 'ApiClientError';
     this.code = code;
@@ -43,6 +37,14 @@ export class ApiClientError extends Error {
     this.details = details;
     this.retryable = retryable;
   }
+}
+
+export interface ApiClientErrorInput {
+  readonly message: string;
+  readonly code: string;
+  readonly status: number;
+  readonly details?: Record<string, unknown>;
+  readonly retryable?: boolean;
 }
 
 export interface ProjectResponse {

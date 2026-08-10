@@ -118,12 +118,12 @@ describe('OpenAICompatibleAdapter integration', () => {
       usage: { prompt_tokens: 3, completion_tokens: 4 },
     });
     const fetch = async () => new Response(body, { status: 200 });
-    const adapter = new OpenAICompatibleAdapter(
-      'test',
-      'https://x',
-      'k',
-      fetch as unknown as typeof fetch,
-    );
+    const adapter = new OpenAICompatibleAdapter({
+      name: 'test',
+      baseUrl: 'https://x',
+      apiKey: 'k',
+      fetchImpl: fetch as unknown as typeof globalThis.fetch,
+    });
     const provider = new DeepSeekProvider('DeepSeek-R1-0528', adapter);
     const res = await provider.chat('hi', { outputSchema: z.object({ ok: z.boolean() }) });
     assert.deepEqual(res.structuredOutput, { ok: true });

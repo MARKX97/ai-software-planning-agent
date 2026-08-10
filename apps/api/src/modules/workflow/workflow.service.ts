@@ -139,7 +139,7 @@ export class WorkflowService {
     query: ListExecutionLogsQuery,
   ): Promise<ExecutionLogsListResponse> {
     await this.projects.findOrFail(projectId);
-    return listWorkflowExecutionLogs(this.db, projectId, executionId, query);
+    return listWorkflowExecutionLogs({ db: this.db, projectId, executionId, query });
   }
 
   private deps() {

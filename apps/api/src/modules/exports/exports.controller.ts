@@ -7,11 +7,10 @@ import {
   Param,
   Post,
   Query,
-  Res,
+  StreamableFile,
   UsePipes,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Response } from 'express';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
 import { UUID_V4_PIPE } from '../../common/pipes/uuid-validation.pipe.js';
 import { AppException } from '../../common/exception/app-exception.js';
@@ -62,11 +61,11 @@ export class ExportsController {
     @Param('project_id', UUID_V4_PIPE) projectId: string,
     @Param('export_id', UUID_V4_PIPE) exportId: string,
     @Query('token') token: string,
-    @Res() response: Response,
-  ): Promise<void> {
+  ): Promise<StreamableFile> {
     const file = await this.exports.getDownload(projectId, exportId, downloadQuerySchema(token));
-    response.setHeader('Content-Type', file.contentType);
-    response.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
-    response.send(file.content);
+    return new StreamableFile(file.content, {
+      type: file.contentType,
+      disposition: `attachment; filename="${file.filename}"`,
+    });
   }
 }

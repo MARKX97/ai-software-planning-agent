@@ -14,16 +14,27 @@ import { nextStageAfterCheckpoint, type WorkflowWait } from './workflow-checkpoi
 
 const TOTAL_STAGES = 9;
 
+interface StageStateInput {
+  readonly db: PrismaService;
+  readonly projectId: string;
+  readonly stage: WorkflowStage;
+  readonly stateMachine: WorkflowStateMachine;
+}
+
+interface StageResultStateInput extends StageStateInput {
+  readonly result: StageResult;
+}
+
+interface WaitingStageStateInput extends StageResultStateInput {
+  readonly waitingFor: WorkflowWait;
+}
+
 /** Mark a stage as running, creating the workflow_state row if needed. */
-export async function markStageRunning(
-  db: PrismaService,
-  projectId: string,
-  stage: WorkflowStage,
-  stateMachine: WorkflowStateMachine,
-): Promise<void> {
+export async function markStageRunning(input: StageStateInput): Promise<void> {
+  const { db, projectId, stage, stateMachine } = input;
   await db.client.workflowState.upsert({
     where: { project_id_stage: { project_id: projectId, stage } },
-    create: buildStageState(projectId, stage, StageStatus.RUNNING, stateMachine),
+    create: buildStageState({ projectId, stage, status: StageStatus.RUNNING, stateMachine }),
     update: {
       status: StageStatus.RUNNING,
       progress: buildProgress(stage, stateMachine),
@@ -35,13 +46,8 @@ export async function markStageRunning(
 }
 
 /** Mark a stage as completed and attach its validated output snapshot. */
-export async function markStageCompleted(
-  db: PrismaService,
-  projectId: string,
-  stage: WorkflowStage,
-  result: StageResult,
-  stateMachine: WorkflowStateMachine,
-): Promise<void> {
+export async function markStageCompleted(input: StageResultStateInput): Promise<void> {
+  const { db, projectId, stage, result, stateMachine } = input;
   await db.client.workflowState.update({
     where: { project_id_stage: { project_id: projectId, stage } },
     data: {
@@ -55,14 +61,8 @@ export async function markStageCompleted(
 }
 
 /** Mark clarification as running-with-data while the workflow waits for user input. */
-export async function markStageWaiting(
-  db: PrismaService,
-  projectId: string,
-  stage: WorkflowStage,
-  result: StageResult,
-  stateMachine: WorkflowStateMachine,
-  waitingFor: WorkflowWait,
-): Promise<void> {
+export async function markStageWaiting(input: WaitingStageStateInput): Promise<void> {
+  const { db, projectId, stage, result, stateMachine, waitingFor } = input;
   await db.client.workflowState.update({
     where: { project_id_stage: { project_id: projectId, stage } },
     data: {
@@ -92,12 +92,14 @@ function waitingData(result: StageResult, waitingFor: WorkflowWait): Record<stri
   };
 }
 
-function buildStageState(
-  projectId: string,
-  stage: WorkflowStage,
-  status: StageStatus,
-  stateMachine: WorkflowStateMachine,
-): {
+interface BuildStageStateInput {
+  readonly projectId: string;
+  readonly stage: WorkflowStage;
+  readonly status: StageStatus;
+  readonly stateMachine: WorkflowStateMachine;
+}
+
+function buildStageState(input: BuildStageStateInput): {
   project_id: string;
   stage: WorkflowStage;
   status: StageStatus;
@@ -106,6 +108,7 @@ function buildStageState(
   updated_at: Date;
   started_at: Date | null;
 } {
+  const { projectId, stage, status, stateMachine } = input;
   return {
     project_id: projectId,
     stage,

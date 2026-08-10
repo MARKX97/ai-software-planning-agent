@@ -85,7 +85,12 @@ export async function executeWorkflowPipeline(
       await recoverStreamFailure(deps.db, input, error);
       throw error;
     }
-    await markFailed(deps.db, input.projectId, input.executionId, error);
+    await markFailed({
+      db: deps.db,
+      projectId: input.projectId,
+      executionId: input.executionId,
+      error,
+    });
     return {
       status: await buildWorkflowStatus(deps.db, deps.projects, input.projectId),
       assistantMessage: null,
@@ -196,5 +201,5 @@ async function recoverStreamFailure(
     ]);
     return;
   }
-  await markFailed(db, input.projectId, input.executionId, error);
+  await markFailed({ db, projectId: input.projectId, executionId: input.executionId, error });
 }

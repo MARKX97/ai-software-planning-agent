@@ -50,7 +50,11 @@ function buildProviders(config: LlmOrchestratorConfig): ILLMProvider[] {
       new MockLLMProvider('minimax', config.modelIds.minimax),
     ];
   }
-  const adapter = new OpenAICompatibleAdapter('baishan', config.baseUrl, config.apiKey);
+  const adapter = new OpenAICompatibleAdapter({
+    name: 'baishan',
+    baseUrl: config.baseUrl,
+    apiKey: config.apiKey,
+  });
   return [
     new DeepSeekProvider(config.modelIds.deepseek, adapter),
     new GLMProvider(config.modelIds.glm, adapter),

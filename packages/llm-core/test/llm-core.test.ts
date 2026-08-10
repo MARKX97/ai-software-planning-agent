@@ -84,12 +84,12 @@ describe('isRetryable', () => {
 describe('OpenAICompatibleAdapter', () => {
   it('maps 401 to LLMAuthError', async () => {
     const fetch = async () => new Response('{}', { status: 401 });
-    const adapter = new OpenAICompatibleAdapter(
-      'test',
-      'https://x',
-      'k',
-      fetch as unknown as typeof fetch,
-    );
+    const adapter = new OpenAICompatibleAdapter({
+      name: 'test',
+      baseUrl: 'https://x',
+      apiKey: 'k',
+      fetchImpl: fetch as unknown as typeof globalThis.fetch,
+    });
     await assert.rejects(
       () => adapter.complete({ model: 'm', messages: [{ role: 'user', content: 'hi' }] }, 1000),
       LLMAuthError,
@@ -97,12 +97,12 @@ describe('OpenAICompatibleAdapter', () => {
   });
   it('maps 429 to LLMRateLimitError', async () => {
     const fetch = async () => new Response('{}', { status: 429 });
-    const adapter = new OpenAICompatibleAdapter(
-      'test',
-      'https://x',
-      'k',
-      fetch as unknown as typeof fetch,
-    );
+    const adapter = new OpenAICompatibleAdapter({
+      name: 'test',
+      baseUrl: 'https://x',
+      apiKey: 'k',
+      fetchImpl: fetch as unknown as typeof globalThis.fetch,
+    });
     await assert.rejects(
       () => adapter.complete({ model: 'm', messages: [{ role: 'user', content: 'hi' }] }, 1000),
       LLMRateLimitError,
@@ -110,12 +110,12 @@ describe('OpenAICompatibleAdapter', () => {
   });
   it('maps 400 to non-retryable LLMInvalidRequestError', async () => {
     const fetch = async () => new Response('{}', { status: 400 });
-    const adapter = new OpenAICompatibleAdapter(
-      'test',
-      'https://x',
-      'k',
-      fetch as unknown as typeof fetch,
-    );
+    const adapter = new OpenAICompatibleAdapter({
+      name: 'test',
+      baseUrl: 'https://x',
+      apiKey: 'k',
+      fetchImpl: fetch as unknown as typeof globalThis.fetch,
+    });
     const call = () =>
       adapter.complete({ model: 'm', messages: [{ role: 'user', content: 'hi' }] }, 1000);
     await assert.rejects(call, LLMInvalidRequestError);
@@ -123,12 +123,12 @@ describe('OpenAICompatibleAdapter', () => {
   });
   it('rejects malformed success responses', async () => {
     const fetch = async () => new Response('{}', { status: 200 });
-    const adapter = new OpenAICompatibleAdapter(
-      'test',
-      'https://x',
-      'k',
-      fetch as unknown as typeof fetch,
-    );
+    const adapter = new OpenAICompatibleAdapter({
+      name: 'test',
+      baseUrl: 'https://x',
+      apiKey: 'k',
+      fetchImpl: fetch as unknown as typeof globalThis.fetch,
+    });
     await assert.rejects(
       () => adapter.complete({ model: 'm', messages: [{ role: 'user', content: 'hi' }] }, 1000),
       LLMNetworkError,

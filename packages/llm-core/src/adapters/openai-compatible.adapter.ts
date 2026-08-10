@@ -17,6 +17,13 @@ interface RequestOptions {
   readonly signal?: AbortSignal;
 }
 
+export interface OpenAICompatibleAdapterOptions {
+  readonly name: string;
+  readonly baseUrl: string;
+  readonly apiKey: string;
+  readonly fetchImpl?: typeof globalThis.fetch;
+}
+
 /**
  * OpenAI-compatible HTTP client used by the three providers to talk to Baishan.
  *
@@ -28,15 +35,14 @@ interface RequestOptions {
 export class OpenAICompatibleAdapter implements ILLMHttpClient {
   readonly name: string;
 
-  constructor(
-    name: string,
-    baseUrl: string,
-    apiKey: string,
-    private readonly fetchImpl: typeof globalThis.fetch = globalThis.fetch.bind(globalThis),
-  ) {
+  private readonly fetchImpl: typeof globalThis.fetch;
+
+  constructor(options: OpenAICompatibleAdapterOptions) {
+    const { name, baseUrl, apiKey, fetchImpl = globalThis.fetch.bind(globalThis) } = options;
     this.name = name;
     this.baseUrl = baseUrl;
     this.apiKey = apiKey;
+    this.fetchImpl = fetchImpl;
   }
 
   private readonly baseUrl: string;

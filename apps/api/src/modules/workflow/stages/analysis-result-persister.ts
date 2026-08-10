@@ -10,13 +10,16 @@ import type { StageResult } from '@ai-planning/shared';
 import type { PrismaService } from '../../../database/database.module.js';
 
 /** Persist a single stage's structured output to the analysis_results table. */
-export async function persistAnalysisResult(
-  db: PrismaService,
-  projectId: string,
-  executionId: string,
-  stage: WorkflowStage,
-  result: StageResult,
-): Promise<void> {
+interface PersistAnalysisResultInput {
+  readonly db: PrismaService;
+  readonly projectId: string;
+  readonly executionId: string;
+  readonly stage: WorkflowStage;
+  readonly result: StageResult;
+}
+
+export async function persistAnalysisResult(input: PersistAnalysisResultInput): Promise<void> {
+  const { db, projectId, executionId, stage, result } = input;
   const resultType = result.byProvider
     ? 'multi_model'
     : result.structuredOutput !== null

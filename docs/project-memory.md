@@ -48,14 +48,17 @@
 - **Evidence:** [`system-design.md`](./system-design.md) 的主流程图。
 - **Impact:** 修改 Mermaid 后必须实际解析全部图表，不能只依赖 Markdown 格式检查。
 
-### MEM-005 Docker Dependency Cache Boundary
+### MEM-006 Docker Dependency Cache Boundary
 
 - **Status:** Active
-- **Last verified:** 2026-08-03
-- **Fact:** 当前 Dockerfile 在 `pnpm install` 前执行 `COPY . .`，任何源码变化都会使依赖层缓存失效；P1 最终构建因此重新下载完整 894 包依赖树，而不是新增了 894 个依赖。
-- **Evidence:** 根目录 [`Dockerfile`](../Dockerfile) 的 base stage 与本次 P1 生产镜像构建日志。
-- **Impact:** 功能开发阶段不得反复重建 Docker；后续单独优化 manifest/dependency layer 与 pnpm store cache 后，才恢复频繁镜像验证。
+- **Last verified:** 2026-08-10
+- **Fact:** Dockerfile 先复制根目录和各 workspace 的依赖清单并安装，再复制源码；普通源码变化可复用安装层，依赖变化时 BuildKit 继续复用 pnpm store。日志中的约 894 个包是 monorepo 完整依赖树，不是一次改动新增的依赖数。
+- **Evidence:** 根目录 [`Dockerfile`](../Dockerfile) 和 [`deployment.md`](./playbooks/deployment.md)。
+- **Impact:** 只有 package manifest、lockfile、workspace 配置或基础镜像变化才应重新执行完整安装；普通源码构建不应重新下载完整依赖树。
 
 ## Superseded Memory
 
-暂无。失效条目移入此处，并注明替代它的权威文档或 Active Memory ID。
+### MEM-005 Docker Dependency Cache Boundary
+
+- **Status:** Superseded by MEM-006 on 2026-08-10
+- **Previous fact:** Dockerfile 在安装前复制全部源码，导致任意源码变化使依赖层失效。

@@ -43,7 +43,7 @@ export class LlmOrchestratorService {
     const startedAt = Date.now();
     try {
       const { response, retries } = await callWithRetry(provider, prompt, options);
-      return this.finalize(response, provider, retries, options);
+      return this.finalize({ response, provider, retries, options });
     } catch (error) {
       this.recordFailure(provider, startedAt);
       throw error;
@@ -61,7 +61,7 @@ export class LlmOrchestratorService {
     const startedAt = Date.now();
     try {
       const { response, retries } = await callStreamWithRetry(provider, prompt, options);
-      return this.finalize(response, provider, retries, options);
+      return this.finalize({ response, provider, retries, options });
     } catch (error) {
       this.recordFailure(provider, startedAt);
       throw error;
@@ -81,7 +81,7 @@ export class LlmOrchestratorService {
       options,
       onFailure: (failed, startedAt) => this.recordFailure(failed, startedAt),
     });
-    return this.finalize(response, provider, retries, options);
+    return this.finalize({ response, provider, retries, options });
   }
 
   /** Parallel call to all providers; partial failure → null entries. */
@@ -96,7 +96,7 @@ export class LlmOrchestratorService {
         const startedAt = Date.now();
         try {
           const { response, retries } = await callWithRetry(p, prompt, options);
-          return [p.name, this.finalize(response, p, retries, options)] as const;
+          return [p.name, this.finalize({ response, provider: p, retries, options })] as const;
         } catch {
           this.recordFailure(p, startedAt);
           return [p.name, null] as const;
@@ -133,7 +133,7 @@ export class LlmOrchestratorService {
       const startedAt = Date.now();
       try {
         const { response, retries } = await callWithRetry(provider, prompt, options);
-        return this.finalize(response, provider, retries, options);
+        return this.finalize({ response, provider, retries, options });
       } catch (error) {
         this.recordFailure(provider, startedAt);
         failures[name] = error instanceof Error ? error.message : String(error);
@@ -169,12 +169,8 @@ export class LlmOrchestratorService {
     }
   }
 
-  private finalize(
-    response: LLMResponse,
-    provider: ILLMProvider,
-    retries: number,
-    options: LLMCallOptions,
-  ): LLMResponse {
+  private finalize(input: FinalizeInput): LLMResponse {
+    const { response, provider, retries, options } = input;
     const enriched = { ...response, retries };
     this.tracker.record({
       provider: provider.name,
@@ -196,4 +192,11 @@ export class LlmOrchestratorService {
       success: false,
     });
   }
+}
+
+interface FinalizeInput {
+  readonly response: LLMResponse;
+  readonly provider: ILLMProvider;
+  readonly retries: number;
+  readonly options: LLMCallOptions;
 }

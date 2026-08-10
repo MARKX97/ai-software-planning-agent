@@ -41,50 +41,68 @@ export function StageRail({
           </Badge>
         </div>
         <ol className="grid gap-2">
-          {stages.map((stage, index) => {
-            const state = stateByStage.get(stage);
-            const active = status?.current_stage === stage;
-            return (
-              <li key={stage}>
-                <details
-                  className={`group rounded-md border ${
-                    active ? 'border-cyan-300 bg-cyan-50' : 'border-slate-200 bg-white'
-                  }`}
-                  open={active || undefined}
-                >
-                  <summary className="grid min-h-16 cursor-pointer list-none grid-cols-[32px_1fr_auto] items-center gap-3 p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 [&::-webkit-details-marker]:hidden">
-                    <span
-                      className={`grid size-8 place-items-center rounded-full text-xs font-bold ${
-                        active ? 'bg-cyan-900 text-white' : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      {index + 1}
-                    </span>
-                    <span>
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-slate-950">{stageName(stage)}</span>
-                        <Badge variant={statusVariant(state?.status ?? 'pending')}>
-                          {statusName(state?.status ?? 'pending')}
-                        </Badge>
-                      </span>
-                      <span className="mt-1 block text-xs text-slate-500">
-                        {state ? formatDateTime(state.created_at) : '还没轮到'}
-                      </span>
-                    </span>
-                    <span className="text-xs font-semibold text-slate-500">
-                      <span className="group-open:hidden">展开</span>
-                      <span className="hidden group-open:inline">收起</span>
-                    </span>
-                  </summary>
-                  <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-4">
-                    <StageRecord state={state} />
-                  </div>
-                </details>
-              </li>
-            );
-          })}
+          {stages.map((stage, index) => (
+            <StageItem
+              active={status?.current_stage === stage}
+              index={index}
+              key={stage}
+              stage={stage}
+              state={stateByStage.get(stage)}
+            />
+          ))}
         </ol>
       </CardBody>
     </Card>
+  );
+}
+
+function StageItem({
+  active,
+  index,
+  stage,
+  state,
+}: {
+  active: boolean;
+  index: number;
+  stage: string;
+  state?: WorkflowStateResponse;
+}) {
+  return (
+    <li>
+      <details
+        className={`group rounded-md border ${
+          active ? 'border-cyan-300 bg-cyan-50' : 'border-slate-200 bg-white'
+        }`}
+        open={active || undefined}
+      >
+        <summary className="grid min-h-16 cursor-pointer list-none grid-cols-[32px_1fr_auto] items-center gap-3 p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 [&::-webkit-details-marker]:hidden">
+          <span
+            className={`grid size-8 place-items-center rounded-full text-xs font-bold ${
+              active ? 'bg-cyan-900 text-white' : 'bg-slate-100 text-slate-700'
+            }`}
+          >
+            {index + 1}
+          </span>
+          <span>
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-slate-950">{stageName(stage)}</span>
+              <Badge variant={statusVariant(state?.status ?? 'pending')}>
+                {statusName(state?.status ?? 'pending')}
+              </Badge>
+            </span>
+            <span className="mt-1 block text-xs text-slate-500">
+              {state ? formatDateTime(state.created_at) : '还没轮到'}
+            </span>
+          </span>
+          <span className="text-xs font-semibold text-slate-500">
+            <span className="group-open:hidden">展开</span>
+            <span className="hidden group-open:inline">收起</span>
+          </span>
+        </summary>
+        <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-4">
+          <StageRecord state={state} />
+        </div>
+      </details>
+    </li>
   );
 }

@@ -189,7 +189,12 @@ describe('workflow stage processors', () => {
       },
     };
 
-    await markFailed(failingDb as never, 'project-1', 'execution-1', new Error('fetch failed'));
+    await markFailed({
+      db: failingDb as never,
+      projectId: 'project-1',
+      executionId: 'execution-1',
+      error: new Error('fetch failed'),
+    });
     assert.deepEqual(messages, ['工作流执行失败，请稍后重试。', '工作流执行失败，请稍后重试。']);
   });
 });

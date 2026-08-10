@@ -42,11 +42,11 @@ export class KnowledgeRetrievalService {
       const items = rows.map(toEvidenceCitation);
       return { items, insufficient_evidence: items.length === 0 };
     } catch {
-      throw new AppException(
-        ErrorCode.KNOWLEDGE_UNAVAILABLE,
-        'Knowledge retrieval is temporarily unavailable',
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
+      throw new AppException({
+        code: ErrorCode.KNOWLEDGE_UNAVAILABLE,
+        message: 'Knowledge retrieval is temporarily unavailable',
+        httpStatus: HttpStatus.SERVICE_UNAVAILABLE,
+      });
     }
   }
 

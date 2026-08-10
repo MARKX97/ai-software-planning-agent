@@ -42,21 +42,11 @@ export function ArtifactDetailClient({
   return (
     <PageFrame
       actions={
-        <>
-          <Button
-            disabled={downloadMutation.isPending}
-            onClick={handleDownload}
-            variant="secondary"
-          >
-            {downloadMutation.isPending ? '正在准备下载' : '下载这份内容'}
-          </Button>
-          <ButtonLink href={`/projects/${projectId}/artifacts`} variant="quiet">
-            回到全部内容
-          </ButtonLink>
-          <ButtonLink href={`/projects/${projectId}/knowledge`} variant="quiet">
-            项目资料
-          </ButtonLink>
-        </>
+        <ArtifactActions
+          downloading={downloadMutation.isPending}
+          onDownload={handleDownload}
+          projectId={projectId}
+        />
       }
       description="这是这次讨论留下的完整记录。你可以直接阅读，或下载下来交给接手的人继续做。"
       eyebrow="一份整理好的内容"
@@ -71,6 +61,30 @@ export function ArtifactDetailClient({
       ) : null}
       {artifact ? <ArtifactBody artifact={artifact} /> : null}
     </PageFrame>
+  );
+}
+
+function ArtifactActions({
+  downloading,
+  onDownload,
+  projectId,
+}: {
+  downloading: boolean;
+  onDownload: () => void;
+  projectId: string;
+}) {
+  return (
+    <>
+      <Button disabled={downloading} onClick={onDownload} variant="secondary">
+        {downloading ? '正在准备下载' : '下载这份内容'}
+      </Button>
+      <ButtonLink href={`/projects/${projectId}/artifacts`} variant="quiet">
+        回到全部内容
+      </ButtonLink>
+      <ButtonLink href={`/projects/${projectId}/knowledge`} variant="quiet">
+        项目资料
+      </ButtonLink>
+    </>
   );
 }
 
