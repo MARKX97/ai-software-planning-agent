@@ -141,12 +141,27 @@ const demoResponses: Array<[string, (provider: string, prompt: string) => unknow
 
 /** Return deterministic, coherent content for local end-to-end demos. */
 export function mockContent(provider: string, prompt: string): string {
-  if (prompt.includes('AGENT_ACTION_SELECTION')) return JSON.stringify({ actions: [] });
+  if (prompt.includes('AGENT_ACTION_SELECTION')) return JSON.stringify(mockAgentAction(prompt));
   if (prompt.includes('Artifact type to generate:')) return mockArtifact(prompt);
   if (prompt.includes('WORKFLOW_CHECKPOINT_DISCUSSION')) return mockCheckpointDiscussion(prompt);
   if (prompt.includes('WORKFLOW_REQUIREMENT_CLARIFICATION')) return mockClarification(prompt);
   const match = demoResponses.find(([marker]) => prompt.includes(marker));
   return JSON.stringify(match ? match[1](provider, prompt) : { mock: true, provider });
+}
+
+function mockAgentAction(prompt: string): unknown {
+  const projectId = prompt.match(
+    /<untrusted-context name="projectId">\n([0-9a-f-]{36})\n<\/untrusted-context>/i,
+  )?.[1];
+  if (!projectId) return { actions: [] };
+  return {
+    actions: [
+      {
+        tool: 'searchKnowledge',
+        input: { projectId, query: 'Evidence relevant to the current planning stage', topK: 3 },
+      },
+    ],
+  };
 }
 
 function mockRequirementQuestions(prompt: string): unknown[] {

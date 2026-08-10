@@ -1,6 +1,6 @@
 # V3 P2 Controlled Tools And Incremental Regeneration
 
-> Status: Active
+> Status: Completed — delivered 2026-08-10
 > Scope: P2 controlled read-only Agent Tools, auditable trace, and source-aware incremental artifact regeneration.
 
 ## Goal
@@ -67,3 +67,18 @@ four read-only tools, a durable tool audit trail, and server-derived incremental
 - Regeneration changes only affected artifact types; replay and duplicate requests do not duplicate
   Tool audit rows, active artifacts, model logs, or cost.
 - Contracts, migration, deterministic tests, full verification, and UI E2E agree.
+
+## Verification Results
+
+- `pnpm verify` passed: format, Harness, lint, typecheck, deterministic Eval, API/Web tests, and
+  production builds.
+- Focused Action repair, Tool security/audit, Graph response redaction, impact calculation, and
+  selected-artifact regeneration tests passed.
+- Production Compose build applied all eight migrations; API, Web, and PostgreSQL were healthy and
+  passed smoke checks. Containers were stopped after verification and volumes were retained.
+- Existing knowledge/workflow/Graph-recovery HTTP integrations and the P2 Tool/regeneration HTTP
+  integration passed against PostgreSQL.
+- The existing 12 navigation/project E2E cases passed, followed by the complete workflow P2 case in
+  Chromium, Firefox, and WebKit after correcting test-only fixture assumptions.
+- Real Baishan and real Embedding were not run because they remain explicit opt-in cost-bearing
+  checks rather than the default release gate.

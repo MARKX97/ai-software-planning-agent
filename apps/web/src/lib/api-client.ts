@@ -16,6 +16,7 @@ const USER_ERROR_MESSAGES: Record<string, string> = {
   WORKFLOW_ALREADY_RUNNING: '工作流正在运行，无需重复启动。',
   WORKFLOW_NOT_RUNNING: '工作流尚未启动，请先启动后再操作。',
   WORKFLOW_STAGE_NOT_CLARIFICATION: '当前阶段不需要补充信息，请刷新页面查看最新状态。',
+  REGENERATION_NOT_REQUIRED: '当前没有需要更新的产物，或更新任务已在运行。',
   LLM_TIMEOUT: '模型响应超时，请稍后重试。',
   LLM_NETWORK_ERROR: '暂时无法连接模型服务，请稍后重试。',
   LLM_CANCELLED: '回复已取消。',

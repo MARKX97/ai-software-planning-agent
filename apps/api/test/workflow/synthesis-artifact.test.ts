@@ -129,6 +129,31 @@ describe('ArtifactGenerator', () => {
       await rm(dataDir, { recursive: true, force: true });
     }
   });
+
+  it('regenerates only the requested artifact types', async () => {
+    const calls: Array<{ provider: string; prompt: string }> = [];
+    const saved: SavedArtifact[] = [{ type: 'prd', content: 'existing' }];
+    const dataDir = await mkdtemp(join(tmpdir(), 'artifact-incremental-'));
+    try {
+      const generator = new ArtifactGenerator(
+        mockOrchestrator(calls, 'requirement_report'),
+        new ArtifactFileStore(mockDb(saved) as never, dataDir),
+      );
+      const result = await generator.generateAll(context(), [], ['backend_spec', 'project_plan']);
+      assert.deepEqual(
+        result.successes.map((item) => item.type),
+        ['backend_spec', 'project_plan'],
+      );
+      assert.equal(calls.length, 2);
+      assert.deepEqual(saved.map((item) => item.type).sort(), [
+        'backend_spec',
+        'prd',
+        'project_plan',
+      ]);
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
 });
 
 function analysis(
@@ -215,6 +240,7 @@ function mockDb(saved: SavedArtifact[]): unknown {
           return { id: `${args.data.type}-id`, ...args.data };
         },
         findFirst: async () => null,
+        findMany: async () => saved.map((item) => ({ type: item.type })),
       },
       tokenUsage: { upsert: async () => undefined },
     },

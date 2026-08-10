@@ -17,13 +17,12 @@ import {
 import { getUserErrorMessage } from '@/lib/api-client';
 import type { MessageListResponse, WorkflowStreamResponse } from '@/types/api';
 
-export function WorkflowClient({
-  projectId,
-  autoStart = false,
-}: {
+interface WorkflowClientProps {
   projectId: string;
   autoStart?: boolean;
-}) {
+}
+
+export function WorkflowClient({ projectId, autoStart = false }: WorkflowClientProps) {
   const queryClient = useQueryClient();
   const statusQuery = useQuery({
     queryKey: ['workflow-status', projectId],

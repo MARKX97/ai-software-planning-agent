@@ -20,10 +20,12 @@ import { AgentToolService, type AgentToolRunResult } from './agent-tool.service.
 
 @Injectable()
 export class AgentActionService {
+  @Inject(AgentToolService)
+  private readonly tools!: AgentToolService;
+
   constructor(
     private readonly config: AppConfigService,
     private readonly db: PrismaService,
-    private readonly tools: AgentToolService,
     @Inject(LLM_ORCHESTRATOR) private readonly orchestrator: LlmOrchestratorService,
   ) {}
 

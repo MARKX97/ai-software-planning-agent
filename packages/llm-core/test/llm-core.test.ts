@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { z } from 'zod';
 import {
+  agentActionPlanSchema,
   feasibilityAssessmentSchema,
   multiModelAnalysisSchema,
   mvpPlanSchema,
@@ -148,6 +149,26 @@ describe('MockLLMProvider', () => {
     const res = await provider.chat('hi', { outputSchema: schema });
     // zod strips unknown keys by default → only `mock` survives.
     assert.deepEqual(res.structuredOutput, { mock: true });
+  });
+  it('returns one deterministic read-only Action when a project ID is available', async () => {
+    const provider = new MockLLMProvider('glm');
+    const projectId = '550e8400-e29b-41d4-a716-446655440000';
+    const result = await provider.chat(
+      `AGENT_ACTION_SELECTION\n<untrusted-context name="projectId">\n${projectId}\n</untrusted-context>`,
+      { outputSchema: agentActionPlanSchema },
+    );
+    assert.deepEqual(result.structuredOutput, {
+      actions: [
+        {
+          tool: 'searchKnowledge',
+          input: {
+            projectId,
+            query: 'Evidence relevant to the current planning stage',
+            topK: 3,
+          },
+        },
+      ],
+    });
   });
   it('supports multiple clarification rounds before continuing', async () => {
     const provider = new MockLLMProvider('glm');

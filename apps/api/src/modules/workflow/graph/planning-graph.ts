@@ -51,41 +51,11 @@ export function createPlanningGraph(
   executeStage: ExecuteGraphStage,
   prepareStage: PrepareGraphStage = async (_graphRunId, context) => context,
 ) {
-  const chooseAction = async (state: PlanningGraphState) => ({
-    context: await prepareStage(state.graphRunId, state.context, state.stage),
-    currentNode: 'choose_action',
-  });
-  const runStage = async (state: PlanningGraphState) => {
-    const result = await executeStage(state.context, state.stage);
-    return {
-      context: state.context,
-      stage: result.nextStage,
-      nextStage: result.nextStage,
-      currentNode: result.stage,
-      waitingFor: result.waitingFor,
-    };
-  };
-  const humanInterrupt = (state: PlanningGraphState) => {
-    const resume = interrupt({
-      graphRunId: state.graphRunId,
-      stage: state.currentNode,
-      waitingFor: state.waitingFor,
-    }) as GraphResume;
-    return {
-      context: resume.context,
-      stage: resume.stage,
-      nextStage: resume.stage,
-      currentNode: 'human_interrupt',
-      waitingFor: null,
-    };
-  };
-  const routeAfterStage = (state: PlanningGraphState): string => {
-    if (state.waitingFor) return 'human_interrupt';
-    return state.stage === WorkflowStage.COMPLETED ? END : 'choose_action';
-  };
+  const chooseAction = chooseActionNode(prepareStage);
+  const runStage = runStageNode(executeStage);
   const builder = new StateGraph(PlanningState)
     .addNode('choose_action', chooseAction)
-    .addNode('human_interrupt', humanInterrupt)
+    .addNode('human_interrupt', humanInterruptNode)
     .addNode(WorkflowStage.REQUIREMENT_ANALYSIS, runStage)
     .addNode(WorkflowStage.REQUIREMENT_CLARIFICATION, runStage)
     .addNode(WorkflowStage.MULTI_MODEL_ANALYSIS, runStage)
@@ -100,10 +70,52 @@ export function createPlanningGraph(
   for (const stage of stageNames) {
     builder.addConditionalEdges(stage, routeAfterStage);
   }
-  builder.addConditionalEdges('human_interrupt', (state) =>
-    state.stage === WorkflowStage.COMPLETED ? END : 'choose_action',
-  );
+  builder.addConditionalEdges('human_interrupt', routeAfterInterrupt);
   return builder.compile({ checkpointer });
+}
+
+function chooseActionNode(prepareStage: PrepareGraphStage) {
+  return async (state: PlanningGraphState) => ({
+    context: await prepareStage(state.graphRunId, state.context, state.stage),
+    currentNode: 'choose_action',
+  });
+}
+
+function runStageNode(executeStage: ExecuteGraphStage) {
+  return async (state: PlanningGraphState) => {
+    const result = await executeStage(state.context, state.stage);
+    return {
+      context: state.context,
+      stage: result.nextStage,
+      nextStage: result.nextStage,
+      currentNode: result.stage,
+      waitingFor: result.waitingFor,
+    };
+  };
+}
+
+function humanInterruptNode(state: PlanningGraphState) {
+  const resume = interrupt({
+    graphRunId: state.graphRunId,
+    stage: state.currentNode,
+    waitingFor: state.waitingFor,
+  }) as GraphResume;
+  return {
+    context: resume.context,
+    stage: resume.stage,
+    nextStage: resume.stage,
+    currentNode: 'human_interrupt',
+    waitingFor: null,
+  };
+}
+
+function routeAfterStage(state: PlanningGraphState): string {
+  if (state.waitingFor) return 'human_interrupt';
+  return state.stage === WorkflowStage.COMPLETED ? END : 'choose_action';
+}
+
+function routeAfterInterrupt(state: PlanningGraphState): string {
+  return state.stage === WorkflowStage.COMPLETED ? END : 'choose_action';
 }
 
 export const PLANNING_GRAPH_STAGES = stageNames;

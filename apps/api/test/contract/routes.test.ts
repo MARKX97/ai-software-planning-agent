@@ -44,6 +44,7 @@ const expectedRoutes = [
   'POST /projects/{project_id}/workflow/continue',
   'POST /projects/{project_id}/workflow/discuss',
   'POST /projects/{project_id}/workflow/advance',
+  'POST /projects/{project_id}/workflow/regenerate',
   'GET /projects/{project_id}/workflow/states',
   'GET /projects/{project_id}/workflow/executions',
   'GET /projects/{project_id}/workflow/executions/{execution_id}',
@@ -93,7 +94,7 @@ function routeEntries(controller: { prototype: object }): string[] {
 }
 
 describe('API route contract', () => {
-  it('keeps all 34 implemented routes registered on controllers', () => {
+  it('keeps all 35 implemented routes registered on controllers', () => {
     const actual = controllers.flatMap(routeEntries).sort();
     assert.deepEqual(actual, expectedRoutes);
   });

@@ -15,3 +15,4 @@
 
 - [`v3-rag-agent.md`](./v3-rag-agent.md)：V3 P0 文档知识库、混合检索、引用快照与最小 UI；P1/P2 延后。
 - [`v3-p1-repository-graph.md`](./v3-p1-repository-graph.md)：V3 P1 PDF/公开仓库索引与可恢复 LangGraph 工作流。
+- [`v3-p2-controlled-tools.md`](./v3-p2-controlled-tools.md)：V3 P2 受控只读 Tool、脱敏审计轨迹与来源感知的增量重生成。

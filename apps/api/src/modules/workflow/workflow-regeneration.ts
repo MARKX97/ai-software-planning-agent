@@ -13,14 +13,7 @@ export async function regenerateAffectedArtifacts(
   const project = await deps.projects.findOrFail(projectId);
   const impact = await loadRegenerationImpact(deps.db, projectId);
   if (!impact) throw regenerationConflict('No artifacts require regeneration');
-  const conversation = await deps.db.client.conversation.findFirst({
-    where: {
-      project_id: projectId,
-      messages: { some: { metadata: { path: ['workflow'], equals: true } } },
-    },
-    orderBy: { updated_at: 'desc' },
-    select: { id: true },
-  });
+  const conversation = await findWorkflowConversation(deps, projectId);
   if (!conversation) {
     throw AppException.notFound(
       ErrorCode.CONVERSATION_NOT_FOUND,
@@ -28,6 +21,30 @@ export async function regenerateAffectedArtifacts(
     );
   }
   await syncProjectBudget(deps, projectId);
+  const executionId = await claimRegeneration(deps, projectId);
+  const result = await executeWorkflowPipeline(deps, {
+    projectId,
+    executionId,
+    originalIdea: project.original_idea,
+    conversationId: conversation.id,
+    startStage: WorkflowStage.PLANNING_GENERATION,
+    regenerationTargets: impact.affected_artifacts,
+  });
+  return result.status;
+}
+
+function findWorkflowConversation(deps: WorkflowExecutorDeps, projectId: string) {
+  return deps.db.client.conversation.findFirst({
+    where: {
+      project_id: projectId,
+      messages: { some: { metadata: { path: ['workflow'], equals: true } } },
+    },
+    orderBy: { updated_at: 'desc' },
+    select: { id: true },
+  });
+}
+
+async function claimRegeneration(deps: WorkflowExecutorDeps, projectId: string): Promise<string> {
   const execution = await deps.db.client.$transaction(async (tx) => {
     const claimed = await tx.project.updateMany({
       where: {
@@ -53,15 +70,7 @@ export async function regenerateAffectedArtifacts(
       },
     });
   });
-  const result = await executeWorkflowPipeline(deps, {
-    projectId,
-    executionId: execution.id,
-    originalIdea: project.original_idea,
-    conversationId: conversation.id,
-    startStage: WorkflowStage.PLANNING_GENERATION,
-    regenerationTargets: impact.affected_artifacts,
-  });
-  return result.status;
+  return execution.id;
 }
 
 function regenerationConflict(message: string): AppException {

@@ -23,7 +23,6 @@
     "apps/api/src/modules/workflow/workflow-state-persister.ts#markStageCompleted": 5,
     "apps/api/src/modules/workflow/workflow-state-persister.ts#markStageRunning": 4,
     "apps/api/src/modules/workflow/workflow-state-persister.ts#markStageWaiting": 6,
-    "apps/api/src/modules/workflow/workflow-store.ts#findWorkflowConversation": 4,
     "apps/api/src/modules/workflow/workflow-store.ts#markFailed": 4,
     "apps/web/src/types/api.ts#constructor": 5,
     "packages/llm-core/src/adapters/openai-compatible.adapter.ts#constructor": 4,

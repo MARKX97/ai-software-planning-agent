@@ -1,7 +1,7 @@
 # System Design
 
 > Version: 1.4.0
-> Status: Current V2 + V3 P0/P1; P2 Contract
+> Status: Current V2 + V3 P0/P1/P2
 
 ---
 
@@ -33,8 +33,8 @@
 
 ## 1. 主流程与调用链
 
-实线表示已交付的 V2/P0/P1，紫色虚线表示正在实施的 P2。实施记录见
-[`v3-p2-controlled-tools.md`](./exec-plans/active/v3-p2-controlled-tools.md)。
+实线表示主链路，紫色虚线表示按配置启用的 P2 动态取证旁路；两者均已交付。实施记录见
+[`v3-p2-controlled-tools.md`](./exec-plans/completed/v3-p2-controlled-tools.md)。
 
 ```mermaid
 flowchart LR
@@ -113,7 +113,7 @@ flowchart LR
 
 索引失败不替换旧的 active revision；RAG 内容统一视为不可信输入，不得控制权限、工作流状态或数据库写入。
 
-## 3. Current V2/P0/P1 + P2 Contract：核心数据关系
+## 3. Current V2/P0/P1/P2：核心数据关系
 
 知识库、引用和 Graph Run 已进入 Prisma；P2 增加 Tool Step 审计实体。
 

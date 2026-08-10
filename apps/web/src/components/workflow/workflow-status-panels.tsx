@@ -1,7 +1,7 @@
-import { Button } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
 import type { ArtifactQualityReport, DecisionSnapshot, WorkflowStatusResponse } from '@/types/api';
-import { ARTIFACT_TYPE_LABELS, type ArtifactType } from '@/features/artifacts/api';
+import { WorkflowActionPanels } from './workflow-action-panels';
+import { GraphRecoveryPanel, RegenerationPanel } from './workflow-trace-panels';
 
 interface WorkflowStatusPanelsProps {
   actionError: string | null;
@@ -29,109 +29,14 @@ export function WorkflowStatusPanels({
 
       <DecisionSnapshotsPanel snapshots={status.decision_snapshots} />
       <QualityReportPanel report={status.quality_report} />
-
-      {actionError && !failureMessage ? (
-        <p
-          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-          role="alert"
-        >
-          {actionError}
-        </p>
-      ) : null}
-
-      {status.current_stage === 'init' ? (
-        <Card>
-          <CardBody className="grid gap-3">
-            <h2 className="text-base font-bold text-slate-950">还没开始</h2>
-            <p className="text-sm leading-6 text-slate-600">
-              点下开始后，我们会先把想法拆开看；遇到关键空白会问你，不会擅自替你补答案。
-            </p>
-            <Button disabled={busy} onClick={onStart}>
-              {busy ? '正在开始' : '开始梳理'}
-            </Button>
-          </CardBody>
-        </Card>
-      ) : null}
-
-      {failureMessage ? (
-        <Card className="border-red-200 bg-red-50">
-          <CardBody className="grid gap-3">
-            <h2 className="text-sm font-bold text-red-800">这次没走完</h2>
-            <p className="text-sm leading-6 text-red-700" role="alert">
-              {actionError ?? failureMessage}
-            </p>
-            <Button className="w-fit" disabled={busy} onClick={onStart} variant="danger">
-              {busy ? '正在再试一次' : '再试一次'}
-            </Button>
-          </CardBody>
-        </Card>
-      ) : null}
+      <WorkflowActionPanels
+        actionError={actionError}
+        busy={busy}
+        failureMessage={failureMessage}
+        onStart={onStart}
+        showStart={status.current_stage === 'init'}
+      />
     </>
-  );
-}
-
-function GraphRecoveryPanel({ status }: { status: WorkflowStatusResponse }) {
-  if (!status.graph_run) return null;
-  const run = status.graph_run;
-  return (
-    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-      <p>
-        执行节点：{run.current_node} · 恢复版本 {run.checkpoint_version}
-        {run.recovery_available ? ' · 可恢复' : ''}
-        {run.interrupt_reason
-          ? ` · 等待 ${run.interrupt_reason === 'reply' ? '回复' : '确认'}`
-          : ''}
-      </p>
-      {run.retrieval_summary ? <p className="mt-1">取证摘要：{run.retrieval_summary}</p> : null}
-      {run.tool_steps.length > 0 ? (
-        <details className="mt-2">
-          <summary className="cursor-pointer font-semibold text-slate-800">查看取证轨迹</summary>
-          <ol className="mt-2 space-y-2">
-            {run.tool_steps.map((step) => (
-              <li className="rounded bg-slate-50 px-2 py-1" key={step.id}>
-                {step.stage} · {step.tool} · {toolStatusLabel(step.status)}
-                {step.summary ? ` · ${step.summary}` : ''}
-              </li>
-            ))}
-          </ol>
-        </details>
-      ) : null}
-    </div>
-  );
-}
-
-function RegenerationPanel({
-  busy,
-  onRegenerate,
-  status,
-}: {
-  busy: boolean;
-  onRegenerate: () => void;
-  status: WorkflowStatusResponse;
-}) {
-  if (!status.regeneration) return null;
-  return (
-    <Card className="border-amber-200 bg-amber-50">
-      <CardBody className="grid gap-3">
-        <h2 className="text-sm font-bold text-amber-950">项目证据有变化</h2>
-        <p className="text-sm leading-6 text-amber-900">
-          将只更新：{status.regeneration.affected_artifacts.map(artifactLabel).join('、')}。
-        </p>
-        <Button className="w-fit" disabled={busy} onClick={onRegenerate}>
-          {busy ? '正在更新' : '更新受影响产物'}
-        </Button>
-      </CardBody>
-    </Card>
-  );
-}
-
-function artifactLabel(value: string): string {
-  return ARTIFACT_TYPE_LABELS[value as ArtifactType] ?? value;
-}
-
-function toolStatusLabel(status: string): string {
-  return (
-    { running: '执行中', success: '成功', failed: '失败', rejected: '已拒绝' }[status] ?? status
   );
 }
 

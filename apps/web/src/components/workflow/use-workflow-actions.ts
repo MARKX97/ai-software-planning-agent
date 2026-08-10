@@ -45,12 +45,7 @@ export function useWorkflowActions(input: WorkflowActionsInput): WorkflowActions
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useAbortOnUnmount(abortRef, mountedRef);
-  useEffect(() => {
-    if (input.autoStart && input.status?.current_stage === 'init' && !autoStartedRef.current) {
-      autoStartedRef.current = true;
-      void startWorkflow();
-    }
-  }, [input.autoStart, input.status?.current_stage]);
+  useAutoStart(input, autoStartedRef, startWorkflow);
 
   function queueDelta(content: string): void {
     bufferRef.current += content;
@@ -156,31 +151,48 @@ export function useWorkflowActions(input: WorkflowActionsInput): WorkflowActions
     }
   }
 
-  async function regenerateArtifacts(): Promise<void> {
-    setBusy(true);
-    setActionError(null);
-    try {
-      await regenerateWorkflow(input.projectId);
-      await input.refresh();
-    } catch (error) {
-      setActionError(getUserErrorMessage(error, '受影响的产物暂时无法更新，请稍后重试。'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return {
     actionError,
     advanceCheckpoint,
     answer,
     busy,
     pendingUserMessage,
-    regenerateArtifacts,
+    regenerateArtifacts: () => runRegeneration(input, setBusy, setActionError),
     setAnswer,
     startWorkflow,
     streamingReply,
     submitReply,
   };
+}
+
+function useAutoStart(
+  input: WorkflowActionsInput,
+  autoStartedRef: RefObject<boolean>,
+  startWorkflow: () => Promise<void>,
+): void {
+  useEffect(() => {
+    if (input.autoStart && input.status?.current_stage === 'init' && !autoStartedRef.current) {
+      autoStartedRef.current = true;
+      void startWorkflow();
+    }
+  }, [input.autoStart, input.status?.current_stage]);
+}
+
+async function runRegeneration(
+  input: WorkflowActionsInput,
+  setBusy: (value: boolean) => void,
+  setActionError: (value: string | null) => void,
+): Promise<void> {
+  setBusy(true);
+  setActionError(null);
+  try {
+    await regenerateWorkflow(input.projectId);
+    await input.refresh();
+  } catch (error) {
+    setActionError(getUserErrorMessage(error, '受影响的产物暂时无法更新，请稍后重试。'));
+  } finally {
+    setBusy(false);
+  }
 }
 
 function useAbortOnUnmount(

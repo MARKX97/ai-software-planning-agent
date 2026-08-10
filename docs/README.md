@@ -43,7 +43,7 @@ Agent 每次开始任务时读取 Active Memory；只有出现可复用的新事
 - 复杂任务：在 [`exec-plans/active/`](./exec-plans/active/README.md) 创建执行计划。
 - V3 P0 RAG：[`v3-rag-agent.md`](./exec-plans/completed/v3-rag-agent.md)。
 - V3 P1：[`v3-p1-repository-graph.md`](./exec-plans/completed/v3-p1-repository-graph.md)（PDF/公开仓库与可恢复 Graph）。
-- V3 P2：[`v3-p2-controlled-tools.md`](./exec-plans/active/v3-p2-controlled-tools.md)（受控 Tool、轨迹与增量重生成，实施中）。
+- V3 P2：[`v3-p2-controlled-tools.md`](./exec-plans/completed/v3-p2-controlled-tools.md)（受控 Tool、轨迹与增量重生成）。
 - 完成记录：移动到 [`exec-plans/completed/`](./exec-plans/completed/README.md)。
 - 临时豁免：登记在 [`tech-debt.md`](./tech-debt.md)，并同步机器基线。
 

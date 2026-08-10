@@ -35,44 +35,19 @@ export async function loadRegenerationImpact(
   if (
     !project ||
     !['completed', 'failed'].includes(project.status) ||
-    ![WorkflowStage.COMPLETED, WorkflowStage.FAILED].includes(project.current_stage)
+    (project.current_stage !== WorkflowStage.COMPLETED &&
+      project.current_stage !== WorkflowStage.FAILED)
   ) {
     return null;
   }
-  const artifacts = await db.client.artifact.findMany({
-    where: { project_id: projectId, deleted_at: null },
-    select: {
-      type: true,
-      created_at: true,
-      citations: { select: { source_id: true, chunk_id: true, content_hash: true } },
-    },
-  });
+  const artifacts = await loadArtifacts(db, projectId);
   if (artifacts.length === 0) return null;
   const citations = artifacts.flatMap((artifact) => artifact.citations);
-  const [sources, chunks] = await Promise.all([
-    db.client.knowledgeSource.findMany({
-      where: {
-        project_id: projectId,
-        deleted_at: null,
-        status: { in: ['ready', 'ready_with_warnings'] },
-      },
-      select: { id: true, created_at: true },
-    }),
-    citations.length
-      ? db.client.knowledgeChunk.findMany({
-          where: {
-            id: { in: citations.map((citation) => citation.chunk_id) },
-            document: {
-              revision: {
-                is_active: true,
-                source: { project_id: projectId, deleted_at: null },
-              },
-            },
-          },
-          select: { id: true, content_hash: true },
-        })
-      : Promise.resolve([]),
-  ]);
+  const { sources, chunks } = await loadActiveEvidence(
+    db,
+    projectId,
+    citations.map((citation) => citation.chunk_id),
+  );
   return deriveRegenerationImpact(
     artifacts.map((artifact) => ({
       type: artifact.type,
@@ -86,6 +61,49 @@ export async function loadRegenerationImpact(
     sources.map((source) => ({ id: source.id, createdAt: source.created_at })),
     new Map(chunks.map((chunk) => [chunk.id, chunk.content_hash])),
   );
+}
+
+function loadArtifacts(db: PrismaService, projectId: string) {
+  return db.client.artifact.findMany({
+    where: { project_id: projectId, deleted_at: null },
+    select: {
+      type: true,
+      created_at: true,
+      citations: { select: { source_id: true, chunk_id: true, content_hash: true } },
+    },
+  });
+}
+
+async function loadActiveEvidence(
+  db: PrismaService,
+  projectId: string,
+  chunkIds: readonly string[],
+) {
+  const [sources, chunks] = await Promise.all([
+    db.client.knowledgeSource.findMany({
+      where: {
+        project_id: projectId,
+        deleted_at: null,
+        status: { in: ['ready', 'ready_with_warnings'] },
+      },
+      select: { id: true, created_at: true },
+    }),
+    chunkIds.length
+      ? db.client.knowledgeChunk.findMany({
+          where: {
+            id: { in: [...chunkIds] },
+            document: {
+              revision: {
+                is_active: true,
+                source: { project_id: projectId, deleted_at: null },
+              },
+            },
+          },
+          select: { id: true, content_hash: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  return { sources, chunks };
 }
 
 export function deriveRegenerationImpact(

@@ -25,6 +25,18 @@ export interface AgentToolRunResult extends ToolReadResult {
   readonly errorCode?: string;
 }
 
+interface AgentToolCall {
+  readonly context: AgentToolRunContext;
+  readonly callNumber: number;
+  readonly beforeRead?: (action: AgentToolAction) => Promise<void>;
+}
+
+interface RejectedToolCall {
+  readonly tool: string;
+  readonly action: unknown;
+  readonly errorCode: string;
+}
+
 @Injectable()
 export class AgentToolService {
   @Inject(KnowledgeRetrievalService)
@@ -39,52 +51,46 @@ export class AgentToolService {
   ): Promise<AgentToolRunResult[]> {
     const results: AgentToolRunResult[] = [];
     for (let index = 0; index < actions.length; index += 1) {
-      results.push(await this.execute(context, actions[index], index + 1, beforeRead));
+      results.push(
+        await this.execute({ context, callNumber: index + 1, beforeRead }, actions[index]),
+      );
     }
     return results;
   }
 
-  async execute(
-    context: AgentToolRunContext,
-    rawAction: unknown,
-    callNumber: number,
-    beforeRead?: (action: AgentToolAction) => Promise<void>,
-  ): Promise<AgentToolRunResult> {
+  async execute(call: AgentToolCall, rawAction: unknown): Promise<AgentToolRunResult> {
     const tool = toolName(rawAction);
     const parsed = agentToolActionSchema.safeParse(rawAction);
-    if (callNumber > 3) {
-      return this.reject(context, callNumber, tool, rawAction, ErrorCode.TOOL_LIMIT_EXCEEDED);
+    if (call.callNumber > 3) {
+      return this.reject(call, {
+        tool,
+        action: rawAction,
+        errorCode: ErrorCode.TOOL_LIMIT_EXCEEDED,
+      });
     }
     if (!parsed.success) {
-      return this.reject(context, callNumber, tool, rawAction, ErrorCode.TOOL_REJECTED);
+      return this.reject(call, { tool, action: rawAction, errorCode: ErrorCode.TOOL_REJECTED });
     }
-    if (parsed.data.input.projectId !== context.projectId) {
-      return this.reject(
-        context,
-        callNumber,
-        parsed.data.tool,
-        parsed.data,
-        ErrorCode.TOOL_PROJECT_MISMATCH,
-      );
+    if (parsed.data.input.projectId !== call.context.projectId) {
+      return this.reject(call, {
+        tool: parsed.data.tool,
+        action: parsed.data,
+        errorCode: ErrorCode.TOOL_PROJECT_MISMATCH,
+      });
     }
-    return this.run(context, callNumber, parsed.data, beforeRead);
+    return this.run(call, parsed.data);
   }
 
-  private async run(
-    context: AgentToolRunContext,
-    callNumber: number,
-    action: AgentToolAction,
-    beforeRead?: (action: AgentToolAction) => Promise<void>,
-  ): Promise<AgentToolRunResult> {
-    const reserved = await this.reserve(context, callNumber, action.tool, action);
+  private async run(call: AgentToolCall, action: AgentToolAction): Promise<AgentToolRunResult> {
+    const reserved = await this.reserve(call, action.tool, action);
     const replay = storedResult(reserved);
     if (reserved.status !== 'running' && replay) return replay;
     const startedAt = Date.now();
     try {
-      await beforeRead?.(action);
+      await call.beforeRead?.(action);
       const result = await readAgentTool(
         { db: this.db, knowledge: this.knowledge },
-        context.projectId,
+        call.context.projectId,
         action,
       );
       const output = { ...result, tool: action.tool, status: 'success' as const };
@@ -98,45 +104,42 @@ export class AgentToolService {
   }
 
   private async reject(
-    context: AgentToolRunContext,
-    callNumber: number,
-    tool: string,
-    action: unknown,
-    errorCode: string,
+    call: AgentToolCall,
+    rejection: RejectedToolCall,
   ): Promise<AgentToolRunResult> {
-    const row = await this.reserve(context, callNumber, tool, action);
+    const row = await this.reserve(call, rejection.tool, rejection.action);
     const replay = storedResult(row);
     if (row.status !== 'running' && replay) return replay;
     const result: AgentToolRunResult = {
-      tool,
+      tool: rejection.tool,
       status: 'rejected',
       resultCount: 0,
       summary: 'Tool 调用已拒绝',
       context: '',
-      errorCode,
+      errorCode: rejection.errorCode,
     };
     await this.finish(row.id, result, 0);
     return result;
   }
 
-  private reserve(context: AgentToolRunContext, callNumber: number, tool: string, action: unknown) {
+  private reserve(call: AgentToolCall, tool: string, action: unknown) {
     const id = randomUUID();
     return this.db.client.toolStep.upsert({
       where: {
         graph_run_id_stage_call_number: {
-          graph_run_id: context.graphRunId,
-          stage: context.stage,
-          call_number: callNumber,
+          graph_run_id: call.context.graphRunId,
+          stage: call.context.stage,
+          call_number: call.callNumber,
         },
       },
       create: {
         id,
-        graph_run_id: context.graphRunId,
-        execution_id: context.executionId,
-        stage: context.stage,
+        graph_run_id: call.context.graphRunId,
+        execution_id: call.context.executionId,
+        stage: call.context.stage,
         node: 'choose_action',
         tool: tool.slice(0, 64),
-        call_number: callNumber,
+        call_number: call.callNumber,
         status: 'running',
         arguments_json: argumentSummary(action) as never,
         updated_at: new Date(),

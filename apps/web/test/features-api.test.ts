@@ -16,6 +16,7 @@ import {
   getWorkflowStatus,
   listConversationMessages,
   listWorkflowStates,
+  regenerateWorkflow,
   runWorkflow,
 } from '@/features/workflow/api';
 import { getModelLogDetail, getTokenUsage, listModelLogs } from '@/features/usage/api';
@@ -98,6 +99,7 @@ describe('feature API clients', () => {
       graphRunId: 'graph-run-1',
       checkpointVersion: 2,
     });
+    await regenerateWorkflow('project-1');
     await listConversationMessages('project-1', 'conversation-1');
     await getTokenUsage('project-1');
     await listModelLogs('project-1', 10, 5);
@@ -134,15 +136,18 @@ describe('feature API clients', () => {
         checkpoint_version: 2,
       },
     });
+    expect(apiRequest).toHaveBeenNthCalledWith(2, '/projects/project-1/workflow/regenerate', {
+      method: 'POST',
+    });
     expect(apiRequest).toHaveBeenNthCalledWith(
-      2,
+      3,
       '/projects/project-1/conversations/conversation-1/messages',
       { query: { offset: 0, limit: 100 } },
     );
-    expect(apiRequest).toHaveBeenNthCalledWith(3, '/usage/tokens', {
+    expect(apiRequest).toHaveBeenNthCalledWith(4, '/usage/tokens', {
       query: { project_id: 'project-1' },
     });
-    expect(apiRequest).toHaveBeenNthCalledWith(4, '/projects/project-1/usage/logs', {
+    expect(apiRequest).toHaveBeenNthCalledWith(5, '/projects/project-1/usage/logs', {
       query: { offset: 10, limit: 5 },
     });
     expect(apiDownload).toHaveBeenCalledWith(

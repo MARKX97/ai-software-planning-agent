@@ -1,7 +1,7 @@
 # Architecture Overview
 
 > Version: 1.4.0
-> Status: Current V2 + V3 P0/P1; P2 Contract
+> Status: Current V2 + V3 P0/P1/P2
 
 ---
 
@@ -76,10 +76,10 @@ Shared: packages/shared/        跨层 LLM 类型、枚举与 Zod Schema
 - V3 只允许 P2 Contract 中四个只读 Tool，不引入运行时 MCP 或任意 Tool 注册
 - 不引入 Redis、Kafka、Elasticsearch、Kubernetes
 
-## V3 P0/P1 Current And P2 Contract
+## V3 P0/P1/P2 Current
 
-V3 P0/P1 已在 PostgreSQL 中提供项目知识索引、公开仓库证据和可恢复 Agent Graph。P2 在
-同一 Graph 内增加一次结构化 Action 选择和固定只读 Tool，不新增运行时或第二套编排。
+V3 已在 PostgreSQL 中提供项目知识索引、公开仓库证据和可恢复 Agent Graph。P2 在同一
+Graph 内增加一次结构化 Action 选择和固定只读 Tool，不新增运行时或第二套编排。
 
 ```text
 Browser / SSE

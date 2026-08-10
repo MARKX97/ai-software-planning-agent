@@ -72,12 +72,55 @@ test('user can create a project, finish workflow, inspect and download artifacts
     await expect(page.locator('aside').getByText('已完成', { exact: true }).first()).toBeVisible({
       timeout: 30_000,
     });
+    await expect(page.getByText(/\d+ 次 Tool · \d+ 条结果/)).toBeVisible();
+    await page.getByText('查看取证轨迹').click();
+    await expect(page.getByText(/searchKnowledge/).first()).toBeVisible();
 
     await page.getByRole('link', { name: '产物' }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/artifacts$`));
     await expect(page.getByRole('heading', { name: '已经整理好的内容' })).toBeVisible();
     const artifactLinks = page.locator(`a[href^="/projects/${projectId}/artifacts/"]`);
     await expect(artifactLinks).toHaveCount(11);
+    const beforeResponse = await request.get(`${apiBase}/projects/${projectId}/artifacts`);
+    const beforeArtifacts = (await beforeResponse.json()) as {
+      items: Array<{ id: string; type: string }>;
+    };
+    const beforeIds = new Map(beforeArtifacts.items.map((item) => [item.type, item.id]));
+
+    const changedSource = await request.post(`${apiBase}/projects/${projectId}/knowledge/sources`, {
+      multipart: {
+        file: {
+          name: 'architecture-update.md',
+          mimeType: 'text/markdown',
+          buffer: Buffer.from('# 架构补充\n数据库必须继续使用 PostgreSQL 作为唯一事实源。'),
+        },
+      },
+    });
+    expect(changedSource.status()).toBe(201);
+    await page.goto(`/projects/${projectId}/workflow`);
+    await expect(page.getByRole('heading', { name: '项目证据有变化' })).toBeVisible();
+    await page.getByRole('button', { name: '更新受影响产物' }).click();
+    await expect(page.getByRole('heading', { name: '项目证据有变化' })).toBeHidden({
+      timeout: 30_000,
+    });
+    const afterResponse = await request.get(`${apiBase}/projects/${projectId}/artifacts`);
+    const afterArtifacts = (await afterResponse.json()) as {
+      items: Array<{ id: string; type: string }>;
+    };
+    const affected = new Set([
+      'prd',
+      'architecture',
+      'frontend_spec',
+      'backend_spec',
+      'project_plan',
+      'ai_coding_rules',
+    ]);
+    expect(afterArtifacts.items).toHaveLength(11);
+    for (const artifact of afterArtifacts.items) {
+      expect(artifact.id === beforeIds.get(artifact.type)).toBe(!affected.has(artifact.type));
+    }
+
+    await page.goto(`/projects/${projectId}/artifacts`);
     const prdLink = artifactLinks.filter({ hasText: 'PRD' }).first();
     await expect(prdLink).toBeVisible();
 
@@ -86,16 +129,20 @@ test('user can create a project, finish workflow, inspect and download artifacts
     const artifactUrl = page.url();
     await expect(page.getByRole('button', { name: '下载这份内容' })).toBeVisible();
     await expect(page.locator('pre')).toContainText('本地演示模式生成');
-    await expect(page.getByText('[S1] 项目背景', { exact: true })).toBeVisible();
-    await page.getByText('[S1] 项目背景', { exact: true }).click();
+    const citation = page.getByText(/^\[S1\] /).first();
+    await expect(citation).toBeVisible();
+    await citation.click();
     await expect(page.getByText('生成时保存的证据快照')).toBeVisible();
 
     await page.getByRole('link', { name: '项目资料' }).click();
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: '删除' }).click();
+    for (const remaining of [1, 0]) {
+      page.once('dialog', (dialog) => dialog.accept());
+      await page.getByRole('button', { name: '删除' }).first().click();
+      await expect(page.getByRole('button', { name: '删除' })).toHaveCount(remaining);
+    }
     await expect(page.getByRole('heading', { name: '还没有项目资料' })).toBeVisible();
     await page.goto(artifactUrl);
-    await expect(page.getByText('[S1] 项目背景', { exact: true })).toBeVisible();
+    await expect(page.getByText(/^\[S1\] /).first()).toBeVisible();
 
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: '下载这份内容' }).click();
