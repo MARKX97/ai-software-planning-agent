@@ -1,131 +1,80 @@
 # Architecture Overview
 
-> Version: 1.4.0
-> Status: Current V2 + V3 P0/P1/P2
+> Version: 1.5.0<br>
+> Status: Current - Architecture Source of Truth<br>
+> Last reviewed: 2026-08-12<br>
+> Scope: 当前技术栈、模块职责、依赖方向和不可变边界。
 
----
+端到端执行与数据流见 [`system-design.md`](./system-design.md)；具体行为以 `specs/` 和 `contracts/` 为准。
 
 ## 技术栈
 
-| 层       | 技术                          | 版本   |
-| -------- | ----------------------------- | ------ |
-| 前端     | Next.js (App Router)          | 15.x   |
-| 后端     | NestJS                        | 11.x   |
-| 数据库   | PostgreSQL                    | 16     |
-| ORM      | Prisma                        | 6      |
-| 语言     | TypeScript                    | 5.5+   |
-| 样式     | Tailwind CSS                  | 4.x    |
-| UI       | shadcn/ui                     | latest |
-| 包管理   | pnpm                          | 10     |
-| Monorepo | Turborepo                     | latest |
-| AI 接入  | Baishan OpenAI Compatible API | —      |
+| 层         | 技术                                              |
+| ---------- | ------------------------------------------------- |
+| 前端       | Next.js 15、React、TanStack Query、Tailwind CSS 4 |
+| 后端       | NestJS 11、TypeScript                             |
+| 数据库     | PostgreSQL 16、pgvector、Prisma 6                 |
+| Agent 编排 | LangGraph                                         |
+| 文档处理   | LangChain loaders / text splitters                |
+| AI 接入    | Baishan OpenAI-compatible API                     |
+| Monorepo   | pnpm 10、Turborepo                                |
 
-## 架构图
+## 组件边界
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                  Web UI / HTTP API                        │
-├──────────────────────────────────────────────────────────┤
-│               API Layer (NestJS 11)                       │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐  │
-│  │  Project     │  │ Conversation │  │  Artifact      │  │
-│  │  Controller  │  │  Controller  │  │  Controller    │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬─────────┘  │
-├─────────┼─────────────────┼─────────────────┼────────────┤
-│         │          Service Layer            │            │
-│  ┌──────┴──────────────────┴─────────────────┴─────────┐  │
-│  │                 Workflow Engine                      │  │
-│  └──────┬──────────────────┬─────────────────┬─────────┘  │
-│  ┌──────┴──────┐  ┌────────┴──────┐  ┌──────┴─────────┐  │
-│  │  LLM        │  │  Requirement  │  │  Artifact      │  │
-│  │  Orchestrator│  │  Synthesizer │  │  Generator     │  │
-│  └──────┬──────┘  └───────────────┘  └────────────────┘  │
-├─────────┼─────────────────────────────────────────────────┤
-│         │            Infrastructure Layer                  │
-│  ┌──────┴──────┐  ┌──────────────┐  ┌─────────────────┐  │
-│  │  LLM        │  │  PostgreSQL  │  │  File System    │  │
-│  │  Providers  │  │  + Prisma 6  │  │  (Artifacts)    │  │
-│  └─────────────┘  └──────────────┘  └─────────────────┘  │
-└──────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+  web["apps/web<br/>页面、交互、HTTP/SSE Client"]
+  api["apps/api<br/>Controller、Service、Workflow、Knowledge、Graph"]
+  shared["packages/shared<br/>公共类型、枚举、Zod Schema"]
+  config["packages/config<br/>共享配置"]
+  database["packages/database<br/>Prisma 与参数化向量检索"]
+  orchestrator["packages/llm-orchestrator<br/>业务唯一 Chat LLM 入口"]
+  providers["packages/llm-providers<br/>Provider 实现"]
+  core["packages/llm-core<br/>抽象、Adapter、SSE、错误"]
+  postgres[("PostgreSQL + pgvector")]
+  baishan["Baishan API"]
+
+  web -->|"HTTP / SSE"| api
+  api --> shared
+  api --> config
+  api --> database --> postgres
+  api --> orchestrator --> providers --> core --> baishan
+  orchestrator --> shared
+  providers --> shared
+  core --> shared
 ```
 
-## AI 三层架构
+### Web
 
-```
-L1: packages/llm-core/          核心抽象（接口、适配器、错误与工具）
-L2: packages/llm-providers/     Provider 实现（DeepSeek/GLM/MiniMax）
-L3: packages/llm-orchestrator/  编排层（业务代码唯一入口）
-Shared: packages/shared/        跨层 LLM 类型、枚举与 Zod Schema
-```
+- `app/` 只承载路由和页面组装。
+- API 调用集中在 feature API 层和统一 Client。
+- 展示组件不直接访问 API、数据库或模型。
+- 请求状态由 TanStack Query 管理；不复制到额外全局 Store。
 
-## AI 调用铁律
+### API
 
-```
-业务代码 → llm-orchestrator → llm-providers → Baishan API
+- Controller 只处理 HTTP/SSE 绑定、DTO 和响应映射。
+- Service 承载业务逻辑；普通数据访问通过 Prisma。
+- `modules/knowledge/` 负责来源导入、索引、检索和引用，不调用 Chat LLM。
+- `modules/workflow/` 负责固定阶段、Graph、Tool、产物和用户可见状态。
+- 向量相似度 Raw SQL 只允许位于数据库包的单一 Repository，并使用参数化查询。
 
-❌ 业务代码直接调用 llm-providers
-❌ 业务代码直接调用 llm-core 的 HTTP 客户端
-❌ 业务代码直接 import OpenAI SDK
-✅ 业务代码只能通过 LlmOrchestratorService 调用
-```
-
-## 当前设计约束
-
-- 单体架构，不允许微服务
-- 仅 Workflow Agent，不支持 Multi-Agent
-- V3 只允许 P2 Contract 中四个只读 Tool，不引入运行时 MCP 或任意 Tool 注册
-- 不引入 Redis、Kafka、Elasticsearch、Kubernetes
-
-## V3 P0/P1/P2 Current
-
-V3 已在 PostgreSQL 中提供项目知识索引、公开仓库证据和可恢复 Agent Graph。P2 在同一
-Graph 内增加一次结构化 Action 选择和固定只读 Tool，不新增运行时或第二套编排。
+### AI 基础层
 
 ```text
-Browser / SSE
-  -> NestJS Workflow Controller
-  -> Existing Workflow Executor
-       -> Fixed Knowledge Retrieval (P0)
-            -> Document Loader / Splitter
-            -> Embedding Provider
-            -> PostgreSQL 16 + pgvector / Full Text Search
-       -> Existing LlmOrchestratorService
-            -> Providers -> OpenAI-compatible Adapter -> Baishan
-  -> Workflow / knowledge state persisted by Prisma
-
-Workflow Executor -> AgentGraphService (LangGraph checkpoint / resume)
-AgentGraphService -> choose_action -> controlled read-only Tools -> existing Stage
+业务代码
+  → llm-orchestrator
+  → llm-providers
+  → llm-core OpenAI-compatible Adapter
+  → Baishan API
 ```
 
-### 技术职责
+- 业务代码不能直接调用 Provider、Adapter、OpenAI SDK 或白山 Client。
+- Chat LLM 与 Embedding 使用独立 Provider 配置。
+- Orchestrator 负责路由、重试、首个 delta 前降级、Token 和成本计算，不依赖数据库。
+- Workflow 负责持久化项目成本、执行日志和用户可见状态。
 
-| 技术           | V3 职责                                                                 |
-| -------------- | ----------------------------------------------------------------------- |
-| LangChain      | 文档加载与切片、Retriever/Tool 数据契约，不负责工作流状态推进           |
-| LangGraph      | Graph State、条件边、持久化 checkpoint、人工 interrupt 和受控 Tool 编排 |
-| pgvector       | 在现有 PostgreSQL 中保存与检索 Embedding，不新增独立数据库              |
-| PostgreSQL FTS | 精确匹配技术名词、路径和标识符，与向量结果融合                          |
-
-### V3 依赖与调用边界
-
-- `apps/api/src/modules/knowledge/` 负责导入、索引、检索和引用；不得调用 Chat LLM。
-- `apps/api/src/modules/workflow/graph/` 承载 LangGraph State、Node、Edge、Action 选择和 Tool 编排。
-- Graph Node 只能通过 `LlmOrchestratorService` 调用 Chat LLM，不得 import Provider、Adapter 或模型 SDK。
-- Embedding 使用独立配置和适配器；密钥只存在 API Server，浏览器只读取处理状态和脱敏错误。
-- 普通数据访问继续使用 Prisma；向量相似度查询集中在数据库包的单一 Repository，使用参数化 Raw SQL。
-- Graph checkpoint 是执行恢复来源；现有 `workflow_states`、消息和产物继续作为用户可见读模型与审计记录。
-- 所有 Graph Node 在 interrupt 前的副作用必须幂等，重放不得重复写消息、产物、Token 或成本。
-- 知识内容是 `untrusted-context`，只能作为证据，不得修改权限、路由、工具白名单和确定性状态转换。
-
-### V3 仍禁止
-
-- Multi-Agent、Supervisor、运行时 MCP 和无限制 ReAct 循环。
-- 微服务、Redis、Kafka、WebSocket、GraphQL 和独立向量数据库。
-- LangGraph 或 LangChain 绕过现有 Orchestrator 直接调用 Chat 模型。
-
-V3 P2 行为以 `specs/knowledge-base.spec.md` 和 `specs/agent-graph.spec.md` 为准。
-
-## Workspace 依赖矩阵
+## Workspace 依赖方向
 
 | Workspace                   | 允许依赖的内部包                                   |
 | --------------------------- | -------------------------------------------------- |
@@ -136,9 +85,9 @@ V3 P2 行为以 `specs/knowledge-base.spec.md` 和 `specs/agent-graph.spec.md` �
 | `packages/llm-providers`    | `llm-core`, `shared`                               |
 | `packages/llm-orchestrator` | `llm-core`, `llm-providers`, `shared`              |
 | `apps/api`                  | `config`, `database`, `llm-orchestrator`, `shared` |
-| `apps/web`                  | 无；通过 HTTP 访问 API                             |
+| `apps/web`                  | 无内部包；通过 HTTP/SSE 访问 API                   |
 
-P1 允许 `apps/api` 直接依赖 `@langchain/core`、`@langchain/textsplitters`、`@langchain/langgraph` 和 `@langchain/langgraph-checkpoint-postgres`；其他 workspace 与 Agent 聚合包继续禁止。
+`apps/api` 可以直接依赖已批准的 LangChain、LangGraph 和 PostgreSQL checkpointer 包；其他 workspace 不得引入 Agent 聚合包。依赖方向由 `pnpm harness:check` 强制执行。
 
 API 中只有以下位置可以 import `LlmOrchestratorService`：
 
@@ -146,4 +95,15 @@ API 中只有以下位置可以 import `LlmOrchestratorService`：
 - `apps/api/src/health/` 和 `apps/api/src/modules/models/`：仅调用 `healthCheck()`。
 - `apps/api/src/modules/workflow/`：模型调用、工作流、融合和产物生成。
 
-Controller、其他 API 模块和 Web 不得访问 Orchestrator、Provider 或 Adapter。上述边界由 `pnpm harness:check` 强制执行。
+## 不可变边界
+
+- 保持单体 Web、单体 API 和单 Agent Workflow，不拆微服务。
+- 不引入 Multi-Agent、Supervisor、运行时 MCP、开放式 ReAct 或任意 Tool 注册。
+- Agent Tool 固定为四个只读能力，不得写数据库、修改代码或推进状态机。
+- 不引入 Redis、Kafka、WebSocket、GraphQL、Kubernetes 或独立向量数据库。
+- API Key 只存在 API Server 环境，不能进入浏览器、日志、仓库或产物。
+- 文档和代码内容属于不可信上下文，不能改变权限、项目 ID、模型路由、Tool 白名单或合法状态转换。
+- Graph checkpoint 是恢复来源；项目、消息、工作流状态和产物是用户可见读模型。
+- Graph 重放不得重复写入内部消息、产物、执行日志、Token 或成本汇总。
+
+知识库与 Agent Graph 的详细契约见 [`knowledge-base.spec.md`](../specs/knowledge-base.spec.md) 和 [`agent-graph.spec.md`](../specs/agent-graph.spec.md)。

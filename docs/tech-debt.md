@@ -1,6 +1,7 @@
 # Technical Debt And Harness Exceptions
 
 > Status: Current
+> Last reviewed: 2026-08-12
 > Rule: 机器基线位于 `scripts/harness/code-shape-baseline.json`。现有指标只能下降，不能增加新豁免或扩大数值。
 
 生产文件、函数长度和参数数量仍由 Harness 全量强制执行；当前三类机器基线均为空。

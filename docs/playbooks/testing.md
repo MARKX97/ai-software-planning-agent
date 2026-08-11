@@ -1,6 +1,8 @@
 # Testing Playbook
 
 > Status: Current
+> Last reviewed: 2026-08-12
+> Scope: 当前测试分层、命令和发布门禁。
 
 ## Layers
 
@@ -11,9 +13,9 @@
 | HTTP integration        | Fetch + PostgreSQL                | 完整 API 与持久化行为           |
 | E2E                     | Playwright                        | 创建、讨论、推进、产物和成本    |
 | LLM                     | Mock Provider                     | 默认确定性、无付费调用          |
-| V3 Knowledge（P0）      | 固定文档 + Mock Embedding         | 解析、Chunk、检索、隔离与引用   |
-| V3 Graph（P1）          | LangGraph checkpointer + Mock LLM | 固定分支、interrupt、恢复与幂等 |
-| V3 Tool（P2）           | 共享 Zod + Mock LLM/Embedding     | 白名单、隔离、限次、审计与重放  |
+| Knowledge               | 固定文档 + Mock Embedding         | 解析、Chunk、检索、隔离与引用   |
+| Recoverable Graph       | LangGraph checkpointer + Mock LLM | 固定分支、interrupt、恢复与幂等 |
+| Controlled Tools        | 共享 Zod + Mock LLM/Embedding     | 白名单、隔离、限次、审计与重放  |
 
 ## Commands
 
@@ -32,9 +34,9 @@ CI 的干净环境在执行 migration、`pnpm verify` 或任何 database build �
 `pnpm --filter @ai-planning/database db:generate`；Prisma generated client 不提交到仓库。
 HTTP integration 失败时，CI 必须保留完整输出，并将精简的失败断言与上下文写入 check annotation，便于无需重现本地端口环境即可定位。
 
-## V2 Coverage Contract
+## Coverage Contract
 
-当前 V2 的测试完成标准按行为风险判断，不以 100% 行覆盖为目标：
+当前测试完成标准按行为风险判断，不以 100% 行覆盖为目标：
 
 - Service：CRUD、项目归属、分页/筛选、聚合、not found 和降级分支必须有单元测试。
 - Workflow：状态转换、检查点、上下文边界、持久化状态、SSE、重试和成本边界必须有确定性测试。
@@ -42,7 +44,7 @@ HTTP integration 失败时，CI 必须保留完整输出，并将精简的失败
 - Web：API/SSE client、关键状态组件、表单校验、异步 action、error/retry 和下载必须有组件测试或 E2E。
 - E2E：至少覆盖导航、项目创建/删除、知识源管理、完整工作流、四个检查点、11 类产物、引用快照、下载、成本页和 API 失败恢复。
 
-不为 re-export、常量包、Nest 模块声明、纯样式 UI 原子组件、Prisma 生成代码或 Planned V3 创建无行为断言的测试。数据库约束由 Prisma/HTTP integration 验证。
+不为 re-export、常量包、Nest 模块声明、纯样式 UI 原子组件或 Prisma 生成代码创建无行为断言的测试。数据库约束由 Prisma/HTTP integration 验证。
 
 ## Canonical Evaluation Fixture
 
@@ -68,9 +70,9 @@ RUN_REAL_BAISHAN_STREAM=1 pnpm exec dotenv -e .env -- pnpm --filter @ai-planning
 
 不得在默认 CI 中打开该开关。
 
-## V3 Knowledge And Agent Graph
+## Knowledge And Agent Graph
 
-V3 测试必须继续满足默认确定性、零外部模型费用和项目隔离。真实 Embedding 与真实 Chat 模型只允许通过独立显式 smoke-test 开关运行。
+知识库与 Agent Graph 测试必须继续满足默认确定性、零外部模型费用和项目隔离。真实 Embedding 与真实 Chat 模型只允许通过独立显式 smoke-test 开关运行。
 
 ### Fixtures
 
@@ -96,12 +98,12 @@ V3 测试必须继续满足默认确定性、零外部模型费用和项目隔�
 - Tool 参数由服务端覆盖 `projectId`；非白名单 Tool、无效 Zod 输入和路径逃逸在执行前失败。
 - GitHub 来源只允许 HTTPS `github.com`，拒绝凭据、非允许重定向、符号链接逃逸和疑似密钥文件。
 - 解析、Embedding、pgvector 或知识库不可用时返回脱敏错误，不记录原文、向量、密钥或内部栈。
-- 无知识源和零检索结果继续运行 V2 Mock 流程，并明确 `insufficient_evidence`。
+- 无知识源和零检索结果继续运行无证据 Mock 流程，并明确 `insufficient_evidence`。
 
 ### Graph Contract And Recovery
 
 - 9 个阶段、4 个检查点、澄清上限和 11 类产物的现有回归继续通过。
-- P2 Structured Action 每阶段一次选择 0..3 个只读 Tool；关闭 `AGENT_ACTIONS_ENABLED` 时回归 P1 固定检索。
+- Structured Action 每阶段一次选择 0..3 个只读 Tool；关闭 `AGENT_ACTIONS_ENABLED` 时回归固定检索 Graph。
 - CI 分别以 `AGENT_ACTIONS_ENABLED=false` 和 `WORKFLOW_RUNNER=v2` 启动独立 Mock API，
   两种回退都必须通过 HTTP/SSE 完成澄清、4 个检查点、9 个阶段和 11 类产物。
 - interrupt 后使用相同 `graphRunId` 恢复；过期 checkpoint 返回冲突。
@@ -116,7 +118,7 @@ V3 测试必须继续满足默认确定性、零外部模型费用和项目隔�
 - 产物 `[S1]` 可以打开证据抽屉，来源不可用时仍显示历史快照和状态说明。
 - Graph 轨迹展示当前 Node、Tool 次数、检索摘要和 interrupt 原因，不暴露 Prompt、密钥或完整文档。
 - 来源变化后只重生成服务端计算的受影响产物，未受影响产物的 ID、内容和更新时间保持不变。
-- RAG feature flag 关闭时，V2 页面、SSE 和工作流 E2E 不变。
+- RAG feature flag 关闭时，无证据页面、SSE 和工作流 E2E 不变。
 
 ### Release Gates
 
@@ -127,4 +129,4 @@ pnpm verify
 pnpm --filter @ai-planning/web test:e2e
 ```
 
-V3 每个阶段必须先提交对应契约和最小回归测试。真实 Embedding smoke test 的命令和环境变量在 Provider 确定后写入 deployment playbook；在此之前不得假设白山 Chat API 支持 Embedding。
+知识库、Graph 或 Tool 行为变更必须先更新对应契约并提交最小回归测试。真实 Embedding smoke test 的命令和环境变量以 deployment playbook 为准；Embedding 继续使用独立 Provider 配置，不默认复用白山 Chat API。

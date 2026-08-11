@@ -1,6 +1,8 @@
 # Development Playbook
 
 > Status: Current
+> Last reviewed: 2026-08-12
+> Scope: 当前开发修改顺序、工程边界与验证要求。
 
 ## Change Flow
 

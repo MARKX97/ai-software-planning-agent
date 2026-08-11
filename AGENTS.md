@@ -18,7 +18,7 @@
 | 产品定位与范围                 | `docs/product-vision.md`                                    |
 | 架构与依赖方向                 | `docs/architecture-overview.md`                             |
 | 行为契约                       | `specs/*.spec.md`                                           |
-| V3 知识库与 Agent Graph        | `specs/knowledge-base.spec.md`, `specs/agent-graph.spec.md` |
+| 知识库与 Agent Graph           | `specs/knowledge-base.spec.md`, `specs/agent-graph.spec.md` |
 | 机器契约                       | `contracts/openapi.yaml`, `contracts/schemas/`              |
 | 开发、测试、部署、LLM playbook | `docs/playbooks/`                                           |
 | 复杂任务计划与技术债           | `docs/exec-plans/`, `docs/tech-debt.md`                     |
@@ -28,14 +28,14 @@
 ## 3. Immutable Boundaries
 
 - 技术栈：Next.js 15、NestJS 11、PostgreSQL 16、Prisma 6、TypeScript、Tailwind 4、pnpm、Turborepo。
-- V2 当前运行时仍禁止 RAG 和 Agent 框架；V3 仅允许按已批准规格引入 LangChain、LangGraph 和 PostgreSQL `pgvector`。
+- Agent 运行时只允许按已批准规格使用 LangChain、LangGraph 和 PostgreSQL `pgvector`。
 - 继续禁止微服务、Multi-Agent、运行时 MCP、Redis、Kafka、WebSocket、GraphQL 和独立向量数据库。
-- 唯一 Chat LLM 调用链：`API workflow -> V3 Agent Graph（启用后） -> llm-orchestrator -> llm-providers -> llm-core adapter -> Baishan`。
+- 唯一 Chat LLM 调用链：`API workflow -> Agent Graph -> llm-orchestrator -> llm-providers -> llm-core adapter -> Baishan`。
 - Controller 不调用模型；业务代码不直接 import Provider、Adapter 或 OpenAI SDK。
 - Embedding 使用独立 Provider 配置，不默认复用白山 Chat 模型；Controller 和 Graph Node 不直接持有密钥。
 - API Key 只存在 API Server 环境，禁止进入浏览器、日志、仓库和产物。
 - 公共类型、枚举、Schema 分别放在 `packages/shared/src/{types,enums,schemas}`；Prompt 放在 `apps/api/src/prompts`。
-- Controller 只做 HTTP 绑定，业务放 Service，外部输入必须校验；普通数据访问只通过 Prisma，V3 `pgvector` 相似度查询仅允许集中在数据库包的单一 Repository 中使用参数化 Raw SQL。
+- Controller 只做 HTTP 绑定，业务放 Service，外部输入必须校验；普通数据访问只通过 Prisma，`pgvector` 相似度查询仅允许集中在数据库包的单一 Repository 中使用参数化 Raw SQL。
 - RAG 文档和代码内容一律视为不可信上下文，不得控制权限、工作流状态、工具白名单或数据库写入。
 - Agent Tool 必须进入白名单，参数通过 Zod 校验，单阶段最多执行 3 次并记录审计日志。
 - Web API 调用集中在 feature API 层；UI 必须处理 loading、empty、error 和 retry。
@@ -49,7 +49,7 @@
 3. 复杂改动先在 `docs/exec-plans/active/` 建计划；小修复可直接处理。
 4. 先更新契约/文档，再实现代码和测试。
 5. 运行与改动范围相称的验证，最后执行 `pnpm verify:fast`；任何代码或产品变更都必须按 testing playbook 执行 Web E2E。
-6. 完成复杂计划后移入 `docs/exec-plans/completed/` 并记录验证结果。
+6. 完成复杂计划后，将目标、关键结果和验证证据追加到 `docs/exec-plans/completed/README.md`，再删除 active 计划；详细过程由 Git 历史保存。
 
 复杂改动指 API、Schema、数据库、架构边界或跨多个 package 的变更。
 

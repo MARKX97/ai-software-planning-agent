@@ -1,6 +1,7 @@
 # Deployment And Operations Playbook
 
 > Status: Current
+> Last reviewed: 2026-08-12
 > Scope: 当前仓库保证原生本地运行、Docker Compose 本地演示和 GitHub Actions 验证；生产监控和自动部署尚未实现。
 
 ## Local Runtime
@@ -17,7 +18,7 @@ pnpm dev
 - API health: `http://localhost:3001/api/v1/health`
 - API 默认只监听 `127.0.0.1`；需要对外监听时显式设置 `API_HOST`，且非 loopback 地址必须同时设置非空 `API_KEY`。
 - `CORS_ALLOWED_ORIGINS` 是逗号分隔的精确 Origin allowlist，默认只允许本地 Web 的 `localhost:3000` 与 `127.0.0.1:3000`。
-- PostgreSQL 16 必须与 `DATABASE_URL` 一致；V3 使用带 pgvector 0.8.2 的 `pgvector/pgvector:0.8.2-pg16` 镜像。
+- PostgreSQL 16 必须与 `DATABASE_URL` 一致；知识检索使用带 pgvector 0.8.2 的 `pgvector/pgvector:0.8.2-pg16` 镜像。
 
 ## Docker Demo
 
@@ -31,9 +32,9 @@ docker compose up --build
 - Compose 内 API 使用 `0.0.0.0` 供 Web 容器访问，并配置固定的本地演示 API Key；Web 构建使用同一公开演示 key。宿主机端口仅绑定 `127.0.0.1`，该配置不得作为生产凭据复用。
 - `BAISHAN_API_KEY` 为空时使用确定性 Mock；配置真实密钥时只注入 API 容器。
 - `EMBEDDING_PROVIDER` 默认是固定向量 `mock`；真实服务使用 `openai-compatible`，并单独配置 `EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL` 和 `EMBEDDING_DIMENSIONS`。
-- `RAG_ENABLED` 默认 `true`；设为 `false` 时跳过知识检索与查询 Embedding，工作流沿用 V2 无证据路径。
-- `WORKFLOW_RUNNER` 默认 `graph`；迁移期设为 `v2` 可回退旧 runner。Graph checkpoint 与业务库使用同一 `DATABASE_URL`。
-- `AGENT_ACTIONS_ENABLED` 默认 `true`；设为 `false` 时跳过 P2 Action/Tool，保留 P1 固定检索 Graph。
+- `RAG_ENABLED` 默认 `true`；设为 `false` 时跳过知识检索与查询 Embedding，工作流沿用无证据路径。
+- `WORKFLOW_RUNNER` 默认 `graph`；设为 `v2` 时使用旧的确定性 runner。Graph checkpoint 与业务库使用同一 `DATABASE_URL`。
+- `AGENT_ACTIONS_ENABLED` 默认 `true`；设为 `false` 时跳过动态 Action/Tool，保留固定检索 Graph。
 - Compose 是本地演示入口，不代表生产部署方案。
 
 ### Dependency Cache

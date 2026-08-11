@@ -1,53 +1,25 @@
 # System Design
 
-> Version: 1.4.0
-> Status: Current V2 + V3 P0/P1/P2
+> Version: 1.5.0<br>
+> Status: Current<br>
+> Last reviewed: 2026-08-12<br>
+> Scope: 当前端到端执行、知识索引、恢复和核心数据关系。
 
----
+本文档只展示系统数据流。模块职责见 [`architecture-overview.md`](./architecture-overview.md)，详细行为见 [`workflow.spec.md`](../specs/workflow.spec.md)、[`knowledge-base.spec.md`](../specs/knowledge-base.spec.md) 和 [`agent-graph.spec.md`](../specs/agent-graph.spec.md)。
 
-本文档只作为系统设计入口，不承载具体实现细节，避免与 `architecture-overview.md` 和 `specs/*` 重复。
-
-## 权威来源
-
-完整索引见 [`README.md`](./README.md)。
-
-| 主题                           | 权威文档                                                                                       |
-| ------------------------------ | ---------------------------------------------------------------------------------------------- |
-| 产品定位、核心目标、MVP 范围   | `docs/product-vision.md`                                                                       |
-| 架构全景、技术栈、设计约束     | `docs/architecture-overview.md`                                                                |
-| 工作流阶段、状态转换、降级路径 | `specs/workflow.spec.md` + `specs/state-machine.spec.md`                                       |
-| 数据库表结构、约束、索引       | `specs/database.spec.md`                                                                       |
-| API 摘要与实现约束             | `specs/api.spec.md`                                                                            |
-| API 机器可读契约               | `contracts/openapi.yaml`                                                                       |
-| 数据实体与 LLM 输出 Schema     | `specs/schema.spec.md` + `contracts/schemas/llm/*.json`                                        |
-| LLM Provider 与 Orchestrator   | `specs/provider.spec.md` + `specs/orchestrator.spec.md`                                        |
-| 模型路由与 Prompt 管理         | `specs/model-routing.spec.md` + `specs/prompt.spec.md`                                         |
-| Web UI                         | `specs/frontend.spec.md`                                                                       |
-| V3 项目知识库（P2 Contract）   | `specs/knowledge-base.spec.md`                                                                 |
-| V3 Agent Graph（P2 Contract）  | `specs/agent-graph.spec.md`                                                                    |
-| 开发流程、测试、部署           | `docs/playbooks/development.md` + `docs/playbooks/testing.md` + `docs/playbooks/deployment.md` |
-
-## 开发加载规则
-
-开发 Agent 不应从本文档提取实现细节。按 `docs/README.md` 只加载当前任务相关的 spec、contract 和 playbook。
-
-## 1. 主流程与调用链
-
-实线表示主链路，紫色虚线表示按配置启用的 P2 动态取证旁路；两者均已交付。实施记录见
-[`v3-p2-controlled-tools.md`](./exec-plans/completed/v3-p2-controlled-tools.md)。
+## 运行时主链路
 
 ```mermaid
 flowchart LR
   user["用户 / Browser"]
 
   subgraph api["NestJS API Server"]
-    guard["Guard / Pipe<br/>限流、参数校验"]
-    controller["Workflow Controller"]
-    workflow["Workflow Service<br/>项目校验、成本准入"]
+    admission["认证、限流、参数校验、成本准入"]
+    workflow["Workflow Service"]
+    agentGraph["LangGraph<br/>checkpoint / interrupt / resume"]
+    tools["受控只读 Tools<br/>单阶段最多 3 次"]
+    retriever["Knowledge Retrieval<br/>Vector + FTS + RRF"]
     stages["Stage Executor<br/>9 个阶段 / 4 个检查点"]
-    agentGraph["P1 · LangGraph<br/>checkpoint / resume"]
-    tools["P2 · 受控 Tools<br/>单阶段最多 3 次"]
-    retriever["P0 · Retriever<br/>Vector + FTS + RRF"]
     orchestrator["LlmOrchestratorService<br/>路由、重试、降级"]
     stream["SSE<br/>delta / done / error"]
   end
@@ -58,64 +30,86 @@ flowchart LR
     baishan["Baishan API"]
   end
 
-  database[("PostgreSQL<br/>状态、消息、产物、日志")]
+  database[("PostgreSQL + pgvector<br/>业务数据、知识索引、Graph checkpoint")]
+  files["Artifact Files"]
 
-  user -->|"POST /api/v1"| guard --> controller --> workflow -->|"V2 runner"| stages
-  workflow -->|"P0 固定检索"| retriever -->|"证据上下文"| stages
-  workflow --> agentGraph -->|"run_stage"| stages
-  agentGraph -. "P2 动态取证" .-> tools -.-> retriever -. "检索结果" .-> agentGraph
-  stages -->|"Structured Output Schema"| orchestrator --> provider --> adapter --> baishan
-  baishan -->|"SSE 或完整响应"| adapter --> provider --> orchestrator
-  orchestrator -->|"delta"| stream --> user
-  stages -->|"状态、消息、结果、产物"| database
-  orchestrator -->|"调用日志、Token、成本"| database
-  database -->|"决策快照 + 当前会话"| stages
-
-  classDef planned fill:#f7f1ff,stroke:#7c3aed,stroke-width:1.5px,stroke-dasharray:5 4;
-  class tools planned;
+  user -->|"HTTP / SSE"| admission --> workflow --> agentGraph
+  agentGraph -->|"固定检索"| retriever
+  agentGraph -. "结构化 Action" .-> tools --> retriever
+  retriever -->|"EvidenceCitation[]"| agentGraph --> stages
+  stages --> orchestrator --> provider --> adapter --> baishan
+  baishan --> adapter --> provider --> orchestrator --> stages
+  stages --> stream --> user
+  agentGraph --> database
+  stages --> database
+  stages --> files
 ```
 
-V2 阶段顺序：`需求分析 → 需求澄清 → 检查点 1 → 多模型分析 → 需求融合 → 检查点 2 → 可行性分析 → 风险分析 → MVP 收缩 → 检查点 3 → 平台推荐 → 检查点 4 → 规划生成`。
+所有 Chat LLM 调用只经过 `LlmOrchestratorService`。没有知识源、没有检索结果或关闭知识检索时，工作流沿用无证据路径并明确标记限制。
 
-所有 Chat LLM 调用只经过 `LlmOrchestratorService`。没有知识源、证据不足或关闭 V3 feature flag 时，继续执行 V2 路径。
+## 规划工作流
 
-## 2. Current V3 P0：知识导入与 RAG 数据流
+```mermaid
+flowchart TD
+  start["创建项目"] --> requirement["需求分析"] --> clarification["需求澄清"]
+  clarification -->|"仍需信息，最多 5 轮"| requirement
+  clarification --> cp1["检查点：需求范围"]
+  cp1 --> multi["多模型分析"] --> synthesis["需求融合"] --> cp2["检查点：需求取舍"]
+  cp2 --> feasibility["可行性分析"] --> risk["风险分析"] --> mvp["MVP 收缩"] --> cp3["检查点：MVP 范围"]
+  cp3 --> platform["平台推荐"] --> cp4["检查点：技术方案"] --> planning["规划生成"] --> done["完成"]
+```
+
+检查点讨论通过 SSE 返回。用户确认时保存结构化决策快照；后续阶段只接收已确认决定和当前活动会话的受限上下文。
+
+## 知识索引与引用
 
 ```mermaid
 flowchart LR
-  files["P0 · Markdown / TXT<br/>P1 · PDF"]
-  repo["P1 · 公开 GitHub 仓库<br/>固定 commit SHA"]
-  validate["来源校验<br/>类型、大小、域名、安全"]
-  parse["Loader / Parser"]
+  sources["Markdown / TXT / PDF<br/>公开 GitHub 仓库"]
+  validate["类型、大小、域名和安全校验"]
+  parse["解析与规范化"]
   split["确定性切片<br/>hash + locator"]
   embed["独立 Embedding Provider"]
-  metadata[("Source / Document<br/>Revision / Status")]
+  revision["新 Revision"]
   chunks[("Chunk<br/>FTS + pgvector")]
-  activate["原子切换<br/>active revision"]
-  query["Workflow / AgentGraph<br/>检索请求"]
-  retrieve["项目级混合检索<br/>project_id + active revision"]
-  evidence["EvidenceCitation[]"]
-  stage["Stage Executor"]
-  artifact[("Artifact<br/>引用快照")]
-  fallback["V2 降级 / 人工检查点"]
+  activate["原子切换 Active Revision"]
+  retrieve["项目级混合检索"]
+  evidence["引用快照"]
+  artifact[("Artifact + Citations")]
 
-  files --> validate
-  repo --> validate
-  validate --> parse --> split
-  split --> metadata
+  sources --> validate --> parse --> split
+  split --> revision
   split --> embed --> chunks
-  metadata --> activate
-  chunks --> activate
-  query --> retrieve --> chunks
-  chunks -->|"命中"| evidence --> stage --> artifact
-  retrieve -->|"无结果 / 失败"| fallback
+  revision --> chunks --> activate --> retrieve --> evidence --> artifact
 ```
 
-索引失败不替换旧的 active revision；RAG 内容统一视为不可信输入，不得控制权限、工作流状态或数据库写入。
+- 新 revision 完整成功后才替换旧 active revision；失败时继续使用旧版本。
+- 检索在数据库层同时过滤 `project_id` 和 active revision。
+- 来源内容作为不可信上下文，不能控制权限、状态或数据库写入。
+- 来源删除后新检索不可命中，历史产物仍保留生成时引用快照。
 
-## 3. Current V2/P0/P1/P2：核心数据关系
+## 恢复与增量重生成
 
-知识库、引用和 Graph Run 已进入 Prisma；P2 增加 Tool Step 审计实体。
+```text
+节点成功
+  → 原子提交内部业务副作用
+  → 保存 Graph checkpoint
+  → 进入下一节点或人工 interrupt
+
+节点失败或进程中断
+  → 复用最近 Graph Run
+  → 从最近成功 checkpoint 恢复
+  → 重放时复用已提交的内部结果
+
+知识来源变化
+  → 服务端计算受影响产物闭包
+  → 只重新生成受影响产物
+  → 未受影响产物保持不变
+```
+
+运行模式与回退开关见 [`deployment.md`](./playbooks/deployment.md)。
+
+## 核心数据关系
 
 ```mermaid
 erDiagram
@@ -124,21 +118,20 @@ erDiagram
   PROJECT ||--o{ WORKFLOW_STATE : tracks
   PROJECT ||--o{ WORKFLOW_EXECUTION : runs
   PROJECT ||--o{ ANALYSIS_RESULT : owns
-  WORKFLOW_EXECUTION o|--o{ ANALYSIS_RESULT : produces
   PROJECT ||--o{ ARTIFACT : owns
+  ARTIFACT ||--o{ ARTIFACT_CITATION : preserves
   PROJECT ||--o{ MODEL_EXECUTION_LOG : records
-  WORKFLOW_EXECUTION o|--o{ MODEL_EXECUTION_LOG : records
   PROJECT ||--|| TOKEN_USAGE : aggregates
 
   PROJECT ||--o{ KNOWLEDGE_SOURCE : owns
   KNOWLEDGE_SOURCE ||--o{ KNOWLEDGE_REVISION : versions
   KNOWLEDGE_REVISION ||--o{ KNOWLEDGE_DOCUMENT : contains
   KNOWLEDGE_DOCUMENT ||--o{ KNOWLEDGE_CHUNK : splits_into
-  ARTIFACT ||--o{ ARTIFACT_CITATION : preserves
   ARTIFACT_CITATION }o--|| KNOWLEDGE_CHUNK : snapshots
+
   PROJECT ||--o{ GRAPH_RUN : runs
   GRAPH_RUN ||--o{ TOOL_STEP : audits
   GRAPH_RUN }o--o{ KNOWLEDGE_CHUNK : uses
 ```
 
-完整规则见 [`workflow.spec.md`](../specs/workflow.spec.md)、[`database.spec.md`](../specs/database.spec.md)、[`orchestrator.spec.md`](../specs/orchestrator.spec.md)、[`knowledge-base.spec.md`](../specs/knowledge-base.spec.md) 和 [`agent-graph.spec.md`](../specs/agent-graph.spec.md)。
+字段、约束和索引以 [`database.spec.md`](../specs/database.spec.md) 与 Prisma Schema 为准。

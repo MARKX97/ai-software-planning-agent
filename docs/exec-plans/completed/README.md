@@ -1,23 +1,34 @@
-# Completed Plans
+# Completed Delivery Ledger
 
-## V1
+> Status: Historical Ledger<br>
+> Last reviewed: 2026-08-12<br>
+> Scope: 已完成复杂任务的目标、结果和验证摘要；当前行为以 Product、Architecture、Spec 和 Contract 为准。
 
-- [`phases-1-10.md`](./phases-1-10.md)：V1 MVP 各阶段交付摘要。
-- [`harness-engineering.md`](./harness-engineering.md)：Harness Engineering 约束改造。
-- [`ai-production-hardening.md`](./ai-production-hardening.md)：AI 安全、模型降级与 Docker Harness 改造。
+详细执行过程由 Git 历史保存，不再为每次已完成任务长期保留独立计划文件。
 
-## V2
+## Deliveries
 
-- [`v2-controlled-quality-loop.md`](./v2-controlled-quality-loop.md)：V2 决策快照、受控上下文、产物质量闭环与 Prompt 追溯。
-- [`v2-test-coverage.md`](./v2-test-coverage.md)：V2 关键分支、数据隔离、错误恢复、HTTP 集成与 Playwright E2E 覆盖。
+| 完成日期   | 交付内容                  | 结果摘要                                                       | 验证记录                                        |
+| ---------- | ------------------------- | -------------------------------------------------------------- | ----------------------------------------------- |
+| 2026-07-18 | 工程约束与 Harness        | 建立架构、文档、配置、安全和代码形态机器门禁                   | `harness:check`、`verify`、Mock eval            |
+| 2026-07-22 | AI 生产安全加固           | 完成模型降级、SSE 边界、成本与 Docker 配置加固                 | LLM tests、API tests、Docker Harness            |
+| 2026-07-23 | 初始产品与质量闭环        | 完成规划工作流、Web UI、十一类产物、决策快照和质量报告         | unit、contract、integration、build、E2E         |
+| 2026-08-03 | 工作流测试加固            | 补齐数据隔离、错误恢复、HTTP 集成和关键用户路径                | `pnpm verify`、HTTP integration、Playwright     |
+| 2026-08-03 | 项目知识与引用            | 完成文档索引、混合检索、引用快照和无证据降级                   | pgvector integration、Mock eval、三浏览器 E2E   |
+| 2026-08-03 | 仓库知识与可恢复 Graph    | 完成 PDF、公开仓库、固定 commit 引用和 checkpoint 恢复         | parser/security、Graph integration、E2E         |
+| 2026-08-10 | 受控 Tool 与增量重生成    | 完成四个只读 Tool、脱敏轨迹和服务端影响范围计算                | contract/security、API/Web tests、E2E           |
+| 2026-08-10 | Docker 缓存与代码形态债务 | 优化依赖层缓存并清空代码形态豁免                               | format、lint、typecheck、tests、Harness         |
+| 2026-08-11 | 审查问题修复              | 完成 AUD-01 至 AUD-15 的并发、恢复、原子性、资源与安全边界修复 | 完整 CI、PostgreSQL HTTP、E2E、fallback、Docker |
 
-## V3
+## Audit Remediation
 
-- [`v3-rag-agent.md`](./v3-rag-agent.md)：V3 P0 文档知识库、混合检索、引用快照与最小 UI；P1/P2 延后。
-- [`v3-p1-repository-graph.md`](./v3-p1-repository-graph.md)：V3 P1 PDF/公开仓库索引与可恢复 LangGraph 工作流。
-- [`v3-p2-controlled-tools.md`](./v3-p2-controlled-tools.md)：V3 P2 受控只读 Tool、脱敏审计轨迹与来源感知的增量重生成。
+AUD-01 至 AUD-15 已全部完成：
 
-## Maintenance
+- Graph 与 Tool 重放幂等、失败恢复、租约和并发 claim 已闭环。
+- 知识 reindex、产物替换和增量重生成使用安全回退或事务边界。
+- 限流容量、知识处理资源、密钥扫描、审计最小化和 CORS 边界已收紧。
+- [`CI run 31478817902`](https://github.com/MARKX97/ai-software-planning-agent/actions/runs/31478817902) 通过 `pnpm verify`、PostgreSQL HTTP integration、Playwright E2E、两条 runner fallback 和 Docker smoke。
 
-- [`docker-cache-code-shape-debt.md`](./docker-cache-code-shape-debt.md)：Docker 依赖缓存优化与现有 Harness 代码形态债务清理。
-- [`audit-remediation.md`](./audit-remediation.md)：AUD-01–15 按顺序修复，并通过 PostgreSQL HTTP、Playwright、P1/V2 fallback 与 Docker 运行时门禁。
+## Retention Rule
+
+复杂任务完成后，将日期、交付内容、关键结果和验证证据追加到本台账，再删除 `active/` 中的详细计划。需要追溯实施过程时使用 Git 历史；不得把本台账当作当前产品或行为契约。

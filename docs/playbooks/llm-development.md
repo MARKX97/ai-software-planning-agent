@@ -1,6 +1,8 @@
 # LLM Development Playbook
 
 > Status: Current
+> Last reviewed: 2026-08-12
+> Scope: 当前 Chat LLM 层次、调用边界与修改流程。
 
 ## Layers
 
