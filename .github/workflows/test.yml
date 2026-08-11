@@ -73,7 +73,17 @@ jobs:
           cat web.log
           exit 1
 
-      - run: RUN_REAL_INTEGRATION=1 API_TEST_URL=http://127.0.0.1:3001/api/v1 pnpm --filter @ai-planning/api test
+      - name: Run HTTP integration
+        run: |
+          set -o pipefail
+          RUN_REAL_INTEGRATION=1 API_TEST_URL=http://127.0.0.1:3001/api/v1 \
+            pnpm --filter @ai-planning/api test 2>&1 | tee api-integration.log
+
+      - name: Annotate HTTP integration failure
+        if: failure()
+        run: |
+          node -e "const fs=require('fs');const value=fs.readFileSync('api-integration.log','utf8').split('\\n').slice(-160).join('\\n').replace(/%/g,'%25').replace(/\\r/g,'%0D').replace(/\\n/g,'%0A');console.log('::error title=HTTP integration failure::'+value)"
+
       - run: pnpm --filter @ai-planning/web test:e2e
 
       - name: Stop default API
@@ -111,6 +121,7 @@ jobs:
           if-no-files-found: ignore
           path: |
             api.log
+            api-integration.log
             api-p1.log
             api-v2.log
             web.log
