@@ -29,7 +29,7 @@ pnpm --filter @ai-planning/web test:e2e # Web 端到端测试
 HTTP integration 由 CI 在 PostgreSQL 和运行中 API 上显式启用。
 CI 的干净环境在执行 migration、`pnpm verify` 或任何 database build 前，必须先运行
 `pnpm --filter @ai-planning/database db:generate`；Prisma generated client 不提交到仓库。
-HTTP integration 失败时，CI 必须保留完整输出，并将末尾错误写入 check annotation，便于无需重现本地端口环境即可定位。
+HTTP integration 失败时，CI 必须保留完整输出，并将精简的失败断言与上下文写入 check annotation，便于无需重现本地端口环境即可定位。
 
 ## V2 Coverage Contract
 
