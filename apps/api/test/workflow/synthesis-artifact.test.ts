@@ -221,27 +221,29 @@ interface SavedArtifact {
 }
 
 function mockDb(saved: SavedArtifact[]): unknown {
+  const artifact = {
+    updateMany: async () => ({ count: 0 }),
+    create: async (args: {
+      data: {
+        type: ArtifactType;
+        content: string;
+        citations?: { create: unknown[] };
+      };
+    }) => {
+      saved.push({
+        type: args.data.type,
+        content: args.data.content,
+        citationCount: args.data.citations?.create.length,
+      });
+      return { id: `${args.data.type}-id`, ...args.data };
+    },
+    findFirst: async () => null,
+    findMany: async () => saved.map((item) => ({ type: item.type })),
+  };
   return {
     client: {
-      artifact: {
-        updateMany: async () => ({ count: 0 }),
-        create: async (args: {
-          data: {
-            type: ArtifactType;
-            content: string;
-            citations?: { create: unknown[] };
-          };
-        }) => {
-          saved.push({
-            type: args.data.type,
-            content: args.data.content,
-            citationCount: args.data.citations?.create.length,
-          });
-          return { id: `${args.data.type}-id`, ...args.data };
-        },
-        findFirst: async () => null,
-        findMany: async () => saved.map((item) => ({ type: item.type })),
-      },
+      artifact,
+      $transaction: (run: (tx: { artifact: typeof artifact }) => unknown) => run({ artifact }),
       tokenUsage: { upsert: async () => undefined },
     },
   };

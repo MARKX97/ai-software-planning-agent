@@ -5,6 +5,7 @@ import { loadRegenerationImpact } from './artifact-generation/artifact-impact.js
 import { executeWorkflowPipeline, type WorkflowExecutorDeps } from './workflow-executor.js';
 import type { WorkflowStatusResponse } from './workflow-response.dto.js';
 import { syncProjectBudget } from './workflow-budget.js';
+import { retainRegenerationImpact } from './artifact-generation/artifact-regeneration-state.js';
 
 export async function regenerateAffectedArtifacts(
   deps: WorkflowExecutorDeps,
@@ -21,6 +22,7 @@ export async function regenerateAffectedArtifacts(
     );
   }
   await syncProjectBudget(deps, projectId);
+  await retainRegenerationImpact(deps.db, projectId, impact);
   const executionId = await claimRegeneration(deps, projectId);
   const result = await executeWorkflowPipeline(deps, {
     projectId,

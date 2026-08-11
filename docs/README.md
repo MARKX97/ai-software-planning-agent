@@ -49,6 +49,10 @@ Agent 每次开始任务时读取 Active Memory；只有出现可复用的新事
 
 复杂任务是指修改 API、Schema、数据库、架构边界或多个 workspace package。小范围 bug 修复不要求计划文件。
 
+## Review Reports
+
+- [`2026-08-11-project-audit.md`](./reviews/2026-08-11-project-audit.md)：V2 与 V3 P0/P1/P2 的第一性原理及对抗式时间点审查。
+
 ## Drift Rules
 
 - 每个主题只能有一个权威来源，其他文档只链接，不复制长期规则。

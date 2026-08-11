@@ -6,21 +6,17 @@ import type {
   LLMResponse,
   WorkflowContext,
 } from '@ai-planning/shared';
-import { renderPrompt } from '../../../prompts/prompt-template.js';
-import { PLANNING_GENERATION_PROMPT } from '../../../prompts/planning-generation.prompt.js';
 import { ARTIFACT_PROVIDER, ARTIFACT_TYPES, STAGE_TIMEOUT_MS } from '../stages/model-routing.js';
 import { ArtifactFileStore } from './artifact-file-store.js';
-import {
-  finalizeArtifactContent,
-  formatEvidence,
-  numberedEvidence,
-  usedCitations,
-} from './artifact-citations.js';
+import { graphStageKey } from '../workflow-idempotency.js';
+import { WorkflowStage } from '@ai-planning/shared';
+import { finalizeArtifactContent, numberedEvidence, usedCitations } from './artifact-citations.js';
 import {
   buildArtifactQualityReport,
   inspectArtifact,
   type ArtifactQualityIssueId,
 } from './artifact-quality.js';
+import { ArtifactQualityError, artifactPrompt, revisionPrompt } from './artifact-prompt.js';
 
 export interface ArtifactGenerationCall {
   readonly prompt: string;
@@ -101,23 +97,18 @@ export class ArtifactGenerator {
     const calls: ArtifactGenerationCall[] = [];
     const citationKeys = evidence.map((item) => item.citationKey);
     try {
-      const first = await this.call({ ctx, provider, prompt, attemptNumber: 1, calls });
-      const firstIssues = inspectArtifact(first.content, citationKeys);
-      const response =
-        firstIssues.length === 0
-          ? first
-          : await this.call({
-              ctx,
-              provider,
-              prompt: revisionPrompt(prompt, firstIssues),
-              attemptNumber: 2,
-              calls,
-            });
+      const response = await this.generateResponse({ ctx, provider, prompt, calls, citationKeys });
       const issues = inspectArtifact(response.content, citationKeys);
       if (issues.length > 0) throw new ArtifactQualityError(type, issues);
       const content = finalizeArtifactContent(response.content, evidence.length > 0);
       const citations = usedCitations(content, evidence);
-      await this.store.save({ projectId: ctx.projectId, type, content, citations });
+      await this.store.save({
+        projectId: ctx.projectId,
+        type,
+        content,
+        citations,
+        idempotencyKey: graphStageKey(ctx, WorkflowStage.PLANNING_GENERATION, type),
+      });
       return {
         type,
         provider,
@@ -138,6 +129,26 @@ export class ArtifactGenerator {
         qualityIssues: error instanceof ArtifactQualityError ? error.issues : [],
       };
     }
+  }
+
+  private async generateResponse(input: {
+    readonly ctx: WorkflowContext;
+    readonly provider: string;
+    readonly prompt: string;
+    readonly calls: ArtifactGenerationCall[];
+    readonly citationKeys: readonly string[];
+  }): Promise<LLMResponse> {
+    const { ctx, provider, prompt, calls, citationKeys } = input;
+    const first = await this.call({ ctx, provider, prompt, attemptNumber: 1, calls });
+    const issues = inspectArtifact(first.content, citationKeys);
+    if (issues.length === 0) return first;
+    return this.call({
+      ctx,
+      provider,
+      prompt: revisionPrompt(prompt, issues),
+      attemptNumber: 2,
+      calls,
+    });
   }
 
   private async call(input: {
@@ -178,29 +189,4 @@ export class ArtifactGenerator {
   private errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
   }
-}
-
-class ArtifactQualityError extends Error {
-  constructor(
-    type: ArtifactType,
-    readonly issues: readonly ArtifactQualityIssueId[],
-  ) {
-    super(`Artifact '${type}' failed quality checks: ${issues.join(', ')}`);
-  }
-}
-
-function revisionPrompt(prompt: string, issues: readonly ArtifactQualityIssueId[]): string {
-  return `${prompt}\n\nREVISION_REQUIRED\nFix only these quality issues and return the complete revised artifact: ${issues.join(', ')}.`;
-}
-
-function artifactPrompt(
-  context: string,
-  type: ArtifactType,
-  evidence: readonly ArtifactCitation[],
-): string {
-  return renderPrompt(PLANNING_GENERATION_PROMPT, {
-    context,
-    artifactType: type,
-    evidence: formatEvidence(evidence),
-  });
 }

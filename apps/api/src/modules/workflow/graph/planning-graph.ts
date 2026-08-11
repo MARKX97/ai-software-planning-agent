@@ -16,6 +16,7 @@ export interface GraphResume {
 
 const PlanningState = Annotation.Root({
   graphRunId: Annotation<string>(),
+  logicalAttempt: Annotation<number>(),
   context: Annotation<WorkflowContext>(),
   stage: Annotation<WorkflowStage>(),
   nextStage: Annotation<WorkflowStage>(),
@@ -28,11 +29,13 @@ export type ExecuteGraphStage = (
   context: WorkflowContext,
   stage: WorkflowStage,
 ) => Promise<PipelineStageResult>;
-export type PrepareGraphStage = (
-  graphRunId: string,
-  context: WorkflowContext,
-  stage: WorkflowStage,
-) => Promise<WorkflowContext>;
+export interface PrepareGraphStageInput {
+  readonly graphRunId: string;
+  readonly context: WorkflowContext;
+  readonly stage: WorkflowStage;
+  readonly logicalAttempt: number;
+}
+export type PrepareGraphStage = (input: PrepareGraphStageInput) => Promise<WorkflowContext>;
 
 const stageNames = [
   WorkflowStage.REQUIREMENT_ANALYSIS,
@@ -49,7 +52,7 @@ const stageNames = [
 export function createPlanningGraph(
   checkpointer: BaseCheckpointSaver,
   executeStage: ExecuteGraphStage,
-  prepareStage: PrepareGraphStage = async (_graphRunId, context) => context,
+  prepareStage: PrepareGraphStage = async ({ context }) => context,
 ) {
   const chooseAction = chooseActionNode(prepareStage);
   const runStage = runStageNode(executeStage);
@@ -75,10 +78,22 @@ export function createPlanningGraph(
 }
 
 function chooseActionNode(prepareStage: PrepareGraphStage) {
-  return async (state: PlanningGraphState) => ({
-    context: await prepareStage(state.graphRunId, state.context, state.stage),
-    currentNode: 'choose_action',
-  });
+  return async (state: PlanningGraphState) => {
+    const context = {
+      ...state.context,
+      graphRunId: state.graphRunId,
+      logicalAttempt: state.logicalAttempt,
+    };
+    return {
+      context: await prepareStage({
+        graphRunId: state.graphRunId,
+        context,
+        stage: state.stage,
+        logicalAttempt: state.logicalAttempt,
+      }),
+      currentNode: 'choose_action',
+    };
+  };
 }
 
 function runStageNode(executeStage: ExecuteGraphStage) {
@@ -106,6 +121,7 @@ function humanInterruptNode(state: PlanningGraphState) {
     nextStage: resume.stage,
     currentNode: 'human_interrupt',
     waitingFor: null,
+    logicalAttempt: state.logicalAttempt + 1,
   };
 }
 

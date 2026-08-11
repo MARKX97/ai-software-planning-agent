@@ -94,7 +94,11 @@ INIT
 
 - `run`、`continue`、`discuss` 的模型回复通过 SSE 输出；流式期间不推进检查点。
 - 本轮用户消息只作为临时上下文传入模型。完整生成成功后，在一个事务中保存用户消息、助手消息和 conversation 更新时间。
-- 取消或失败不保存半条助手消息，也不重复保存用户消息；`continue/discuss` 恢复原检查点，`run` 可重新启动。
+- 取消或失败不保存半条助手消息，也不重复保存用户消息；V2 的 `continue/discuss` 恢复原检查点，Graph 节点失败后由 `run` 复用 checkpoint 中的未提交上下文继续。
+- 初次 `run` 取消或失败后，项目进入 `failed`，客户端可对同一项目重新调用 `run`；不得把它伪装成尚未产生的澄清检查点。
+- `run` 的准入以数据库条件更新为唯一裁决，并与 execution 创建处于同一事务；内存 guard 只用于提前返回友好错误。
+- Graph runner 的节点失败后，重新 `run` 复用最近 failed Graph Run 与 checkpoint；V2 runner
+  仍从项目持久化阶段结果重建上下文。
 - 客户端断开会取消上游模型请求并将 execution 标记为 `cancelled`。
 - 需求澄清与检查点讨论按 `glm -> minimax -> deepseek` 降级。首个 delta 前失败可切换，输出开始后失败不得切换。
 - 每个失败 Provider 和最终成功 Provider 都写入同一 execution 的模型调用日志；`attempt_number` 表示本次逻辑调用中的 Provider 顺序。
@@ -157,6 +161,8 @@ INIT
 
 质量报告必须记录预期/已生成产物数、逐项检查结果和实际发生修订的产物类型。部分产物在修订后仍失败时，保留成功产物并将报告标记为 `warning`；全部失败时阶段失败。
 有项目证据时，PRD 和 Architecture 必须至少使用一个本次提供的 `[S#]`；其他产物以及无证据降级路径不得生成引用标记。无证据路径由应用层为产物追加“未使用项目证据”说明，不依赖模型自报。
+增量重生成允许已成功的目标立即替换，但任何失败目标必须持久化在
+`planning_generation.workflow_state`，并继续出现在 `workflow/status.regeneration`；只有该目标后续成功生成时才清除。
 
 ## 5. 状态转换规则
 

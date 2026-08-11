@@ -75,6 +75,33 @@ jobs:
       - run: RUN_REAL_INTEGRATION=1 API_TEST_URL=http://127.0.0.1:3001/api/v1 pnpm --filter @ai-planning/api test
       - run: pnpm --filter @ai-planning/web test:e2e
 
+      - name: Stop default API
+        run: kill "$(cat api.pid)"
+
+      - name: Verify P1 Graph fallback
+        run: |
+          API_PORT=3002 AGENT_ACTIONS_ENABLED=false node apps/api/dist/main.js > api-p1.log 2>&1 &
+          echo $! > api-p1.pid
+          for _ in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:3002/api/v1/health && break
+            sleep 1
+          done
+          RUN_FALLBACK_INTEGRATION=1 EXPECTED_WORKFLOW_MODE=p1 API_TEST_URL=http://127.0.0.1:3002/api/v1 \
+            pnpm --filter @ai-planning/api exec tsx --tsconfig tsconfig.json --test test/integration/http-workflow-fallback.integration.test.ts
+          kill "$(cat api-p1.pid)"
+
+      - name: Verify V2 runner fallback
+        run: |
+          API_PORT=3003 WORKFLOW_RUNNER=v2 node apps/api/dist/main.js > api-v2.log 2>&1 &
+          echo $! > api-v2.pid
+          for _ in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:3003/api/v1/health && break
+            sleep 1
+          done
+          RUN_FALLBACK_INTEGRATION=1 EXPECTED_WORKFLOW_MODE=v2 API_TEST_URL=http://127.0.0.1:3003/api/v1 \
+            pnpm --filter @ai-planning/api exec tsx --tsconfig tsconfig.json --test test/integration/http-workflow-fallback.integration.test.ts
+          kill "$(cat api-v2.pid)"
+
       - name: Upload test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -83,6 +110,8 @@ jobs:
           if-no-files-found: ignore
           path: |
             api.log
+            api-p1.log
+            api-v2.log
             web.log
             apps/web/playwright-report
             apps/web/test-results

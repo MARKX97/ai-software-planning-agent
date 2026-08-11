@@ -7,17 +7,7 @@
  *
  * @internal
  */
-import {
-  AllModelsFailedError,
-  LLMAuthError,
-  LLMCancelledError,
-  LLMError,
-  LLMNetworkError,
-  LLMRateLimitError,
-  LLMSchemaValidationError,
-  LLMTimeoutError,
-  type LlmOrchestratorService,
-} from '@ai-planning/llm-orchestrator';
+import { type LlmOrchestratorService } from '@ai-planning/llm-orchestrator';
 import {
   WorkflowStage,
   type LLMStreamOptions,
@@ -38,8 +28,12 @@ import {
 import { createStageRegistry } from './stages/stage-registry.js';
 import type { StageDeps } from './stages/stage-deps.js';
 import type { StageProcessor } from './stages/stage-processor.js';
-import { persistAnalysisResult } from './stages/analysis-result-persister.js';
+import {
+  loadIdempotentStageResult,
+  persistAnalysisResult,
+} from './stages/analysis-result-persister.js';
 import type { MultiModelResult } from './stages/multi-model-analysis.stage.js';
+import { mapLlmError } from './workflow-error-mapper.js';
 
 export interface PipelineRunDeps {
   readonly db: PrismaService;
@@ -47,6 +41,11 @@ export interface PipelineRunDeps {
   readonly dataDir: string;
   readonly knowledge?: KnowledgeRetrievalService;
   readonly stream?: Pick<LLMStreamOptions, 'onDelta' | 'signal'>;
+  readonly onCheckpoint?: (input: {
+    context: WorkflowContext;
+    result: StageResult;
+    waitingFor: 'reply' | 'review';
+  }) => Promise<void>;
 }
 
 export interface PipelineRunOptions {
@@ -94,7 +93,13 @@ export async function runPipelineStage(
   await updateProjectStage(deps.db, ctx.projectId, currentStage);
   const stateInput = { db: deps.db, projectId: ctx.projectId, stage: currentStage, stateMachine };
   await markStageRunning(stateInput);
-  const result = await runStage(processor, ctx);
+  const result =
+    (await loadIdempotentStageResult({
+      db: deps.db,
+      stage: currentStage,
+      graphRunId: ctx.graphRunId,
+      logicalAttempt: ctx.logicalAttempt,
+    })) ?? (await runStage(processor, ctx));
   ctx.resultsByStage[currentStage] = result;
   await persistAnalysisResult({
     db: deps.db,
@@ -102,6 +107,8 @@ export async function runPipelineStage(
     executionId: ctx.executionId,
     stage: currentStage,
     result,
+    graphRunId: ctx.graphRunId,
+    logicalAttempt: ctx.logicalAttempt,
   });
   await markStageCompleted({ ...stateInput, result });
   if (currentStage === WorkflowStage.REQUIREMENT_SYNTHESIS) {
@@ -109,14 +116,33 @@ export async function runPipelineStage(
   }
   const waitingFor = waitingForUser(currentStage, result, ctx.clarificationRound);
   if (waitingFor) {
-    await updateProjectStage(deps.db, ctx.projectId, currentStage);
-    await markStageWaiting({ ...stateInput, result, waitingFor });
+    await persistWaitingCheckpoint({ deps, context: ctx, result, waitingFor, stateInput });
   }
   return {
     stage: currentStage,
     nextStage: decideNextStage(stateMachine, currentStage, result),
     waitingFor,
   };
+}
+
+async function persistWaitingCheckpoint(input: {
+  deps: PipelineRunDeps;
+  context: WorkflowContext;
+  result: StageResult;
+  waitingFor: 'reply' | 'review';
+  stateInput: Parameters<typeof markStageRunning>[0];
+}): Promise<void> {
+  await updateProjectStage(input.deps.db, input.context.projectId, input.result.stage);
+  await markStageWaiting({
+    ...input.stateInput,
+    result: input.result,
+    waitingFor: input.waitingFor,
+  });
+  await input.deps.onCheckpoint?.({
+    context: input.context,
+    result: input.result,
+    waitingFor: input.waitingFor,
+  });
 }
 
 function pickStartingStage(ctx: WorkflowContext): WorkflowStage {
@@ -149,40 +175,6 @@ function decideNextStage(
     }
   }
   return stateMachine.nextStage(stage);
-}
-
-function mapLlmError(error: unknown): void {
-  if (error instanceof LLMCancelledError) throw error;
-  if (error instanceof AllModelsFailedError) {
-    throw AppException.internal(
-      '所有模型服务当前均不可用，请稍后重试。',
-      ErrorCode.ALL_MODELS_FAILED,
-    );
-  }
-  if (error instanceof LLMTimeoutError) {
-    throw AppException.internal('模型响应超时，请稍后重试。', ErrorCode.LLM_TIMEOUT);
-  }
-  if (error instanceof LLMRateLimitError) {
-    throw AppException.internal('请求过于频繁，请稍后再试。', ErrorCode.RATE_LIMITED);
-  }
-  if (error instanceof LLMAuthError) {
-    throw AppException.internal(
-      '模型服务配置无效，请联系管理员检查 API Key。',
-      ErrorCode.LLM_ERROR,
-    );
-  }
-  if (error instanceof LLMSchemaValidationError) {
-    throw AppException.internal('模型返回的数据无法处理，请重新运行工作流。', ErrorCode.LLM_ERROR);
-  }
-  if (error instanceof LLMNetworkError) {
-    throw AppException.internal('暂时无法连接模型服务，请稍后重试。', ErrorCode.LLM_NETWORK_ERROR);
-  }
-  if (error instanceof LLMError) {
-    throw AppException.internal('模型服务暂时不可用，请稍后重试。', ErrorCode.LLM_ERROR);
-  }
-  if (error instanceof Error && error.message.includes('Cost limit exceeded')) {
-    throw AppException.costLimitExceeded();
-  }
 }
 
 async function updateProjectStage(

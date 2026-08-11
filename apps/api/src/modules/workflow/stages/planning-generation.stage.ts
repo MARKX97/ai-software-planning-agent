@@ -15,6 +15,7 @@ import type { StageDeps } from './stage-deps.js';
 import type { StageProcessor } from './stage-processor.js';
 import { logModelCall } from './model-call-log.js';
 import { ARTIFACT_TYPES } from './model-routing.js';
+import { retainFailedRegenerationTargets } from '../artifact-generation/artifact-regeneration-state.js';
 
 export class PlanningGenerationStage implements StageProcessor {
   readonly stage = WorkflowStage.PLANNING_GENERATION;
@@ -31,6 +32,13 @@ export class PlanningGenerationStage implements StageProcessor {
     }
     for (const item of result.failures) {
       for (const call of item.calls) await this.logCall(ctx, item.provider, call);
+    }
+    if (ctx.regenerationTargets && result.failures.length > 0) {
+      await retainFailedRegenerationTargets(
+        this.deps.db,
+        ctx.projectId,
+        result.failures.map((item) => item.type),
+      );
     }
     if (result.successes.length === 0) throw new Error('All artifact generations failed');
     if (ctx.regenerationTargets && result.failures.length > 0) {

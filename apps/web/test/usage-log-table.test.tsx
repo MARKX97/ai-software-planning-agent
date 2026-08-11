@@ -38,9 +38,10 @@ describe('UsageLogTable', () => {
     vi.mocked(listModelLogs).mockResolvedValue({ items: [log], total: 1, offset: 0, limit: 20 });
     vi.mocked(getModelLogDetail).mockResolvedValue({
       ...log,
-      prompt_text: 'demo prompt',
-      response_text: 'demo response',
-      structured_output: null,
+      prompt_hash: 'a'.repeat(64),
+      prompt_length: 11,
+      response_length: 13,
+      response_summary: '模型调用成功，响应内容已按隐私策略省略。',
     });
   });
 
@@ -54,8 +55,9 @@ describe('UsageLogTable', () => {
 
     const button = await screen.findByRole('button', { name: '看看细节' }, { timeout: 3_000 });
     await userEvent.click(button);
-    expect(await screen.findByText('demo prompt')).toBeInTheDocument();
-    expect(screen.getByText('demo response')).toBeInTheDocument();
+    expect(await screen.findByText('a'.repeat(64))).toBeInTheDocument();
+    expect(screen.getByText(/Prompt 11 字符/)).toBeInTheDocument();
+    expect(screen.getByText(/不保存调用原文/)).toBeInTheDocument();
     expect(button).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('第 2 次')).toBeInTheDocument();
     expect(screen.getByText('接手')).toBeInTheDocument();

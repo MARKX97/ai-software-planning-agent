@@ -18,10 +18,10 @@ export async function confirmCheckpointDecision(
   db: PrismaService,
   input: CheckpointDecisionInput,
 ): Promise<DecisionSnapshot> {
-  return db.client.$transaction((tx) => confirmInTransaction(tx, input));
+  return db.client.$transaction((tx) => confirmCheckpointDecisionInTransaction(tx, input));
 }
 
-async function confirmInTransaction(
+export async function confirmCheckpointDecisionInTransaction(
   tx: Prisma.TransactionClient,
   input: CheckpointDecisionInput,
 ): Promise<DecisionSnapshot> {

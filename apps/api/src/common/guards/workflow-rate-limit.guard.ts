@@ -16,6 +16,7 @@ interface RequestLike {
 }
 
 const WINDOW_MS = 60_000;
+export const MAX_RATE_LIMIT_BUCKETS = 10_000;
 
 /** Per-process admission limit for model-producing workflow operations. */
 @Injectable()
@@ -29,12 +30,18 @@ export class WorkflowRateLimitGuard implements CanActivate {
     if (limit === 0) return true;
     const request = context.switchToHttp().getRequest<RequestLike>();
     const now = Date.now();
-    const key = this.key(request);
+    const caller = this.callerKey(request);
+    this.consume(`caller:${caller}`, limit, now);
+    this.consume(`project:${request.params?.['project_id'] ?? 'unknown'}:${caller}`, limit, now);
+    return true;
+  }
+
+  private consume(key: string, limit: number, now: number): void {
     const entry = this.windows.get(key);
     if (!entry || entry.resetAt <= now) {
+      if (!entry) this.reserveBucket(now);
       this.windows.set(key, { count: 1, resetAt: now + WINDOW_MS });
-      this.prune(now);
-      return true;
+      return;
     }
     if (entry.count >= limit) {
       throw AppException.rateLimited({
@@ -42,20 +49,28 @@ export class WorkflowRateLimitGuard implements CanActivate {
       });
     }
     entry.count += 1;
-    return true;
   }
 
-  private key(request: RequestLike): string {
-    const authorization = String(request.headers['authorization'] ?? '');
-    const caller = authorization || request.ip || request.socket?.remoteAddress || 'unknown';
+  private callerKey(request: RequestLike): string {
+    const caller = this.config.apiKey
+      ? String(request.headers['authorization'] ?? '')
+      : normalizedIp(request.ip ?? request.socket?.remoteAddress);
     const digest = createHash('sha256').update(caller).digest('hex').slice(0, 16);
-    return `${request.params?.['project_id'] ?? 'unknown'}:${digest}`;
+    return digest;
   }
 
-  private prune(now: number): void {
-    if (this.windows.size < 1000) return;
+  private reserveBucket(now: number): void {
+    if (this.windows.size < MAX_RATE_LIMIT_BUCKETS) return;
     for (const [key, entry] of this.windows) {
       if (entry.resetAt <= now) this.windows.delete(key);
     }
+    if (this.windows.size >= MAX_RATE_LIMIT_BUCKETS) {
+      throw AppException.rateLimited({ retry_after_seconds: 60 });
+    }
   }
+}
+
+function normalizedIp(value?: string): string {
+  const ip = (value ?? 'unknown').trim().toLowerCase();
+  return ip.startsWith('::ffff:') ? ip.slice(7) : ip;
 }

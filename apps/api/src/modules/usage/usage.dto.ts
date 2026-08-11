@@ -69,9 +69,10 @@ export interface ModelExecutionLogResponse {
 }
 
 export interface ModelExecutionLogDetailResponse extends ModelExecutionLogResponse {
-  prompt_text: string;
-  response_text: string | null;
-  structured_output: Record<string, unknown> | null;
+  prompt_hash: string;
+  prompt_length: number;
+  response_length: number | null;
+  response_summary: string | null;
 }
 
 export interface ModelExecutionLogListResponse {
@@ -159,9 +160,10 @@ export function toModelExecutionLogResponse(log: ModelExecutionLog): ModelExecut
 export function toModelExecutionLogDetail(log: ModelExecutionLog): ModelExecutionLogDetailResponse {
   return {
     ...toModelExecutionLogResponse(log),
-    prompt_text: log.prompt_text,
-    response_text: log.response_text,
-    structured_output: (log.structured_output as Record<string, unknown> | null) ?? null,
+    prompt_hash: log.prompt_hash,
+    prompt_length: log.prompt_length,
+    response_length: log.response_length,
+    response_summary: log.response_summary,
   };
 }
 

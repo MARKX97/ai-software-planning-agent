@@ -8,13 +8,28 @@ import { PrismaService } from '../../../database/database.module.js';
 import { AppException } from '../../../common/exception/app-exception.js';
 import { ErrorCode } from '../../../common/exception/error-code.js';
 import { runPipelineStage, type PipelineRunDeps } from '../workflow-pipeline-runner.js';
-import { createPlanningGraph, type PlanningGraphState } from './planning-graph.js';
+import {
+  createPlanningGraph,
+  type PlanningGraphState,
+  type PrepareGraphStageInput,
+} from './planning-graph.js';
 import { AgentActionService } from './agent-action.service.js';
+import { graphLeaseDeadline, type GraphClaimStatus } from './graph-run-lease.js';
+import {
+  attachGraphRun,
+  completeGraphRun,
+  createGraphRun,
+  failGraphRun,
+  findRetryGraphRun,
+} from './agent-graph-run-store.js';
 
 export interface GraphResumeInput {
   readonly graphRunId: string;
   readonly checkpointVersion: number;
   readonly stage: WorkflowStage;
+  readonly kind: 'interrupt' | 'retry';
+  readonly claimStatus: GraphClaimStatus;
+  readonly logicalAttempt: number;
 }
 
 export interface GraphExecutionInput {
@@ -49,44 +64,40 @@ export class AgentGraphService implements OnModuleInit, OnModuleDestroy {
     const graph = createPlanningGraph(
       checkpointer,
       (ctx, stage) => runPipelineStage(ctx, deps, stage),
-      (graphRunId, ctx, stage) => this.actions.prepare({ graphRunId, context: ctx, stage }),
+      (prepareInput) => this.prepareStage(prepareInput),
     );
-    const run = resume
-      ? await this.attachResume(context.projectId, context.executionId, resume)
-      : await this.createRun(context.projectId, context.executionId, startStage);
+    const run = await this.resolveRun({ context, startStage, resume });
     const graphConfig = { configurable: { thread_id: run.id } };
     try {
-      if (resume) {
+      if (resume?.kind === 'interrupt') {
         await graph.invoke(new Command({ resume: { context, stage: resume.stage } }), graphConfig);
+      } else if (resume) {
+        const checkpoint = await graph.getState(graphConfig);
+        const checkpointContext = (checkpoint.values as PlanningGraphState).context;
+        await graph.updateState(graphConfig, {
+          context: graphContext(
+            { ...checkpointContext, executionId: context.executionId },
+            run.id,
+            resume.logicalAttempt,
+          ),
+        });
+        await graph.invoke(null, graphConfig);
       } else {
         await graph.invoke(initialState(run.id, context, startStage), graphConfig);
       }
       const snapshot = await graph.getState(graphConfig);
       const state = snapshot.values as PlanningGraphState;
       const interrupted = snapshot.next.includes('human_interrupt');
-      await this.db.client.graphRun.update({
-        where: { id: run.id },
-        data: {
-          status: interrupted ? 'interrupted' : 'completed',
-          current_node: interrupted ? state.currentNode : 'end',
-          current_stage: interrupted
-            ? (state.currentNode as WorkflowStage)
-            : WorkflowStage.COMPLETED,
-          waiting_for: interrupted ? state.waitingFor : null,
-          checkpoint_version: { increment: 1 },
-          completed_at: interrupted ? null : new Date(),
-          updated_at: new Date(),
-        },
-      });
-      return interrupted ? (state.currentNode as WorkflowStage) : WorkflowStage.COMPLETED;
+      return completeGraphRun(this.db, { runId: run.id, state, interrupted });
     } catch (error) {
-      await this.db.client.graphRun.update({
-        where: { id: run.id },
-        data: {
-          status: error instanceof LLMCancelledError ? 'cancelled' : 'failed',
-          current_node: error instanceof LLMCancelledError ? 'cancelled' : 'failed',
-          updated_at: new Date(),
-        },
+      const failed = await graph.getState(graphConfig).catch(() => null);
+      const failedState = failed?.values as PlanningGraphState | undefined;
+      await failGraphRun(this.db, {
+        runId: run.id,
+        cancelled: error instanceof LLMCancelledError,
+        state: failedState,
+        nextNode: failed?.next[0],
+        startStage,
       });
       throw error;
     }
@@ -109,22 +120,29 @@ export class AgentGraphService implements OnModuleInit, OnModuleDestroy {
       graphRunId: input.graphRunId,
       checkpointVersion: input.checkpointVersion,
       stage: input.stage,
+      kind: 'interrupt',
+      claimStatus: 'interrupted',
+      logicalAttempt: 1,
     };
   }
 
-  async reserveResume(projectId: string, input: GraphResumeInput): Promise<void> {
-    const claimed = await this.db.client.graphRun.updateMany({
-      where: {
-        id: input.graphRunId,
-        project_id: projectId,
-        status: 'interrupted',
-        checkpoint_version: input.checkpointVersion,
-      },
-      data: { status: 'running', updated_at: new Date() },
-    });
-    if (claimed.count !== 1) {
-      throw AppException.conflict(ErrorCode.INVALID_STAGE_TRANSITION, 'Graph checkpoint is stale');
-    }
+  async retryInput(
+    projectId: string,
+    projectStatus: 'active' | 'failed',
+  ): Promise<GraphResumeInput | undefined> {
+    if (!this.enabled) return undefined;
+    const now = new Date();
+    const claimStatus = projectStatus === 'active' ? 'expired' : 'failed';
+    const run = await findRetryGraphRun(this.db, { projectId, claimStatus, now });
+    if (!run) return undefined;
+    return {
+      graphRunId: run.id,
+      checkpointVersion: run.checkpoint_version,
+      stage: run.current_stage,
+      kind: 'retry',
+      claimStatus,
+      logicalAttempt: run.logical_attempt,
+    };
   }
 
   private async checkpointSaver(): Promise<PostgresSaver> {
@@ -136,33 +154,39 @@ export class AgentGraphService implements OnModuleInit, OnModuleDestroy {
     return this.checkpointer;
   }
 
-  private createRun(projectId: string, executionId: string, stage: WorkflowStage) {
-    return this.db.client.graphRun.create({
+  private resolveRun(input: {
+    context: WorkflowContext;
+    startStage: WorkflowStage;
+    resume?: GraphResumeInput;
+  }) {
+    const { context, startStage, resume } = input;
+    return resume
+      ? attachGraphRun(this.db, {
+          runId: resume.graphRunId,
+          projectId: context.projectId,
+          executionId: context.executionId,
+          checkpointVersion: resume.checkpointVersion,
+        })
+      : createGraphRun(this.db, {
+          projectId: context.projectId,
+          executionId: context.executionId,
+          stage: startStage,
+        });
+  }
+
+  private async prepareStage(input: PrepareGraphStageInput): Promise<WorkflowContext> {
+    const { graphRunId, context, stage, logicalAttempt } = input;
+    await this.db.client.graphRun.update({
+      where: { id: graphRunId },
       data: {
-        project_id: projectId,
-        execution_id: executionId,
-        status: 'running',
-        current_node: 'start',
+        current_node: 'choose_action',
         current_stage: stage,
+        logical_attempt: logicalAttempt,
+        lease_expires_at: graphLeaseDeadline(),
         updated_at: new Date(),
       },
     });
-  }
-
-  private async attachResume(projectId: string, executionId: string, input: GraphResumeInput) {
-    const attached = await this.db.client.graphRun.updateMany({
-      where: {
-        id: input.graphRunId,
-        project_id: projectId,
-        status: 'running',
-        checkpoint_version: input.checkpointVersion,
-      },
-      data: { execution_id: executionId, updated_at: new Date() },
-    });
-    if (attached.count !== 1) {
-      throw AppException.conflict(ErrorCode.INVALID_STAGE_TRANSITION, 'Graph checkpoint is stale');
-    }
-    return { id: input.graphRunId };
+    return this.actions.prepare({ graphRunId, context, stage, logicalAttempt });
   }
 }
 
@@ -171,5 +195,21 @@ function initialState(
   context: WorkflowContext,
   stage: WorkflowStage,
 ): PlanningGraphState {
-  return { graphRunId, context, stage, nextStage: stage, currentNode: 'start', waitingFor: null };
+  return {
+    graphRunId,
+    logicalAttempt: 1,
+    context: graphContext(context, graphRunId, 1),
+    stage,
+    nextStage: stage,
+    currentNode: 'start',
+    waitingFor: null,
+  };
+}
+
+function graphContext(
+  context: WorkflowContext,
+  graphRunId: string,
+  logicalAttempt: number,
+): WorkflowContext {
+  return { ...context, graphRunId, logicalAttempt };
 }

@@ -15,6 +15,7 @@ V3 使用 LangGraph 承载现有 9 个业务阶段的执行、条件分支、人
 ```typescript
 type PlanningGraphState = {
   graphRunId: string;
+  logicalAttempt: number;
   projectId: string;
   stage: WorkflowStage;
   confirmedDecisions: DecisionSnapshot[];
@@ -30,6 +31,8 @@ type PlanningGraphState = {
 ```
 
 - `graphRunId` 同时作为 LangGraph `thread_id`，每次完整工作流运行唯一。
+- `logicalAttempt` 从 1 开始，只在用户输入或确认导致业务继续时递增；进程崩溃后的同一
+  checkpoint 重放保持不变，用于区分业务重入和节点重放。
 - Graph checkpoint 是执行恢复来源；现有项目、工作流、消息和产物表是用户可见读模型和审计记录。
 - Graph State 只保存恢复所需数据，不保存 API Key、完整原始文件或未脱敏异常栈。
 
@@ -82,8 +85,11 @@ START
 
 - interrupt 前的副作用必须已提交且幂等，或推迟到 resume 后执行。
 - 恢复请求必须携带当前 `graphRunId` 和预期 checkpoint 版本；过期请求返回状态冲突。
-- 节点写入使用 `graph_run_id + node + logical_attempt` 幂等键，重放不得重复创建消息、产物、执行日志或 Token 汇总。
-- 节点失败后从最近成功 checkpoint 恢复；已经成功的并行节点不得重复执行。
+- 节点写入使用 `graph_run_id + node/stage + logical_attempt` 幂等键，重放不得重复创建消息、产物、执行日志或 Token 汇总。
+- 检查点用户/助手消息必须作为当前 Graph 节点的幂等副作用，在该节点 checkpoint 提交前落库；不得先把 Graph Run 标为 `interrupted` 再创建唯一可推进的对话。
+- 节点失败后，用户重新运行同一项目时复用最近 failed Graph Run，从最近成功 checkpoint
+  恢复；已经成功的节点不得重复执行。外部模型 Provider 不提供幂等协议时，crash window
+  可能重新发起相同请求，但内部调用日志与 Token/成本汇总必须在同一事务内和业务读模型一样只提交一次。
 - 用户取消沿用 AbortSignal，Graph Run 标记 `cancelled`，不保存半条助手消息。
 
 ## 7. SSE 与用户状态
@@ -110,18 +116,21 @@ START
 | 知识库暂时不可用          | 不切换项目或来源；按无证据路径继续或进入人工检查点 |
 | Agent Action 连续校验失败 | 当前阶段失败，不执行自由文本中的潜在 Tool 指令     |
 | interrupt 后进程重启      | 使用持久化 checkpoint 和相同 `graphRunId` 恢复     |
+| resume claim 后进程退出   | 租约到期后允许同一 checkpoint 重新 claim           |
 | 首个 SSE delta 后模型失败 | 不切换模型，沿用现有流式一致性规则                 |
 
 ## 10. 验收标准
 
 - 9 个阶段和 4 个检查点的 V2 行为回归通过。
 - Graph 能在进程重启后恢复到最近 checkpoint。
+- resume claim、项目阶段推进和 execution 创建必须原子提交；运行中 claim 使用可续期租约，过期后可恢复。
 - 同一 checkpoint 重复 resume 不产生重复副作用。
 - Tool 白名单、Zod 参数校验和单阶段 3 次上限不可绕过。
 - Agent 无法通过知识内容改变项目 ID、模型调用链或合法状态转换。
 - Graph 轨迹能够关联模型日志、检索证据、Token 和成本。
 - 没有知识源时可以完成原有 Mock Eval。
-- 相同 `graph_run_id + stage + call_number` 重放复用已有 Tool 结果，不重复写审计记录或产生调用成本。
+- 相同 `graph_run_id + stage + logical_attempt + call_number` 重放复用已有 Tool 结果，不重复写审计记录或产生调用成本；业务阶段重入递增 `logical_attempt`，不得复用上一次业务尝试的结果。
+- 并发命中同一 Tool 幂等键时只有 claim owner 执行读取；其他执行者等待结果，只有 owner 租约过期后可接管。
 
 ## 11. 版本边界
 

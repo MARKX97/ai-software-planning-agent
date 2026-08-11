@@ -11,6 +11,7 @@ export interface StoreArtifactInput {
   readonly type: ArtifactType;
   readonly content: string;
   readonly citations?: readonly ArtifactCitation[];
+  readonly idempotencyKey?: string;
 }
 
 /** Persists generated Markdown in both the artifact table and DATA_DIR. */
@@ -21,6 +22,12 @@ export class ArtifactFileStore {
   ) {}
 
   async save(input: StoreArtifactInput): Promise<Artifact> {
+    if (input.idempotencyKey) {
+      const existing = await this.db.client.artifact.findUnique({
+        where: { idempotency_key: input.idempotencyKey },
+      });
+      if (existing) return existing;
+    }
     const id = randomUUID();
     const relativePath = join('artifacts', input.projectId, `${input.type}-${id}.md`);
     const fullPath = resolve(this.dataDir, relativePath);
@@ -64,38 +71,41 @@ export class ArtifactFileStore {
     filePath: string,
   ): Promise<Artifact> {
     const now = new Date();
-    await this.db.client.artifact.updateMany({
-      where: { project_id: input.projectId, type: input.type, deleted_at: null },
-      data: { deleted_at: now, updated_at: now },
-    });
-    return this.db.client.artifact.create({
-      data: {
-        id,
-        project_id: input.projectId,
-        type: input.type,
-        type_display_name: ARTIFACT_DISPLAY_NAME[input.type],
-        title: ARTIFACT_DISPLAY_NAME[input.type],
-        stage: WorkflowStage.PLANNING_GENERATION,
-        content: input.content,
-        file_path: filePath,
-        size_bytes: Buffer.byteLength(input.content, 'utf8'),
-        citations: input.citations?.length
-          ? {
-              create: input.citations.map((citation, index) => ({
-                source_id: citation.sourceId,
-                document_id: citation.documentId,
-                chunk_id: citation.chunkId,
-                citation_key: citation.citationKey,
-                position: index + 1,
-                title: citation.title,
-                locator: citation.locator,
-                excerpt: citation.excerpt,
-                content_hash: citation.contentHash,
-              })),
-            }
-          : undefined,
-        updated_at: now,
-      },
+    return this.db.client.$transaction(async (tx) => {
+      await tx.artifact.updateMany({
+        where: { project_id: input.projectId, type: input.type, deleted_at: null },
+        data: { deleted_at: now, updated_at: now },
+      });
+      return tx.artifact.create({
+        data: {
+          id,
+          project_id: input.projectId,
+          type: input.type,
+          type_display_name: ARTIFACT_DISPLAY_NAME[input.type],
+          title: ARTIFACT_DISPLAY_NAME[input.type],
+          stage: WorkflowStage.PLANNING_GENERATION,
+          content: input.content,
+          file_path: filePath,
+          size_bytes: Buffer.byteLength(input.content, 'utf8'),
+          citations: input.citations?.length
+            ? {
+                create: input.citations.map((citation, index) => ({
+                  source_id: citation.sourceId,
+                  document_id: citation.documentId,
+                  chunk_id: citation.chunkId,
+                  citation_key: citation.citationKey,
+                  position: index + 1,
+                  title: citation.title,
+                  locator: citation.locator,
+                  excerpt: citation.excerpt,
+                  content_hash: citation.contentHash,
+                })),
+              }
+            : undefined,
+          updated_at: now,
+          idempotency_key: input.idempotencyKey,
+        },
+      });
     });
   }
 }

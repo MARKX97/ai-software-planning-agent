@@ -72,23 +72,20 @@ describe('ArtifactsService', () => {
     );
   });
 
-  it('soft-deletes the previous version before creating a new artifact', async () => {
+  it('replaces the previous version inside one transaction', async () => {
     let archivedWhere: unknown;
     let createdData: Record<string, unknown> | undefined;
-    const db = {
-      client: {
-        artifact: {
-          updateMany: async (args: { where: unknown }) => {
-            archivedWhere = args.where;
-            return { count: 1 };
-          },
-          create: async (args: { data: Record<string, unknown> }) => {
-            createdData = args.data;
-            return row;
-          },
-        },
+    const artifact = {
+      updateMany: async (args: { where: unknown }) => {
+        archivedWhere = args.where;
+        return { count: 1 };
+      },
+      create: async (args: { data: Record<string, unknown> }) => {
+        createdData = args.data;
+        return row;
       },
     };
+    const db = transactionDb(artifact);
     const dataDir = await mkdtemp(join(tmpdir(), 'artifact-store-'));
     try {
       await new ArtifactFileStore(db as never, dataDir).save({
@@ -103,4 +100,51 @@ describe('ArtifactsService', () => {
       await rm(dataDir, { recursive: true, force: true });
     }
   });
+
+  it('rolls back the old active artifact when the replacement create fails', async () => {
+    const old = { id: 'old-artifact', deleted_at: null as Date | null };
+    const artifact = {
+      updateMany: async () => {
+        old.deleted_at = new Date();
+        return { count: 1 };
+      },
+      create: async () => {
+        throw new Error('database unavailable');
+      },
+    };
+    const db = transactionDb(artifact, () => {
+      old.deleted_at = null;
+    });
+    const dataDir = await mkdtemp(join(tmpdir(), 'artifact-rollback-'));
+    try {
+      await assert.rejects(
+        () =>
+          new ArtifactFileStore(db as never, dataDir).save({
+            projectId: 'project-1',
+            type: 'prd',
+            content: '# Replacement',
+          }),
+        /database unavailable/,
+      );
+      assert.deepEqual(old, { id: 'old-artifact', deleted_at: null });
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
 });
+
+function transactionDb(artifact: object, rollback?: () => void) {
+  return {
+    client: {
+      artifact: { findUnique: async () => null },
+      $transaction: async (run: (tx: { artifact: object }) => unknown) => {
+        try {
+          return await run({ artifact });
+        } catch (error) {
+          rollback?.();
+          throw error;
+        }
+      },
+    },
+  };
+}

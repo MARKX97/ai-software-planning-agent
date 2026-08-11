@@ -331,7 +331,11 @@ describe('real HTTP + PostgreSQL workflow integration', () => {
         const feasibilityDetail = await request(
           `/projects/${projectId}/usage/logs/${feasibilityLog.id}`,
         );
-        assert.match(bodyOf(feasibilityDetail)['prompt_text'] as string, /会员功能以后再说/);
+        const feasibilityBody = bodyOf(feasibilityDetail);
+        assert.match(feasibilityBody['prompt_hash'] as string, /^[a-f0-9]{64}$/);
+        assert.ok(Number(feasibilityBody['prompt_length']) > 0);
+        assert.equal('prompt_text' in feasibilityBody, false);
+        assert.equal('response_text' in feasibilityBody, false);
       } finally {
         if (projectId) {
           const cleanup = await request(`/projects/${projectId}`, { method: 'DELETE' });

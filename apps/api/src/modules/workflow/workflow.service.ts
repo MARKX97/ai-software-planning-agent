@@ -26,10 +26,10 @@ import {
   listWorkflowStates,
   type ExecutionLogsListResponse,
 } from './workflow-history.js';
-import { confirmCheckpointDecision } from './workflow-decisions.js';
+import { confirmCheckpointDecisionInTransaction } from './workflow-decisions.js';
 import { executeWorkflowPipeline } from './workflow-executor.js';
 import { nextCheckpointStage } from './workflow-interaction-guard.js';
-import { buildWorkflowStatus, createExecution } from './workflow-store.js';
+import { buildWorkflowStatus, claimWorkflowExecutionInTransaction } from './workflow-store.js';
 import { streamContinue, streamDiscuss, streamRun } from './workflow-stream-actions.js';
 import type { WorkflowSse } from './workflow-sse.js';
 import { syncProjectBudget } from './workflow-budget.js';
@@ -90,13 +90,18 @@ export class WorkflowService {
       checkpointVersion: input.checkpoint_version,
       stage: nextStage,
     });
-    if (graphResume) await this.graph.reserveResume(projectId, graphResume);
-    await confirmCheckpointDecision(this.db, {
-      projectId,
-      conversationId: input.conversation_id,
-      stage: project.current_stage as WorkflowStage,
+    const execution = await this.db.client.$transaction(async (tx) => {
+      await confirmCheckpointDecisionInTransaction(tx, {
+        projectId,
+        conversationId: input.conversation_id,
+        stage: project.current_stage as WorkflowStage,
+      });
+      return claimWorkflowExecutionInTransaction(tx, {
+        project,
+        stage: nextStage,
+        resume: graphResume,
+      });
     });
-    const execution = await createExecution(this.db, projectId, nextStage);
     const result = await executeWorkflowPipeline(this.deps(), {
       projectId,
       executionId: execution.id,

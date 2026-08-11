@@ -16,7 +16,9 @@ four read-only tools, a durable tool audit trail, and server-derived incremental
 - Tool inputs use shared Zod schemas. The server rejects a mismatched model-supplied project ID,
   then executes only with the authenticated route project ID.
 - Each stage may execute at most three tools. Every attempted call is audited and replayed by its
-  `graph_run_id + stage + call_number` key.
+  `graph_run_id + stage + logical_attempt + call_number` key. `logical_attempt`
+  was added during the 2026-08-11 audit remediation so business-stage re-entry does
+  not reuse a previous attempt's Tool result.
 - Source and repository content remains untrusted, redacted, and length-limited before it reaches a
   stage prompt. Tools cannot write data, advance workflow state, or call a model.
 - `AGENT_ACTIONS_ENABLED=false` restores the P1 fixed-retrieval Graph path.

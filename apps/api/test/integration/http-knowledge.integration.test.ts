@@ -111,6 +111,13 @@ describe('real HTTP + PostgreSQL knowledge integration', () => {
             ?.error_message,
           'Knowledge indexing failed',
         );
+        const searchAfterFailure = await jsonRequest(`/projects/${projectId}/knowledge/search`, {
+          method: 'POST',
+          body: JSON.stringify({ query: 'PostgreSQL', source_ids: [sourceId] }),
+        });
+        assert.equal(searchAfterFailure.response.status, 200);
+        assert.equal(searchAfterFailure.body?.['insufficient_evidence'], false);
+        assert.ok((searchAfterFailure.body?.['items'] as unknown[]).length > 0);
 
         const repaired = await jsonRequest(
           `/projects/${projectId}/knowledge/sources/${sourceId}/reindex`,

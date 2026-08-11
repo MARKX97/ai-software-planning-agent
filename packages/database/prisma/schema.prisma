@@ -182,6 +182,7 @@ model Message {
   role            MessageRole @map("role")
   content         String      @db.Text
   metadata        Json?
+  idempotency_key String?     @unique @map("idempotency_key") @db.VarChar(240)
   created_at      DateTime    @default(now()) @map("created_at") @db.Timestamptz
 
   conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
@@ -245,6 +246,8 @@ model GraphRun {
   current_node       String        @map("current_node") @db.VarChar(100)
   current_stage      WorkflowStage @map("current_stage")
   checkpoint_version Int           @default(0) @map("checkpoint_version")
+  logical_attempt    Int           @default(1) @map("logical_attempt")
+  lease_expires_at   DateTime?     @map("lease_expires_at") @db.Timestamptz
   waiting_for        String?       @map("waiting_for") @db.VarChar(20)
   started_at         DateTime      @default(now()) @map("started_at") @db.Timestamptz
   updated_at         DateTime      @map("updated_at") @db.Timestamptz
@@ -255,47 +258,55 @@ model GraphRun {
 
   @@index([project_id, updated_at(sort: Desc)])
   @@index([project_id, status])
+  @@index([execution_id])
+  @@index([status, lease_expires_at])
   @@map("graph_runs")
 }
 
 /// P2 read-only Tool audit. The unique call number makes Graph node replay idempotent.
 model ToolStep {
-  id             String        @id @default(uuid()) @db.Uuid
-  graph_run_id   String        @map("graph_run_id") @db.Uuid
-  execution_id   String?       @map("execution_id") @db.Uuid
-  stage          WorkflowStage @map("stage")
-  node           String        @db.VarChar(100)
-  tool           String        @db.VarChar(64)
-  call_number    Int           @map("call_number")
-  status         String        @db.VarChar(20)
-  arguments_json Json          @map("arguments_json")
-  result_json    Json?         @map("result_json")
-  result_count   Int           @default(0) @map("result_count")
-  duration_ms    Int?          @map("duration_ms")
-  error_code     String?       @map("error_code") @db.VarChar(50)
-  created_at     DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updated_at     DateTime      @map("updated_at") @db.Timestamptz
+  id               String        @id @default(uuid()) @db.Uuid
+  graph_run_id     String        @map("graph_run_id") @db.Uuid
+  execution_id     String?       @map("execution_id") @db.Uuid
+  stage            WorkflowStage @map("stage")
+  node             String        @db.VarChar(100)
+  tool             String        @db.VarChar(64)
+  call_number      Int           @map("call_number")
+  logical_attempt  Int           @default(1) @map("logical_attempt")
+  claim_token      String?       @map("claim_token") @db.VarChar(36)
+  lease_expires_at DateTime?     @map("lease_expires_at") @db.Timestamptz
+  status           String        @db.VarChar(20)
+  arguments_json   Json          @map("arguments_json")
+  result_json      Json?         @map("result_json")
+  result_count     Int           @default(0) @map("result_count")
+  duration_ms      Int?          @map("duration_ms")
+  error_code       String?       @map("error_code") @db.VarChar(50)
+  created_at       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updated_at       DateTime      @map("updated_at") @db.Timestamptz
 
   graph_run GraphRun @relation(fields: [graph_run_id], references: [id], onDelete: Cascade)
 
-  @@unique([graph_run_id, stage, call_number])
+  @@unique([graph_run_id, stage, logical_attempt, call_number])
   @@index([graph_run_id, created_at])
   @@index([execution_id])
+  @@index([status, lease_expires_at])
   @@map("tool_steps")
 }
 
 /// Stage analysis result (structured LLM output persisted).
 model AnalysisResult {
-  id             String        @id @default(uuid()) @db.Uuid
-  project_id     String        @map("project_id") @db.Uuid
-  execution_id   String?       @map("execution_id") @db.Uuid
-  stage          WorkflowStage @map("stage")
-  result_type    String        @map("result_type") @db.VarChar(50)
-  schema_name    String?       @map("schema_name") @db.VarChar(100)
-  schema_version String?       @map("schema_version") @db.VarChar(30)
-  content_json   Json          @map("content_json")
-  content_text   String?       @map("content_text") @db.Text
-  created_at     DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  id              String        @id @default(uuid()) @db.Uuid
+  project_id      String        @map("project_id") @db.Uuid
+  execution_id    String?       @map("execution_id") @db.Uuid
+  stage           WorkflowStage @map("stage")
+  result_type     String        @map("result_type") @db.VarChar(50)
+  schema_name     String?       @map("schema_name") @db.VarChar(100)
+  schema_version  String?       @map("schema_version") @db.VarChar(30)
+  content_json    Json          @map("content_json")
+  content_text    String?       @map("content_text") @db.Text
+  result_json     Json?         @map("result_json")
+  idempotency_key String?       @unique @map("idempotency_key") @db.VarChar(200)
+  created_at      DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
   project   Project            @relation(fields: [project_id], references: [id], onDelete: Cascade)
   execution WorkflowExecution? @relation(fields: [execution_id], references: [id], onDelete: SetNull)
@@ -321,6 +332,7 @@ model Artifact {
   created_at        DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updated_at        DateTime      @map("updated_at") @db.Timestamptz
   deleted_at        DateTime?     @map("deleted_at") @db.Timestamptz
+  idempotency_key   String?       @unique @map("idempotency_key") @db.VarChar(200)
 
   project   Project            @relation(fields: [project_id], references: [id], onDelete: Cascade)
   citations ArtifactCitation[]
@@ -369,10 +381,11 @@ model ModelExecutionLog {
   model_id          String        @map("model_id") @db.VarChar(100)
   status            CallStatus    @map("status")
   attempt_number    Int           @default(1) @map("attempt_number")
-  prompt_text       String        @map("prompt_text") @db.Text
+  prompt_hash       String        @map("prompt_hash") @db.VarChar(64)
+  prompt_length     Int           @map("prompt_length")
   prompt_version_id String?       @map("prompt_version_id") @db.Uuid
-  response_text     String?       @map("response_text") @db.Text
-  structured_output Json?         @map("structured_output")
+  response_length   Int?          @map("response_length")
+  response_summary  String?       @map("response_summary") @db.VarChar(200)
   input_tokens      Int           @default(0) @map("input_tokens")
   output_tokens     Int           @default(0) @map("output_tokens")
   cached_tokens     Int           @default(0) @map("cached_tokens")
@@ -383,6 +396,7 @@ model ModelExecutionLog {
   latency_ms        Int?          @map("latency_ms")
   error_code        String?       @map("error_code") @db.VarChar(50)
   error_message     String?       @map("error_message") @db.Text
+  idempotency_key   String?       @unique @map("idempotency_key") @db.VarChar(200)
   created_at        DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
   project        Project            @relation(fields: [project_id], references: [id], onDelete: Cascade)

@@ -138,7 +138,7 @@ function isText(buffer: Buffer): boolean {
 
 function hasLikelySecret(buffer: Buffer): boolean {
   return /-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:api[_-]?key|password|secret|token)\s*[:=]\s*['"]?[A-Za-z0-9_+/=-]{16,}/i.test(
-    buffer.subarray(0, 4_096).toString('utf8'),
+    buffer.toString('utf8'),
   );
 }
 

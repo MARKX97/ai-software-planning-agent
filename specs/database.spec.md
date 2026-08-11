@@ -85,14 +85,15 @@
 
 ### 4.3 messages
 
-| 字段              | 类型        | 约束                                    |
-| ----------------- | ----------- | --------------------------------------- |
-| `id`              | UUID        | PK                                      |
-| `conversation_id` | UUID        | FK -> conversations, NOT NULL           |
-| `role`            | VARCHAR(20) | NOT NULL, CHECK `user/assistant/system` |
-| `content`         | TEXT        | NOT NULL                                |
-| `metadata`        | JSONB       | NULL                                    |
-| `created_at`      | TIMESTAMPTZ | NOT NULL, DEFAULT NOW()                 |
+| 字段              | 类型         | 约束                                    |
+| ----------------- | ------------ | --------------------------------------- |
+| `id`              | UUID         | PK                                      |
+| `conversation_id` | UUID         | FK -> conversations, NOT NULL           |
+| `role`            | VARCHAR(20)  | NOT NULL, CHECK `user/assistant/system` |
+| `content`         | TEXT         | NOT NULL                                |
+| `metadata`        | JSONB        | NULL                                    |
+| `idempotency_key` | VARCHAR(240) | UNIQUE, NULL；Graph checkpoint 消息键   |
+| `created_at`      | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                 |
 
 ### 4.4 workflow_states
 
@@ -131,45 +132,54 @@
 ### 4.6 analysis_results
 
 P1 的 `graph_runs` 保存 `graph_run_id`、当前 Node/Stage、恢复状态和单调递增的
-`checkpoint_version`；checkpoint payload 由 `@langchain/langgraph-checkpoint-postgres`
+`checkpoint_version`、区分业务重入与节点重放的 `logical_attempt`，以及可回收运行中
+claim 的 `lease_expires_at`；checkpoint payload 由 `@langchain/langgraph-checkpoint-postgres`
 在同一 PostgreSQL 数据库的自管理表中持久化。用户可见状态仍以现有工作流表为准。
 
 P2 的 `tool_steps` 每行记录一次尝试：`graph_run_id`、`execution_id`、`stage`、`node`、
-`tool`、`call_number`、脱敏参数摘要、内部限长结果、结果数、耗时、状态和错误码。
-`(graph_run_id, stage, call_number)` 唯一，Graph 重放复用该行，不重复执行 Tool。
+`logical_attempt`、`tool`、`call_number`、脱敏参数摘要、内部限长结果、结果数、耗时、状态和错误码。
+`(graph_run_id, stage, logical_attempt, call_number)` 唯一，Graph 重放复用该行，不重复执行 Tool。
+`running` 行另有 `claim_token` 与 `lease_expires_at`；只有 token owner 执行和完成 Tool，
+非 owner 等待已提交结果，租约过期后才允许条件接管。
 
-| 字段             | 类型         | 约束                                                |
-| ---------------- | ------------ | --------------------------------------------------- |
-| `id`             | UUID         | PK                                                  |
-| `project_id`     | UUID         | FK -> projects, NOT NULL                            |
-| `execution_id`   | UUID         | FK -> workflow_executions, NULL, ON DELETE SET NULL |
-| `stage`          | VARCHAR(50)  | NOT NULL, CHECK WorkflowStage                       |
-| `result_type`    | VARCHAR(50)  | NOT NULL                                            |
-| `schema_name`    | VARCHAR(100) | NULL                                                |
-| `schema_version` | VARCHAR(30)  | NULL                                                |
-| `content_json`   | JSONB        | NOT NULL                                            |
-| `content_text`   | TEXT         | NULL                                                |
-| `created_at`     | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                             |
+| 字段              | 类型         | 约束                                                |
+| ----------------- | ------------ | --------------------------------------------------- |
+| `id`              | UUID         | PK                                                  |
+| `project_id`      | UUID         | FK -> projects, NOT NULL                            |
+| `execution_id`    | UUID         | FK -> workflow_executions, NULL, ON DELETE SET NULL |
+| `stage`           | VARCHAR(50)  | NOT NULL, CHECK WorkflowStage                       |
+| `result_type`     | VARCHAR(50)  | NOT NULL                                            |
+| `schema_name`     | VARCHAR(100) | NULL                                                |
+| `schema_version`  | VARCHAR(30)  | NULL                                                |
+| `content_json`    | JSONB        | NOT NULL                                            |
+| `content_text`    | TEXT         | NULL                                                |
+| `result_json`     | JSONB        | NULL，Graph 重放使用的完整阶段结果                  |
+| `idempotency_key` | VARCHAR(200) | UNIQUE, NULL；Graph stage logical attempt 键        |
+| `created_at`      | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                             |
 
 ### 4.7 artifacts
 
-| 字段                | 类型         | 约束                          |
-| ------------------- | ------------ | ----------------------------- |
-| `id`                | UUID         | PK                            |
-| `project_id`        | UUID         | FK -> projects, NOT NULL      |
-| `type`              | VARCHAR(50)  | NOT NULL, CHECK ArtifactType  |
-| `type_display_name` | VARCHAR(100) | NOT NULL                      |
-| `title`             | VARCHAR(200) | NOT NULL                      |
-| `stage`             | VARCHAR(50)  | NOT NULL, CHECK WorkflowStage |
-| `content`           | TEXT         | NOT NULL                      |
-| `file_path`         | TEXT         | NULL                          |
-| `size_bytes`        | INTEGER      | NULL                          |
-| `format`            | VARCHAR(20)  | NOT NULL, DEFAULT `markdown`  |
-| `created_at`        | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()       |
-| `updated_at`        | TIMESTAMPTZ  | NOT NULL                      |
-| `deleted_at`        | TIMESTAMPTZ  | NULL                          |
+| 字段                | 类型         | 约束                           |
+| ------------------- | ------------ | ------------------------------ |
+| `id`                | UUID         | PK                             |
+| `project_id`        | UUID         | FK -> projects, NOT NULL       |
+| `type`              | VARCHAR(50)  | NOT NULL, CHECK ArtifactType   |
+| `type_display_name` | VARCHAR(100) | NOT NULL                       |
+| `title`             | VARCHAR(200) | NOT NULL                       |
+| `stage`             | VARCHAR(50)  | NOT NULL, CHECK WorkflowStage  |
+| `content`           | TEXT         | NOT NULL                       |
+| `file_path`         | TEXT         | NULL                           |
+| `size_bytes`        | INTEGER      | NULL                           |
+| `format`            | VARCHAR(20)  | NOT NULL, DEFAULT `markdown`   |
+| `created_at`        | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()        |
+| `updated_at`        | TIMESTAMPTZ  | NOT NULL                       |
+| `deleted_at`        | TIMESTAMPTZ  | NULL                           |
+| `idempotency_key`   | VARCHAR(200) | UNIQUE, NULL；Graph 产物提交键 |
 
 **UNIQUE**: `(project_id, type)` for non-deleted rows.
+
+同类型产物替换必须在单个数据库事务中 soft-delete 旧 active 行并创建新 artifact/citations；
+新行创建失败时旧 active 行保持不变，事务外已写入的新文件必须清理。
 
 ### 4.8 exports
 
@@ -201,10 +211,11 @@ P2 的 `tool_steps` 每行记录一次尝试：`graph_run_id`、`execution_id`�
 | `model_id`          | VARCHAR(100)  | NOT NULL                                              |
 | `status`            | VARCHAR(20)   | NOT NULL, CHECK `success/failed/timeout/rate_limited` |
 | `attempt_number`    | INTEGER       | NOT NULL, DEFAULT 1                                   |
-| `prompt_text`       | TEXT          | NOT NULL                                              |
+| `prompt_hash`       | VARCHAR(64)   | NOT NULL，SHA-256                                     |
+| `prompt_length`     | INTEGER       | NOT NULL, CHECK >= 0                                  |
 | `prompt_version_id` | UUID          | FK -> prompt_versions, NULL, ON DELETE SET NULL       |
-| `response_text`     | TEXT          | NULL                                                  |
-| `structured_output` | JSONB         | NULL                                                  |
+| `response_length`   | INTEGER       | NULL, CHECK >= 0                                      |
+| `response_summary`  | VARCHAR(200)  | NULL；仅状态摘要，不含模型输出原文                    |
 | `input_tokens`      | INTEGER       | NOT NULL, DEFAULT 0                                   |
 | `output_tokens`     | INTEGER       | NOT NULL, DEFAULT 0                                   |
 | `cached_tokens`     | INTEGER       | NOT NULL, DEFAULT 0                                   |
@@ -215,7 +226,10 @@ P2 的 `tool_steps` 每行记录一次尝试：`graph_run_id`、`execution_id`�
 | `latency_ms`        | INTEGER       | NULL                                                  |
 | `error_code`        | VARCHAR(50)   | NULL                                                  |
 | `error_message`     | TEXT          | NULL                                                  |
+| `idempotency_key`   | VARCHAR(200)  | UNIQUE, NULL；Graph 模型调用提交键                    |
 | `created_at`        | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW()                               |
+
+同一次模型调用的 `model_execution_logs` 插入与 `token_usage` 累加必须在同一数据库事务内提交；幂等键冲突表示该调用已经完整计账。
 
 ### 4.10 prompt_versions
 
@@ -419,7 +433,8 @@ P2 的 `tool_steps` 每行记录一次尝试：`graph_run_id`、`execution_id`�
 - Controller 不直接返回 Prisma 实体，必须通过 DTO 映射。
 - 软删除查询默认过滤 `deleted_at IS NULL`。
 - `download_token_hash` 只存 hash，不存明文下载 token。
-- `prompt_text` 和 `response_text` 可能包含用户输入，日志展示接口必须走鉴权。
+- 模型调用日志默认不保存 Prompt、响应或 structured output 原文；只保存 Prompt SHA-256、
+  输入/输出字符长度、无内容状态摘要、PromptVersion、Token、成本和错误元数据。
 - `embedding` 和 `search_vector` 只能由数据库包访问；向量 SQL 必须参数化并在 SQL 层过滤项目与 active revision。
 - 知识源内容、Chunk、Embedding 和引用 excerpt 禁止写入日志；`error_message` 只保存脱敏信息。
 

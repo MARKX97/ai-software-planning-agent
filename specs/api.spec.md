@@ -32,6 +32,9 @@
 | 时间格式   | ISO 8601 UTC                                                |
 | 错误格式   | `{ error: { code, message, details? } }`                    |
 
+运行时默认只监听 `127.0.0.1`，CORS 仅允许 `CORS_ALLOWED_ORIGINS` 中的精确 Origin。
+当 `API_HOST` 配置为非 loopback 地址时，`API_KEY` 必须非空，否则 API 拒绝启动。
+
 ## 3. 接口清单
 
 | Method | Path                                                              | 说明         |
@@ -88,7 +91,7 @@
 - LLM 调用只允许白名单模块通过 `LlmOrchestratorService`。
 - `run`、`workflow/continue`、`workflow/discuss` 返回 `200 text/event-stream`；`workflow/advance` 仍返回 `202 application/json`。
 - Controller 只绑定 SSE headers 和输出，模型调用与持久化仍由 Workflow Service/Stage 完成。
-- `run`、`workflow/continue`、`workflow/discuss`、`workflow/advance`、`workflow/regenerate` 在进入业务逻辑前执行按项目和调用方计数的固定窗口限流；默认每分钟 10 次，超限返回 `429 RATE_LIMITED`。
+- `run`、`workflow/continue`、`workflow/discuss`、`workflow/advance`、`workflow/regenerate` 在进入业务逻辑前同时执行调用方全局和“调用方+项目”固定窗口限流；默认每分钟 10 次，超限返回 `429 RATE_LIMITED`。无鉴权模式只使用规范化远端 IP，不信任任意 Authorization；单实例 bucket 存储必须有硬容量，容量耗尽时失败关闭。
 - 五个模型工作流操作在创建 execution 或打开 SSE 前读取持久化项目成本；达到配置上限时返回 `503 COST_LIMIT_EXCEEDED`。
 
 ### 4.3 Error
@@ -123,6 +126,7 @@
 - `workflow/status.decision_snapshots` 返回已确认检查点的结构化结论；`quality_report` 在规划生成完成后返回确定性质量检查结果，生成前为 `null`。
 - `workflow/status.graph_run` 返回当前节点、checkpoint 版本和可恢复状态；`continue` 与 `advance` 必须回传 `graph_run_id`、`checkpoint_version`，过期恢复返回 409。
 - `workflow/status.graph_run` 同时返回脱敏 Tool 轨迹、调用次数、检索摘要和 interrupt 原因；不得返回完整 Tool 参数、来源内容或 Prompt。
+- 模型日志详情只返回 Prompt SHA-256、Prompt/响应长度和无内容状态摘要；不得返回 Prompt、响应或 structured output 原文。
 - `workflow/status.regeneration` 由服务端根据 active revision、引用快照和产物依赖计算；为空表示无需重生成。
 - `workflow/regenerate` 无请求体，只在项目已完成且存在影响时执行服务端计算的产物集合；并发调用返回 409，未受影响产物保持不变。
 - `workflow/continue` 只用于需求澄清回复；其他检查点讨论使用 `workflow/discuss`，确认后使用 `workflow/advance`。

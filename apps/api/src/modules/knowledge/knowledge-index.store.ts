@@ -60,8 +60,11 @@ export class KnowledgeIndexStore {
   async fail(sourceId: string, revisionId: string, error: unknown): Promise<void> {
     const code = error instanceof EmbeddingError ? error.code : ErrorCode.KNOWLEDGE_INDEXING_FAILED;
     const message = error instanceof EmbeddingError ? error.message : 'Knowledge indexing failed';
-    await this.db.client.$transaction([
-      this.db.client.knowledgeRevision.update({
+    await this.db.client.$transaction(async (tx) => {
+      const active = await tx.knowledgeRevision.findFirst({
+        where: { source_id: sourceId, is_active: true },
+      });
+      await tx.knowledgeRevision.update({
         where: { id: revisionId },
         data: {
           status: 'failed',
@@ -70,17 +73,18 @@ export class KnowledgeIndexStore {
           completed_at: new Date(),
           is_active: false,
         },
-      }),
-      this.db.client.knowledgeSource.update({
+      });
+      await tx.knowledgeSource.update({
         where: { id: sourceId },
         data: {
-          status: 'failed',
+          status: active ? 'ready_with_warnings' : 'failed',
+          warning_count: active ? active.warning_count + 1 : 0,
           error_code: code,
           error_message: message,
           updated_at: new Date(),
         },
-      }),
-    ]);
+      });
+    });
   }
 
   private async beginTransaction(

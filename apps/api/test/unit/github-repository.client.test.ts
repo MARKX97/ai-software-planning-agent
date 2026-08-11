@@ -28,6 +28,7 @@ describe('GitHubRepositoryClient', () => {
       ['sample-main/.git/config', 'ignored'],
       ['sample-main/package-lock.json', 'ignored'],
       ['sample-main/secret.txt', 'API_KEY=0123456789abcdef'],
+      ['sample-main/late-secret.txt', `${'safe prefix '.repeat(400)}\nAPI_KEY=fedcba9876543210`],
       ['sample-main/image.png', 'ignored'],
     ]);
     const client = new GitHubRepositoryClient(async (url) => {

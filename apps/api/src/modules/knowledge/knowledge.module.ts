@@ -10,6 +10,8 @@ import { KnowledgeRetrievalService } from './knowledge-retrieval.service.js';
 import { KnowledgeSearchController } from './knowledge-search.controller.js';
 import { KnowledgeService } from './knowledge.service.js';
 import { KnowledgeSourceProcessor } from './knowledge-source-processor.js';
+import { WorkflowRateLimitGuard } from '../../common/guards/workflow-rate-limit.guard.js';
+import { KnowledgeWriteAdmissionInterceptor } from './knowledge-write-admission.interceptor.js';
 
 @Module({
   imports: [ProjectsModule],
@@ -23,6 +25,8 @@ import { KnowledgeSourceProcessor } from './knowledge-source-processor.js';
     KnowledgeRetrievalService,
     KnowledgeService,
     KnowledgeSourceProcessor,
+    WorkflowRateLimitGuard,
+    KnowledgeWriteAdmissionInterceptor,
   ],
   exports: [KnowledgeRetrievalService],
 })

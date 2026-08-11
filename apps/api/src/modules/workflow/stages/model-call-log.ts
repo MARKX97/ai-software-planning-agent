@@ -6,11 +6,14 @@
  *
  * @internal
  */
+import type { Prisma } from '@ai-planning/database';
 import type { LLMResponse } from '@ai-planning/shared';
 import type { WorkflowStage } from '@ai-planning/shared';
 import { CallStatus } from '@ai-planning/shared';
 import type { PrismaService } from '../../../database/database.module.js';
 import { redactSensitiveText } from '../../../common/security/sensitive-text.js';
+import { isUniqueViolation, modelCallKey } from '../workflow-idempotency.js';
+import { createHash } from 'node:crypto';
 
 export interface ModelCallLogEntry {
   readonly projectId: string;
@@ -27,31 +30,79 @@ export interface ModelCallLogEntry {
   readonly promptName?: string;
 }
 
+interface ModelCallContext {
+  readonly status: CallStatus;
+  readonly provider: 'deepseek' | 'glm' | 'minimax';
+  readonly promptVersionId: string | null;
+  readonly idempotencyKey?: string;
+}
+
 /** Persist a single model call (success or failure) to the execution log. */
 export async function logModelCall(db: PrismaService, entry: ModelCallLogEntry): Promise<void> {
-  const status = callStatus(entry);
-  const provider = entry.provider as 'deepseek' | 'glm' | 'minimax';
-  const usage = entry.response?.usage;
-  const cost = entry.response?.cost;
+  const context = await resolveModelCallContext(db, entry);
+  try {
+    await db.client.$transaction(async (tx) => {
+      await createModelExecutionLog(tx, entry, context);
+      await updateTokenUsage(tx, entry, new Date());
+    });
+  } catch (error) {
+    if (context.idempotencyKey && isUniqueViolation(error)) return;
+    throw error;
+  }
+}
+
+async function resolveModelCallContext(
+  db: PrismaService,
+  entry: ModelCallLogEntry,
+): Promise<ModelCallContext> {
   const promptVersion = await db.client.promptVersion?.findFirst({
     where: { prompt_name: entry.promptName ?? entry.stage },
     orderBy: { created_at: 'desc' },
     select: { id: true },
   });
-  const now = new Date();
-  await db.client.modelExecutionLog.create({
+  const graphRun = await db.client.graphRun?.findFirst({
+    where: { execution_id: entry.executionId },
+    orderBy: { updated_at: 'desc' },
+    select: { id: true, logical_attempt: true },
+  });
+  return {
+    status: callStatus(entry),
+    provider: entry.provider as ModelCallContext['provider'],
+    promptVersionId: promptVersion?.id ?? null,
+    idempotencyKey: graphRun
+      ? modelCallKey({
+          graphRunId: graphRun.id,
+          logicalAttempt: graphRun.logical_attempt,
+          stage: entry.stage,
+          provider: entry.provider,
+          attemptNumber: entry.attemptNumber ?? 1,
+          prompt: entry.promptText,
+        })
+      : undefined,
+  };
+}
+
+async function createModelExecutionLog(
+  tx: Prisma.TransactionClient,
+  entry: ModelCallLogEntry,
+  context: ModelCallContext,
+): Promise<void> {
+  const usage = entry.response?.usage;
+  const cost = entry.response?.cost;
+  await tx.modelExecutionLog.create({
     data: {
       project_id: entry.projectId,
       execution_id: entry.executionId,
       stage: entry.stage,
-      provider_name: provider,
+      provider_name: context.provider,
       model_id: entry.response?.model ?? entry.modelId ?? entry.provider,
-      status,
+      status: context.status,
       attempt_number: entry.attemptNumber ?? 1,
-      prompt_version_id: promptVersion?.id ?? null,
-      prompt_text: redactSensitiveText(entry.promptText),
-      response_text: entry.response ? redactSensitiveText(entry.response.content) : null,
-      structured_output: (entry.response?.structuredOutput ?? null) as never,
+      prompt_version_id: context.promptVersionId,
+      prompt_hash: createHash('sha256').update(entry.promptText).digest('hex'),
+      prompt_length: entry.promptText.length,
+      response_length: entry.response?.content.length ?? null,
+      response_summary: entry.response ? '模型调用成功，响应内容已按隐私策略省略。' : null,
       input_tokens: usage?.inputTokens ?? 0,
       output_tokens: usage?.outputTokens ?? 0,
       cached_tokens: usage?.cachedTokens ?? 0,
@@ -60,28 +111,28 @@ export async function logModelCall(db: PrismaService, entry: ModelCallLogEntry):
       cost_cached: cost?.cachedInputCost ?? 0,
       cost_total: cost?.totalCost ?? 0,
       latency_ms: entry.response?.latencyMs ?? entry.latencyMs ?? null,
-      error_code: entry.response ? null : (entry.errorCode ?? status.toUpperCase()),
+      error_code: entry.response ? null : (entry.errorCode ?? context.status.toUpperCase()),
       error_message: entry.error ? redactSensitiveText(entry.error) : null,
+      idempotency_key: context.idempotencyKey,
     },
   });
-  await updateTokenUsage(db, entry, now);
 }
 
 async function updateTokenUsage(
-  db: PrismaService,
+  tx: Prisma.TransactionClient,
   entry: ModelCallLogEntry,
   now: Date,
 ): Promise<void> {
   const status = callStatus(entry);
   const usage = entry.response?.usage;
   const cost = entry.response?.cost;
-  const latency = await db.client.modelExecutionLog.aggregate({
+  const latency = await tx.modelExecutionLog.aggregate({
     where: { project_id: entry.projectId, latency_ms: { not: null } },
     _avg: { latency_ms: true },
   });
   const averageLatency = latency._avg.latency_ms;
   const avgLatencyMs = averageLatency === null ? null : Math.round(averageLatency);
-  await db.client.tokenUsage.upsert({
+  await tx.tokenUsage.upsert({
     where: { project_id: entry.projectId },
     create: {
       project_id: entry.projectId,

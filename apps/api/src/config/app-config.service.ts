@@ -13,6 +13,10 @@ import { randomBytes } from 'node:crypto';
 export class AppConfigService {
   /** API server port (default 3001). */
   readonly port: number;
+  /** API bind host (loopback by default). */
+  readonly apiHost: string;
+  /** Exact browser origins allowed by CORS. */
+  readonly corsAllowedOrigins: readonly string[];
   /** Shared API key for authenticating requests; empty when auth disabled. */
   readonly apiKey: string;
   /** Base directory for generated artifacts. */
@@ -49,7 +53,12 @@ export class AppConfigService {
 
   constructor() {
     this.port = this.parsePort(process.env['API_PORT'], 3001);
-    this.apiKey = process.env['API_KEY'] ?? '';
+    this.apiHost = process.env['API_HOST']?.trim() || '127.0.0.1';
+    this.corsAllowedOrigins = this.parseOrigins(process.env['CORS_ALLOWED_ORIGINS']);
+    this.apiKey = process.env['API_KEY']?.trim() ?? '';
+    if (!this.apiKey && !this.isLoopbackHost(this.apiHost)) {
+      throw new Error('API_KEY is required when API_HOST is not loopback');
+    }
     this.dataDir = process.env['DATA_DIR'] ?? './data';
     this.logLevel = process.env['LOG_LEVEL'] ?? 'DEBUG';
     this.databaseUrl = process.env['DATABASE_URL'] ?? '';
@@ -83,6 +92,42 @@ export class AppConfigService {
   private parsePort(value: string | undefined, fallback: number): number {
     const parsed = Number.parseInt(value ?? '', 10);
     return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private parseOrigins(value: string | undefined): readonly string[] {
+    const configured = value ?? 'http://localhost:3000,http://127.0.0.1:3000';
+    const origins = configured
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+      .map((origin) => this.parseOrigin(origin));
+    if (origins.length === 0) throw new Error('CORS_ALLOWED_ORIGINS must not be empty');
+    return [...new Set(origins)];
+  }
+
+  private parseOrigin(origin: string): string {
+    let url: URL;
+    try {
+      url = new URL(origin);
+    } catch {
+      throw new Error(`Invalid CORS origin: ${origin}`);
+    }
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      url.pathname !== '/' ||
+      url.search ||
+      url.hash ||
+      url.username ||
+      url.password
+    ) {
+      throw new Error(`Invalid CORS origin: ${origin}`);
+    }
+    return url.origin;
+  }
+
+  private isLoopbackHost(host: string): boolean {
+    const normalized = host.toLowerCase();
+    return normalized === 'localhost' || normalized === '::1' || /^127(?:\.|$)/.test(normalized);
   }
 
   private parseNumber(value: string | undefined, fallback: number): number {

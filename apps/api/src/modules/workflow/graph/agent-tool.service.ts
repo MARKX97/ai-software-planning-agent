@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   agentToolActionSchema,
@@ -11,12 +10,14 @@ import { ErrorCode } from '../../../common/exception/error-code.js';
 import { redactSensitiveText } from '../../../common/security/sensitive-text.js';
 import { KnowledgeRetrievalService } from '../../knowledge/knowledge-retrieval.service.js';
 import { readAgentTool, type ToolReadResult } from './agent-tool-readers.js';
+import { claimToolStep, type ToolClaim } from './agent-tool-claim.js';
 
 export interface AgentToolRunContext {
   readonly graphRunId: string;
   readonly executionId: string;
   readonly projectId: string;
   readonly stage: WorkflowStage;
+  readonly logicalAttempt: number;
 }
 
 export interface AgentToolRunResult extends ToolReadResult {
@@ -82,9 +83,9 @@ export class AgentToolService {
   }
 
   private async run(call: AgentToolCall, action: AgentToolAction): Promise<AgentToolRunResult> {
-    const reserved = await this.reserve(call, action.tool, action);
-    const replay = storedResult(reserved);
-    if (reserved.status !== 'running' && replay) return replay;
+    const claim = await this.reserve(call, action.tool, action);
+    const replay = storedResult(claim.row);
+    if (!claim.owned) return replay ?? failedResult(action.tool, new Error('Missing Tool result'));
     const startedAt = Date.now();
     try {
       await call.beforeRead?.(action);
@@ -94,11 +95,11 @@ export class AgentToolService {
         action,
       );
       const output = { ...result, tool: action.tool, status: 'success' as const };
-      await this.finish(reserved.id, output, Date.now() - startedAt);
+      await this.finish(claim, output, Date.now() - startedAt);
       return output;
     } catch (error) {
       const output = failedResult(action.tool, error);
-      await this.finish(reserved.id, output, Date.now() - startedAt);
+      await this.finish(claim, output, Date.now() - startedAt);
       return output;
     }
   }
@@ -107,9 +108,10 @@ export class AgentToolService {
     call: AgentToolCall,
     rejection: RejectedToolCall,
   ): Promise<AgentToolRunResult> {
-    const row = await this.reserve(call, rejection.tool, rejection.action);
-    const replay = storedResult(row);
-    if (row.status !== 'running' && replay) return replay;
+    const claim = await this.reserve(call, rejection.tool, rejection.action);
+    const replay = storedResult(claim.row);
+    if (!claim.owned)
+      return replay ?? failedResult(rejection.tool, new Error('Missing Tool result'));
     const result: AgentToolRunResult = {
       tool: rejection.tool,
       status: 'rejected',
@@ -118,45 +120,37 @@ export class AgentToolService {
       context: '',
       errorCode: rejection.errorCode,
     };
-    await this.finish(row.id, result, 0);
+    await this.finish(claim, result, 0);
     return result;
   }
 
   private reserve(call: AgentToolCall, tool: string, action: unknown) {
-    const id = randomUUID();
-    return this.db.client.toolStep.upsert({
-      where: {
-        graph_run_id_stage_call_number: {
-          graph_run_id: call.context.graphRunId,
-          stage: call.context.stage,
-          call_number: call.callNumber,
-        },
-      },
-      create: {
-        id,
-        graph_run_id: call.context.graphRunId,
-        execution_id: call.context.executionId,
-        stage: call.context.stage,
-        node: 'choose_action',
-        tool: tool.slice(0, 64),
-        call_number: call.callNumber,
-        status: 'running',
-        arguments_json: argumentSummary(action) as never,
-        updated_at: new Date(),
-      },
-      update: {},
+    return claimToolStep(this.db, {
+      graphRunId: call.context.graphRunId,
+      executionId: call.context.executionId,
+      stage: call.context.stage,
+      logicalAttempt: call.context.logicalAttempt,
+      callNumber: call.callNumber,
+      tool: tool.slice(0, 64),
+      argumentsJson: argumentSummary(action),
     });
   }
 
-  private async finish(id: string, result: AgentToolRunResult, durationMs: number): Promise<void> {
-    await this.db.client.toolStep.update({
-      where: { id },
+  private async finish(
+    claim: ToolClaim,
+    result: AgentToolRunResult,
+    durationMs: number,
+  ): Promise<void> {
+    await this.db.client.toolStep.updateMany({
+      where: { id: claim.row.id, status: 'running', claim_token: claim.token },
       data: {
         status: result.status,
         result_json: result as never,
         result_count: result.resultCount,
         duration_ms: durationMs,
         error_code: result.errorCode,
+        claim_token: null,
+        lease_expires_at: null,
         updated_at: new Date(),
       },
     });

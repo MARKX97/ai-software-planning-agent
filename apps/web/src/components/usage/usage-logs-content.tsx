@@ -115,9 +115,16 @@ function LogDetail({ props }: { props: UsageLogsContentProps }) {
     return <InlineError error={props.detailError} onRetry={props.onRetryDetail} />;
   return (
     <div className="grid gap-4">
-      <h3 className="text-sm font-bold text-slate-950">这次怎么问、怎么答</h3>
-      <LogText label="问模型的话" value={props.detail?.prompt_text ?? ''} />
-      <LogText label="模型的回答" value={props.detail?.response_text ?? '无响应内容'} />
+      <h3 className="text-sm font-bold text-slate-950">调用审计元数据</h3>
+      <LogText label="Prompt SHA-256" value={props.detail?.prompt_hash ?? ''} />
+      <p className="text-sm text-slate-700">
+        Prompt {props.detail?.prompt_length ?? 0} 字符 · 响应 {props.detail?.response_length ?? 0}{' '}
+        字符
+      </p>
+      <p className="text-sm text-slate-700">
+        {props.detail?.response_summary ?? '本次调用没有响应内容。'}
+      </p>
+      <p className="text-xs text-slate-500">出于隐私与密钥安全考虑，不保存调用原文。</p>
     </div>
   );
 }

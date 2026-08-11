@@ -9,6 +9,7 @@ import {
   Post,
   Res,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common';
@@ -25,6 +26,8 @@ import { UUID_V4_PIPE } from '../../common/pipes/uuid-validation.pipe.js';
 import { KnowledgeService } from './knowledge.service.js';
 import type { KnowledgeSourceListResponse } from './knowledge.dto.js';
 import type { UploadedKnowledgeFile } from './knowledge-parser.js';
+import { WorkflowRateLimitGuard } from '../../common/guards/workflow-rate-limit.guard.js';
+import { KnowledgeWriteAdmissionInterceptor } from './knowledge-write-admission.interceptor.js';
 
 @ApiTags('Knowledge')
 @Controller('projects/:project_id/knowledge/sources')
@@ -32,7 +35,11 @@ export class KnowledgeController {
   constructor(private readonly knowledge: KnowledgeService) {}
 
   @Post()
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024, files: 1 } }))
+  @UseGuards(WorkflowRateLimitGuard)
+  @UseInterceptors(
+    KnowledgeWriteAdmissionInterceptor,
+    FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024, files: 1 } }),
+  )
   @ApiOperation({ summary: '上传并索引 Markdown、TXT 或 PDF 知识源' })
   async create(
     @Param('project_id', UUID_V4_PIPE) projectId: string,
@@ -45,6 +52,8 @@ export class KnowledgeController {
   }
 
   @Post('repositories')
+  @UseGuards(WorkflowRateLimitGuard)
+  @UseInterceptors(KnowledgeWriteAdmissionInterceptor)
   @UsePipes(new ZodValidationPipe(repositoryImportRequestSchema))
   @ApiOperation({ summary: '导入公开 GitHub 仓库' })
   async createRepository(
@@ -64,6 +73,8 @@ export class KnowledgeController {
   }
 
   @Post(':source_id/reindex')
+  @UseGuards(WorkflowRateLimitGuard)
+  @UseInterceptors(KnowledgeWriteAdmissionInterceptor)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '重新索引知识源' })
   reindex(

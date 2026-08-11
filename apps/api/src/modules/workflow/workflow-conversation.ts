@@ -1,9 +1,8 @@
 import type { PrismaService } from '../../database/database.module.js';
-import type { Message } from '@ai-planning/database';
+import type { Message, Prisma } from '@ai-planning/database';
 import { WorkflowStage } from '@ai-planning/shared';
 import { AppException } from '../../common/exception/app-exception.js';
 import { ErrorCode } from '../../common/exception/error-code.js';
-import { checkpointIntroduction } from './workflow-checkpoints.js';
 import { decisionSnapshotsFromMessages } from './workflow-decisions.js';
 import type { DecisionSnapshot } from '@ai-planning/shared';
 
@@ -13,15 +12,35 @@ export interface WorkflowConversationContext {
   readonly confirmedDecisions: readonly DecisionSnapshot[];
 }
 
+export interface ResolveWorkflowConversationInput {
+  readonly projectId: string;
+  readonly requestedId?: string;
+  readonly reuseLatest?: boolean;
+}
+
 /** Reuse a requested conversation or create one for this workflow run. */
 export async function resolveWorkflowConversation(
   db: PrismaService,
-  projectId: string,
-  requestedId?: string,
+  input: ResolveWorkflowConversationInput,
 ): Promise<string> {
+  const { projectId, requestedId, reuseLatest = false } = input;
   if (requestedId) {
     await findConversationOrFail(db, projectId, requestedId);
     return requestedId;
+  }
+  if (reuseLatest) {
+    const latest = await db.client.conversation.findFirst({
+      where: { project_id: projectId },
+      orderBy: { updated_at: 'desc' },
+      select: { id: true },
+    });
+    if (latest) {
+      await db.client.conversation.update({
+        where: { id: latest.id },
+        data: { status: 'active', updated_at: new Date() },
+      });
+      return latest.id;
+    }
   }
   const conversation = await db.client.conversation.create({
     data: { project_id: projectId, status: 'active', updated_at: new Date() },
@@ -60,6 +79,7 @@ export interface WorkflowInteractionInput {
   readonly stage: WorkflowStage;
   readonly kind?: string;
   readonly questions?: unknown[] | null;
+  readonly idempotencyKey?: string;
 }
 
 /** Persist a completed user/assistant interaction atomically. */
@@ -68,24 +88,8 @@ export async function appendWorkflowInteraction(
   input: WorkflowInteractionInput,
 ): Promise<Message> {
   return db.client.$transaction(async (tx) => {
-    if (input.userContent) {
-      await tx.message.create({
-        data: { conversation_id: input.conversationId, role: 'user', content: input.userContent },
-      });
-    }
-    const assistant = await tx.message.create({
-      data: {
-        conversation_id: input.conversationId,
-        role: 'assistant',
-        content: input.assistantContent,
-        metadata: {
-          workflow: true,
-          kind: input.kind ?? 'workflow_discussion',
-          checkpoint_stage: input.stage,
-          ...(input.questions ? { questions: input.questions } : {}),
-        } as never,
-      },
-    });
+    await persistUserMessage(tx, input);
+    const assistant = await persistAssistantMessage(tx, input);
     await tx.conversation.update({
       where: { id: input.conversationId },
       data: { status: 'active', updated_at: new Date() },
@@ -94,46 +98,84 @@ export async function appendWorkflowInteraction(
   });
 }
 
-export async function openCheckpointConversation(
-  db: PrismaService,
-  projectId: string,
-): Promise<string> {
-  const now = new Date();
-  const conversation = await db.client.conversation.create({
-    data: { project_id: projectId, status: 'active', updated_at: now },
+async function persistUserMessage(
+  tx: Prisma.TransactionClient,
+  input: WorkflowInteractionInput,
+): Promise<void> {
+  if (!input.userContent) return;
+  const data = {
+    conversation_id: input.conversationId,
+    role: 'user' as const,
+    content: input.userContent,
+    idempotency_key: input.idempotencyKey ? `${input.idempotencyKey}:user` : null,
+  };
+  if (!input.idempotencyKey) {
+    await tx.message.create({ data });
+    return;
+  }
+  await tx.message.upsert({
+    where: { idempotency_key: data.idempotency_key! },
+    create: data,
+    update: {},
   });
-  return conversation.id;
 }
 
-export async function appendCheckpointIntroduction(
-  db: PrismaService,
-  conversationId: string,
-  stage: WorkflowStage,
+function persistAssistantMessage(
+  tx: Prisma.TransactionClient,
+  input: WorkflowInteractionInput,
 ): Promise<Message> {
-  return appendAgentReply({
-    db,
-    conversationId,
-    content: checkpointIntroduction(stage),
-    stage,
-    kind: 'checkpoint_intro',
+  const data = {
+    conversation_id: input.conversationId,
+    role: 'assistant' as const,
+    content: input.assistantContent,
+    metadata: {
+      workflow: true,
+      kind: input.kind ?? 'workflow_discussion',
+      checkpoint_stage: input.stage,
+      ...(input.questions ? { questions: input.questions } : {}),
+    } as never,
+    idempotency_key: input.idempotencyKey ? `${input.idempotencyKey}:assistant` : null,
+  };
+  if (!input.idempotencyKey) return tx.message.create({ data });
+  return tx.message.upsert({
+    where: { idempotency_key: data.idempotency_key! },
+    create: data,
+    update: {},
   });
 }
 
-interface AgentReplyInput {
+interface CheckpointIntroductionInput {
   readonly db: PrismaService;
-  readonly conversationId: string;
+  readonly projectId: string;
   readonly content: string;
   readonly stage: WorkflowStage;
   readonly kind?: string;
+  readonly idempotencyKey?: string;
 }
 
-export async function appendAgentReply(input: AgentReplyInput): Promise<Message> {
-  const { db, conversationId, content, stage, kind = 'workflow_discussion' } = input;
-  return appendWorkflowInteraction(db, {
-    conversationId,
-    assistantContent: content,
-    stage,
-    kind,
+/** Create a review conversation and its first message as one idempotent side effect. */
+export async function appendCheckpointIntroduction(
+  input: CheckpointIntroductionInput,
+): Promise<Message> {
+  const { db, projectId, ...reply } = input;
+  return db.client.$transaction(async (tx) => {
+    const key = reply.idempotencyKey ? `${reply.idempotencyKey}:assistant` : undefined;
+    const existing = key ? await tx.message.findUnique({ where: { idempotency_key: key } }) : null;
+    if (existing) return existing;
+    const conversation = await tx.conversation.create({
+      data: { project_id: projectId, status: 'active', updated_at: new Date() },
+    });
+    const message = await persistAssistantMessage(tx, {
+      conversationId: conversation.id,
+      assistantContent: reply.content,
+      stage: reply.stage,
+      kind: reply.kind,
+      idempotencyKey: reply.idempotencyKey,
+    });
+    if (message.conversation_id !== conversation.id) {
+      await tx.conversation.delete({ where: { id: conversation.id } });
+    }
+    return message;
   });
 }
 

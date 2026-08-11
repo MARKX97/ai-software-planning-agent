@@ -33,6 +33,7 @@ export class AgentActionService {
     readonly graphRunId: string;
     readonly context: WorkflowContext;
     readonly stage: WorkflowStage;
+    readonly logicalAttempt?: number;
   }): Promise<WorkflowContext> {
     if (!this.config.agentActionsEnabled) return clearToolContext(input.context);
     const catalog = await this.catalog(input.context.projectId);
@@ -45,6 +46,7 @@ export class AgentActionService {
         executionId: input.context.executionId,
         projectId: input.context.projectId,
         stage: input.stage,
+        logicalAttempt: input.logicalAttempt ?? input.context.logicalAttempt ?? 1,
       },
       plan.actions,
       (action) => this.checkToolBudget(input.context.projectId, action),

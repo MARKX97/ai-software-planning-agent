@@ -98,6 +98,8 @@ V3 测试必须继续满足默认确定性、零外部模型费用和项目隔�
 
 - 9 个阶段、4 个检查点、澄清上限和 11 类产物的现有回归继续通过。
 - P2 Structured Action 每阶段一次选择 0..3 个只读 Tool；关闭 `AGENT_ACTIONS_ENABLED` 时回归 P1 固定检索。
+- CI 分别以 `AGENT_ACTIONS_ENABLED=false` 和 `WORKFLOW_RUNNER=v2` 启动独立 Mock API，
+  两种回退都必须通过 HTTP/SSE 完成澄清、4 个检查点、9 个阶段和 11 类产物。
 - interrupt 后使用相同 `graphRunId` 恢复；过期 checkpoint 返回冲突。
 - 同一 checkpoint 重复 resume、节点重放和并行节点部分失败均不重复写消息、产物、日志、Token 或成本。
 - 用户取消传播 AbortSignal，Graph Run 标记 `cancelled`，不保存半条助手消息。

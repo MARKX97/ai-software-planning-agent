@@ -34,10 +34,16 @@ export function WorkflowStatusPanels({
         busy={busy}
         failureMessage={failureMessage}
         onStart={onStart}
-        showStart={status.current_stage === 'init'}
+        startMode={workflowStartMode(status)}
       />
     </>
   );
+}
+
+function workflowStartMode(status: WorkflowStatusResponse): 'new' | 'recover' | null {
+  if (status.current_stage === 'init') return 'new';
+  const graph = status.graph_run;
+  return graph?.status === 'running' && graph.recovery_available ? 'recover' : null;
 }
 
 function ProgressPanel({ status }: { status: WorkflowStatusResponse }) {

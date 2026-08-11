@@ -4,15 +4,12 @@ import type { PrismaService } from '../../database/database.module.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import type { KnowledgeRetrievalService } from '../knowledge/knowledge-retrieval.service.js';
 import {
-  appendCheckpointIntroduction,
-  appendWorkflowInteraction,
   closeWorkflowConversation,
   loadWorkflowConversationContext,
-  openCheckpointConversation,
 } from './workflow-conversation.js';
 import { toMessageResponse, type MessageResponse } from '../conversations/conversations.dto.js';
 import { loadPersistedStageResults } from './workflow-results.js';
-import { runPipeline } from './workflow-pipeline-runner.js';
+import { runPipeline, type PipelineRunDeps } from './workflow-pipeline-runner.js';
 import type { AgentGraphService, GraphResumeInput } from './graph/agent-graph.service.js';
 import type { WorkflowStatusResponse } from './workflow-response.dto.js';
 import {
@@ -27,6 +24,10 @@ import {
   markExecutionFailed,
   markProjectCancelled,
 } from './workflow-execution-state.js';
+import {
+  loadWorkflowCheckpointMessage,
+  persistWorkflowCheckpoint,
+} from './workflow-checkpoint-persistence.js';
 
 export interface WorkflowExecutorDeps {
   readonly db: PrismaService;
@@ -46,6 +47,7 @@ export interface WorkflowExecutorInput {
   readonly stream?: Pick<LLMStreamOptions, 'onDelta' | 'signal'>;
   readonly graphResume?: GraphResumeInput;
   readonly regenerationTargets?: readonly string[];
+  readonly restoreStageOnFailure?: WorkflowStage;
 }
 
 export interface WorkflowExecutionResult {
@@ -53,19 +55,18 @@ export interface WorkflowExecutionResult {
   readonly assistantMessage: MessageResponse | null;
 }
 
+interface CheckpointCapture {
+  message: Awaited<ReturnType<typeof persistWorkflowCheckpoint>> | null;
+}
+
 export async function executeWorkflowPipeline(
   deps: WorkflowExecutorDeps,
   input: WorkflowExecutorInput,
 ): Promise<WorkflowExecutionResult> {
   const ctx = await buildWorkflowContext(deps.db, input);
+  const checkpoint: CheckpointCapture = { message: null };
   try {
-    const pipelineDeps = {
-      db: deps.db,
-      orchestrator: deps.orchestrator,
-      dataDir: deps.projects.dataDir(),
-      knowledge: deps.knowledge,
-      stream: input.stream,
-    };
+    const pipelineDeps = createPipelineDeps(deps, input, checkpoint);
     const finalStage = deps.graph?.enabled
       ? await deps.graph.execute({
           context: ctx,
@@ -97,7 +98,46 @@ export async function executeWorkflowPipeline(
     };
   }
   await markExecutionComplete(deps.db, input.executionId);
-  return persistCheckpointMessage(deps, input, ctx);
+  return completedExecutionResult(deps, input, checkpoint);
+}
+
+async function completedExecutionResult(
+  deps: WorkflowExecutorDeps,
+  input: WorkflowExecutorInput,
+  checkpoint: CheckpointCapture,
+): Promise<WorkflowExecutionResult> {
+  const status = await buildWorkflowStatus(deps.db, deps.projects, input.projectId);
+  const message =
+    checkpoint.message ??
+    (status.waiting_for && status.conversation_id
+      ? await loadWorkflowCheckpointMessage(deps.db, status.conversation_id)
+      : null);
+  return {
+    status,
+    assistantMessage: message ? toMessageResponse(message) : null,
+  };
+}
+
+function createPipelineDeps(
+  deps: WorkflowExecutorDeps,
+  input: WorkflowExecutorInput,
+  checkpoint: CheckpointCapture,
+): PipelineRunDeps {
+  return {
+    db: deps.db,
+    orchestrator: deps.orchestrator,
+    dataDir: deps.projects.dataDir(),
+    knowledge: deps.knowledge,
+    stream: input.stream,
+    onCheckpoint: async (pending) => {
+      checkpoint.message = await persistWorkflowCheckpoint({
+        db: deps.db,
+        workflowConversationId: input.conversationId,
+        userMessage: input.userMessage,
+        ...pending,
+      });
+    },
+  };
 }
 
 export async function buildWorkflowContext(
@@ -143,55 +183,22 @@ function buildControlledHistory(
   return `${prefix.slice(0, MAX_CONTEXT_CHARACTERS)}${currentConversation.slice(-remaining)}`;
 }
 
-async function persistCheckpointMessage(
-  deps: WorkflowExecutorDeps,
-  input: WorkflowExecutorInput,
-  ctx: WorkflowContext,
-): Promise<WorkflowExecutionResult> {
-  const status = await buildWorkflowStatus(deps.db, deps.projects, input.projectId);
-  if (!status.waiting_for) return { status, assistantMessage: null };
-  const currentConversation =
-    status.current_stage === WorkflowStage.REQUIREMENT_CLARIFICATION
-      ? input.conversationId
-      : await openCheckpointConversation(deps.db, input.projectId);
-  const reply = ctx.resultsByStage[WorkflowStage.REQUIREMENT_CLARIFICATION]?.content;
-  const message =
-    status.current_stage === WorkflowStage.REQUIREMENT_CLARIFICATION
-      ? await appendWorkflowInteraction(deps.db, {
-          conversationId: currentConversation,
-          userContent: input.userMessage,
-          assistantContent: reply ?? '需求信息已经更新。',
-          stage: WorkflowStage.REQUIREMENT_CLARIFICATION,
-          kind: 'clarification_reply',
-          questions: status.clarification_questions,
-        })
-      : await appendCheckpointIntroduction(
-          deps.db,
-          currentConversation,
-          status.current_stage as WorkflowStage,
-        );
-  return {
-    status: await buildWorkflowStatus(deps.db, deps.projects, input.projectId),
-    assistantMessage: toMessageResponse(message),
-  };
-}
-
 function appendCurrentMessage(history: string, message?: string): string {
   return [history, message ? `user: ${message}` : ''].filter(Boolean).join('\n');
 }
 
-async function recoverStreamFailure(
+export async function recoverStreamFailure(
   db: PrismaService,
   input: WorkflowExecutorInput,
   error: unknown,
 ): Promise<void> {
-  if (input.startStage === WorkflowStage.REQUIREMENT_ANALYSIS) {
+  if (input.restoreStageOnFailure) {
     if (error instanceof LLMCancelledError) {
       await markExecutionCancelled(db, input.executionId);
     } else {
       await markExecutionFailed(db, input.executionId, error);
     }
-    await updateProjectStage(db, input.projectId, WorkflowStage.REQUIREMENT_CLARIFICATION);
+    await updateProjectStage(db, input.projectId, input.restoreStageOnFailure);
     return;
   }
   if (error instanceof LLMCancelledError) {

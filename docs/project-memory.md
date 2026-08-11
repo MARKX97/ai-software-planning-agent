@@ -1,7 +1,7 @@
 # Project Memory
 
 > Status: Current
-> Last reviewed: 2026-08-10
+> Last reviewed: 2026-08-11
 
 本文件是开发 Agent 的项目级长期记忆，保存跨任务仍然成立、但不适合成为产品契约的已验证事实。完整知识地图见 [`README.md`](./README.md)。
 
@@ -19,9 +19,9 @@
 ### MEM-001 Current Delivery Baseline
 
 - **Status:** Active
-- **Last verified:** 2026-08-10
-- **Fact:** 当前可运行产品是 V2 用户可见工作流加 V3 P0/P1/P2；文档与公开仓库证据、混合检索和引用、持久化 LangGraph 恢复、受控只读 Tool、脱敏审计轨迹及来源感知的增量重生成均已交付。
-- **Evidence:** [`product-vision.md`](./product-vision.md)、[`architecture-overview.md`](./architecture-overview.md)、[`v3-p2-controlled-tools.md`](./exec-plans/completed/v3-p2-controlled-tools.md)。
+- **Last verified:** 2026-08-11
+- **Fact:** 当前可运行产品是 V2 用户可见工作流加 V3 P0/P1/P2；文档与公开仓库证据、混合检索和引用、可租约恢复且内部副作用幂等的 LangGraph、受控只读 Tool、最小化审计元数据及来源感知的增量重生成均已交付。
+- **Evidence:** [`product-vision.md`](./product-vision.md)、[`architecture-overview.md`](./architecture-overview.md)、[`v3-p2-controlled-tools.md`](./exec-plans/completed/v3-p2-controlled-tools.md)、[`audit-remediation.md`](./exec-plans/active/audit-remediation.md)。
 - **Impact:** 对外可以描述 V3 P0/P1/P2；私有仓库、运行时 MCP、Multi-Agent、开放式 ReAct 和自动代码修改仍不在范围内。
 
 ### MEM-002 Real Model Verification Boundary

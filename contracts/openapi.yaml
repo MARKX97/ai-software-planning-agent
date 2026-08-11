@@ -676,7 +676,20 @@ components:
 
     ToolStepResponse:
       type: object
-      required: [id, node, stage, tool, call_number, status, result_count, duration_ms, error_code, created_at]
+      required:
+        [
+          id,
+          node,
+          stage,
+          tool,
+          call_number,
+          logical_attempt,
+          status,
+          result_count,
+          duration_ms,
+          error_code,
+          created_at,
+        ]
       properties:
         id:
           type: string
@@ -688,6 +701,9 @@ components:
         tool:
           type: string
           description: 白名单 Tool 名；被拒绝的未知候选会保留脱敏名称用于审计
+        logical_attempt:
+          type: integer
+          minimum: 1
         call_number:
           type: integer
           minimum: 1
@@ -3088,7 +3104,7 @@ paths:
     get:
       tags: [Token Usage]
       summary: 获取单条模型调用日志详情
-      description: 获取单次模型调用的完整日志，包含发送的 Prompt 和返回的响应文本。
+      description: 获取单次模型调用的审计元数据；不返回 Prompt、响应或结构化输出原文。
       parameters:
         - name: project_id
           in: path
@@ -3112,17 +3128,21 @@ paths:
                   - $ref: '#/components/schemas/ModelExecutionLogResponse'
                   - type: object
                     properties:
-                      prompt_text:
+                      prompt_hash:
                         type: string
-                        description: 发送的完整 Prompt
-                      response_text:
+                        pattern: '^[a-f0-9]{64}$'
+                        description: Prompt 的 SHA-256
+                      prompt_length:
+                        type: integer
+                        minimum: 0
+                      response_length:
+                        type: integer
+                        nullable: true
+                        minimum: 0
+                      response_summary:
                         type: string
                         nullable: true
-                        description: 模型返回的原始文本
-                      structured_output:
-                        type: object
-                        nullable: true
-                        description: 结构化输出
+                        description: 不含模型原文的状态摘要
         '404':
           description: 项目或日志不存在
           content:

@@ -10,6 +10,7 @@ import {
   type ParsedKnowledgeDocument,
   type UploadedKnowledgeFile,
 } from './knowledge-parser.js';
+import { assertChunkCount, assertExtractedCharacters } from './knowledge-limits.js';
 
 const EMBEDDING_BATCH_SIZE = 32;
 const INDEXER_VERSION = 'p0-v1';
@@ -41,6 +42,8 @@ export class KnowledgeIndexerService {
     sourceId: string,
     document: ParsedKnowledgeDocument,
   ): Promise<void> {
+    assertExtractedCharacters(document.content.length);
+    assertChunkCount(document.chunks.length);
     const identity = this.identity();
     const revision = await this.store.begin({
       projectId,
@@ -85,6 +88,10 @@ export class KnowledgeIndexerService {
   }): Promise<void> {
     const identity = this.identity();
     const { projectId, sourceId, documents, contentHash } = input;
+    assertExtractedCharacters(
+      documents.reduce((sum, document) => sum + document.content.length, 0),
+    );
+    assertChunkCount(documents.reduce((sum, document) => sum + document.chunks.length, 0));
     const revision = await this.store.begin({ projectId, sourceId, contentHash, identity });
     if (!revision) return;
     const startedAt = Date.now();

@@ -6,11 +6,11 @@ interface ActionPanelProps {
   readonly busy: boolean;
   readonly failureMessage: string | null;
   readonly onStart: () => void;
-  readonly showStart: boolean;
+  readonly startMode: 'new' | 'recover' | null;
 }
 
 export function WorkflowActionPanels(props: ActionPanelProps) {
-  const { actionError, busy, failureMessage, onStart, showStart } = props;
+  const { actionError, busy, failureMessage, onStart, startMode } = props;
   return (
     <>
       {actionError && !failureMessage ? (
@@ -21,7 +21,7 @@ export function WorkflowActionPanels(props: ActionPanelProps) {
           {actionError}
         </p>
       ) : null}
-      {showStart ? <StartPanel busy={busy} onStart={onStart} /> : null}
+      {startMode ? <StartPanel busy={busy} mode={startMode} onStart={onStart} /> : null}
       {failureMessage ? (
         <Card className="border-red-200 bg-red-50">
           <CardBody className="grid gap-3">
@@ -39,16 +39,29 @@ export function WorkflowActionPanels(props: ActionPanelProps) {
   );
 }
 
-function StartPanel({ busy, onStart }: { busy: boolean; onStart: () => void }) {
+function StartPanel({
+  busy,
+  mode,
+  onStart,
+}: {
+  busy: boolean;
+  mode: 'new' | 'recover';
+  onStart: () => void;
+}) {
+  const recovering = mode === 'recover';
   return (
     <Card>
       <CardBody className="grid gap-3">
-        <h2 className="text-base font-bold text-slate-950">还没开始</h2>
+        <h2 className="text-base font-bold text-slate-950">
+          {recovering ? '上次执行已中断' : '还没开始'}
+        </h2>
         <p className="text-sm leading-6 text-slate-600">
-          点下开始后，我们会先把想法拆开看；遇到关键空白会问你，不会擅自替你补答案。
+          {recovering
+            ? '恢复后会从最近的安全检查点继续。'
+            : '点下开始后，我们会先把想法拆开看；遇到关键空白会问你，不会擅自替你补答案。'}
         </p>
         <Button disabled={busy} onClick={onStart}>
-          {busy ? '正在开始' : '开始梳理'}
+          {busy ? (recovering ? '正在恢复' : '正在开始') : recovering ? '恢复执行' : '开始梳理'}
         </Button>
       </CardBody>
     </Card>

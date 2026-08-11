@@ -25,6 +25,8 @@ export interface StageResult {
 export interface WorkflowContext {
   readonly projectId: string;
   readonly executionId: string;
+  readonly graphRunId?: string;
+  readonly logicalAttempt?: number;
   readonly originalIdea: string;
   readonly conversationHistory: string;
   readonly confirmedDecisions: readonly DecisionSnapshot[];

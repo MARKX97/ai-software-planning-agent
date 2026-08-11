@@ -4,6 +4,7 @@ import { ErrorCode } from '../../src/common/exception/error-code.js';
 import { EmbeddingError } from '../../src/modules/knowledge/embedding.provider.js';
 import { KnowledgeIndexerService } from '../../src/modules/knowledge/knowledge-indexer.service.js';
 import type { ParsedKnowledgeDocument } from '../../src/modules/knowledge/knowledge-parser.js';
+import { MAX_CHUNKS_PER_SOURCE } from '../../src/modules/knowledge/knowledge-limits.js';
 
 const chunks = Array.from({ length: 33 }, (_, position) => ({
   position,
@@ -77,5 +78,23 @@ describe('KnowledgeIndexerService', () => {
       (error: unknown) => (error as { code?: string }).code === ErrorCode.KNOWLEDGE_INDEXING_FAILED,
     );
     assert.equal(failed, true);
+  });
+
+  it('rejects an oversized chunk set before creating a revision or calling Embedding', async () => {
+    let touched = false;
+    const service = new KnowledgeIndexerService(
+      { begin: async () => (touched = true) } as never,
+      { model: 'mock-v1', dimensions: 2, embedDocuments: async () => (touched = true) } as never,
+      {} as never,
+    );
+
+    await assert.rejects(() =>
+      service.index('project-1', 'source-1', {
+        ...document,
+        chunks: Array.from({ length: MAX_CHUNKS_PER_SOURCE + 1 }, () => chunks[0]!),
+      }),
+    );
+
+    assert.equal(touched, false);
   });
 });

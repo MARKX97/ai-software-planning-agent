@@ -10,6 +10,18 @@ it('repairs an invalid Action plan once before executing validated actions', asy
     callSingle: async (): Promise<LLMResponse> => response(++calls === 1 ? {} : { actions: [] }),
     syncProjectCost: () => false,
   };
+  const transactionClient = {
+    tokenUsage: {
+      findUnique: async () => null,
+      upsert: async () => undefined,
+    },
+    modelExecutionLog: {
+      create: async () => {
+        logs += 1;
+      },
+      aggregate: async () => ({ _avg: { latency_ms: 1 } }),
+    },
+  };
   const db = {
     client: {
       knowledgeSource: {
@@ -18,17 +30,9 @@ it('repairs an invalid Action plan once before executing validated actions', asy
         ],
       },
       artifact: { findMany: async () => [] },
-      tokenUsage: {
-        findUnique: async () => null,
-        upsert: async () => undefined,
-      },
+      ...transactionClient,
+      $transaction: (run: (tx: typeof transactionClient) => unknown) => run(transactionClient),
       promptVersion: { findFirst: async () => null },
-      modelExecutionLog: {
-        create: async () => {
-          logs += 1;
-        },
-        aggregate: async () => ({ _avg: { latency_ms: 1 } }),
-      },
     },
   };
   const service = new AgentActionService(

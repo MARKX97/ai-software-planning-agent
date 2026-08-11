@@ -61,6 +61,7 @@ export interface WorkflowStatusResponse {
       stage: string;
       tool: string;
       call_number: number;
+      logical_attempt: number;
       status: 'running' | 'success' | 'failed' | 'rejected';
       result_count: number;
       duration_ms: number | null;

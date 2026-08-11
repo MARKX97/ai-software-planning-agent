@@ -2,6 +2,10 @@ import type { ArtifactType } from '@ai-planning/database';
 import { WorkflowStage } from '@ai-planning/shared';
 import type { PrismaService } from '../../../database/database.module.js';
 import { ARTIFACT_TYPES } from '../stages/model-routing.js';
+import {
+  loadPendingRegenerationImpact,
+  mergeRegenerationImpacts,
+} from './artifact-regeneration-state.js';
 
 export interface RegenerationImpact {
   readonly affected_artifacts: ArtifactType[];
@@ -40,15 +44,18 @@ export async function loadRegenerationImpact(
   ) {
     return null;
   }
-  const artifacts = await loadArtifacts(db, projectId);
-  if (artifacts.length === 0) return null;
+  const [artifacts, pending] = await Promise.all([
+    loadArtifacts(db, projectId),
+    loadPendingRegenerationImpact(db, projectId),
+  ]);
+  if (artifacts.length === 0) return pending;
   const citations = artifacts.flatMap((artifact) => artifact.citations);
   const { sources, chunks } = await loadActiveEvidence(
     db,
     projectId,
     citations.map((citation) => citation.chunk_id),
   );
-  return deriveRegenerationImpact(
+  const derived = deriveRegenerationImpact(
     artifacts.map((artifact) => ({
       type: artifact.type,
       createdAt: artifact.created_at,
@@ -61,6 +68,7 @@ export async function loadRegenerationImpact(
     sources.map((source) => ({ id: source.id, createdAt: source.created_at })),
     new Map(chunks.map((chunk) => [chunk.id, chunk.content_hash])),
   );
+  return mergeRegenerationImpacts(derived, pending);
 }
 
 function loadArtifacts(db: PrismaService, projectId: string) {

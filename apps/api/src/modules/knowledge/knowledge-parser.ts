@@ -15,6 +15,7 @@ import {
   validateUpload,
   type MarkdownSection,
 } from './knowledge-parser-utils.js';
+import { assertChunkCount, assertExtractedCharacters, assertPdfPages } from './knowledge-limits.js';
 const encoder = getEncoding('cl100k_base');
 
 export interface UploadedKnowledgeFile {
@@ -75,6 +76,7 @@ export class KnowledgeParser {
   async parse(file: UploadedKnowledgeFile): Promise<ParsedKnowledgeDocument> {
     const input = validateUpload(file);
     if (input.extension === '.pdf') return this.parsePdf(input.name, input.buffer);
+    assertExtractedCharacters(input.content.length);
     const [document] = await new UploadedTextLoader(
       input.content,
       input.name,
@@ -103,6 +105,7 @@ export class KnowledgeParser {
   ): Promise<ParsedKnowledgeDocument> {
     const normalized = normalizeText(content);
     if (!normalized.trim()) throw invalidFile('Repository file has no indexable text');
+    assertExtractedCharacters(normalized.length);
     const extension = extname(path).toLowerCase();
     const sections =
       extension === '.md'
@@ -124,7 +127,10 @@ export class KnowledgeParser {
     const { PDFParse } = await import('pdf-parse');
     const parser = new PDFParse({ data: buffer });
     try {
+      const info = await parser.getInfo();
+      assertPdfPages(info.total);
       const result = await parser.getText({ pageJoiner: '' });
+      assertExtractedCharacters(result.pages.reduce((sum, page) => sum + page.text.length, 0));
       const chunks: ParsedKnowledgeChunk[] = [];
       for (const page of result.pages) {
         const content = normalizeText(page.text);
@@ -141,6 +147,7 @@ export class KnowledgeParser {
             pageNumber: page.num,
           }),
         );
+        assertChunkCount(chunks.length);
       }
       if (chunks.length === 0) throw invalidFile('PDF has no indexable text');
       const content = result.pages.map((page) => normalizeText(page.text)).join('\n\n');
@@ -178,6 +185,7 @@ export class KnowledgeParser {
           lineEnd: section.startLine + (lines?.to ?? 1) - 1,
           contentHash: hash(content),
         });
+        assertChunkCount(chunks.length);
       }
     }
     if (chunks.length === 0) throw invalidFile('File has no indexable text');

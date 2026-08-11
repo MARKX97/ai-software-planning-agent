@@ -14,12 +14,7 @@ import { assertWorkflowInteraction } from './workflow-interaction-guard.js';
 import { appendWorkflowInteraction, resolveWorkflowConversation } from './workflow-conversation.js';
 import { buildWorkflowContext, executeWorkflowPipeline } from './workflow-executor.js';
 import { CheckpointDiscussionStage } from './stages/checkpoint-discussion.stage.js';
-import {
-  buildWorkflowStatus,
-  createExecution,
-  markProjectStarted,
-  updateProjectStage,
-} from './workflow-store.js';
+import { buildWorkflowStatus, claimWorkflowExecution, createExecution } from './workflow-store.js';
 import {
   markExecutionCancelled,
   markExecutionComplete,
@@ -48,15 +43,24 @@ export async function streamRun(
   input: StreamInput<RunWorkflowRequest>,
 ): Promise<void> {
   const project = await deps.projects.findOrFail(input.projectId);
-  assertWorkflowNotRunning(project);
   await syncProjectBudget(deps, input.projectId);
-  const conversationId = await resolveWorkflowConversation(
-    deps.db,
-    input.projectId,
-    input.body.conversation_id,
-  );
-  const execution = await createExecution(deps.db, input.projectId);
-  await markProjectStarted(deps.db, input.projectId);
+  const graphResume =
+    project.status === 'active' || project.status === 'failed'
+      ? await deps.graph?.retryInput(input.projectId, project.status)
+      : undefined;
+  if (!graphResume) assertWorkflowNotRunning(project);
+  const startStage = graphResume?.stage ?? WorkflowStage.REQUIREMENT_ANALYSIS;
+  const conversationId = await resolveWorkflowConversation(deps.db, {
+    projectId: input.projectId,
+    requestedId: input.body.conversation_id,
+    reuseLatest: Boolean(graphResume),
+  });
+  const execution = await claimWorkflowExecution(deps.db, {
+    project,
+    stage: startStage,
+    resume: graphResume,
+    restartProject: true,
+  });
   input.stream.open();
   await finishStream(input.stream, async () =>
     executeWorkflowPipeline(deps, {
@@ -64,6 +68,8 @@ export async function streamRun(
       executionId: execution.id,
       originalIdea: project.original_idea,
       conversationId,
+      startStage,
+      graphResume,
       stream: streamOptions(input.stream),
     }),
   );
@@ -75,7 +81,10 @@ export async function streamContinue(
 ): Promise<void> {
   const project = await deps.projects.findOrFail(input.projectId);
   const status = await buildWorkflowStatus(deps.db, deps.projects, input.projectId);
-  await resolveWorkflowConversation(deps.db, input.projectId, input.body.conversation_id);
+  await resolveWorkflowConversation(deps.db, {
+    projectId: input.projectId,
+    requestedId: input.body.conversation_id,
+  });
   assertCanContinueWorkflow(project);
   assertWorkflowInteraction(status, input.body.conversation_id, 'reply');
   await syncProjectBudget(deps, input.projectId);
@@ -84,9 +93,11 @@ export async function streamContinue(
     checkpointVersion: input.body.checkpoint_version,
     stage: WorkflowStage.REQUIREMENT_ANALYSIS,
   });
-  if (graphResume) await deps.graph?.reserveResume(input.projectId, graphResume);
-  const execution = await createExecution(deps.db, input.projectId);
-  await updateProjectStage(deps.db, input.projectId, WorkflowStage.REQUIREMENT_ANALYSIS);
+  const execution = await claimWorkflowExecution(deps.db, {
+    project,
+    stage: WorkflowStage.REQUIREMENT_ANALYSIS,
+    resume: graphResume,
+  });
   input.stream.open();
   await finishStream(input.stream, async () =>
     executeWorkflowPipeline(deps, {
@@ -97,6 +108,9 @@ export async function streamContinue(
       startStage: WorkflowStage.REQUIREMENT_ANALYSIS,
       userMessage: input.body.message,
       graphResume,
+      restoreStageOnFailure: deps.graph?.enabled
+        ? undefined
+        : WorkflowStage.REQUIREMENT_CLARIFICATION,
       stream: streamOptions(input.stream),
     }),
   );
@@ -108,7 +122,10 @@ export async function streamDiscuss(
 ): Promise<void> {
   const project = await deps.projects.findOrFail(input.projectId);
   const status = await buildWorkflowStatus(deps.db, deps.projects, input.projectId);
-  await resolveWorkflowConversation(deps.db, input.projectId, input.body.conversation_id);
+  await resolveWorkflowConversation(deps.db, {
+    projectId: input.projectId,
+    requestedId: input.body.conversation_id,
+  });
   assertWorkflowInteraction(status, input.body.conversation_id);
   await syncProjectBudget(deps, input.projectId);
   const stage = project.current_stage as WorkflowStage;

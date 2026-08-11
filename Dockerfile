@@ -26,6 +26,10 @@ COPY . .
 RUN pnpm --filter @ai-planning/database db:generate
 
 FROM base AS build
+ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api/v1
+ARG NEXT_PUBLIC_API_KEY=local-demo-api-key
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_KEY=$NEXT_PUBLIC_API_KEY
 RUN pnpm build
 
 FROM build AS api

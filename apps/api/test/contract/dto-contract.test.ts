@@ -194,28 +194,31 @@ describe('API error and auth contracts', () => {
     assert.equal(new AuthGuard(reflector, { apiKey: '' } as never).canActivate(context()), true);
   });
 
-  it('limits model workflow operations by caller and project', () => {
-    const guard = new WorkflowRateLimitGuard({ workflowRateLimitPerMinute: 1 } as never);
-    const context = (projectId: string) =>
+  it('limits model workflow operations globally per caller and ignores spoofed auth when disabled', () => {
+    const guard = new WorkflowRateLimitGuard({
+      apiKey: '',
+      workflowRateLimitPerMinute: 1,
+    } as never);
+    const context = (projectId: string, authorization = 'Bearer caller') =>
       ({
         switchToHttp: () => ({
           getRequest: () => ({
-            headers: { authorization: 'Bearer caller' },
+            headers: { authorization },
             params: { project_id: projectId },
             ip: '127.0.0.1',
           }),
         }),
       }) as never;
-    assert.equal(guard.canActivate(context('project-a')), true);
+    assert.equal(guard.canActivate(context('project-a', 'Bearer spoof-a')), true);
     assert.throws(
-      () => guard.canActivate(context('project-a')),
+      () => guard.canActivate(context('project-b', 'Bearer spoof-b')),
       (error: unknown) => error instanceof AppException && error.code === ErrorCode.RATE_LIMITED,
     );
-    assert.equal(guard.canActivate(context('project-b')), true);
     assert.equal(
-      new WorkflowRateLimitGuard({ workflowRateLimitPerMinute: 0 } as never).canActivate(
-        context('project-a'),
-      ),
+      new WorkflowRateLimitGuard({
+        apiKey: '',
+        workflowRateLimitPerMinute: 0,
+      } as never).canActivate(context('project-a')),
       true,
     );
   });

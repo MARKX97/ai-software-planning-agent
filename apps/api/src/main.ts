@@ -20,14 +20,14 @@ async function bootstrap(): Promise<void> {
   // Global prefix for all routes per specs/api.spec.md §2.
   app.setGlobalPrefix('api/v1');
 
-  app.enableCors({ origin: true, credentials: true });
+  app.enableCors({ origin: [...config.corsAllowedOrigins], credentials: true });
   app.useGlobalFilters(new HttpExceptionFilter());
 
   await setupSwagger(app);
 
-  await app.listen(config.port);
-  logger.log(`API listening on http://localhost:${config.port}/api/v1`);
-  logger.log(`Swagger UI at http://localhost:${config.port}/api/docs`);
+  await app.listen(config.port, config.apiHost);
+  logger.log(`API listening on http://${config.apiHost}:${config.port}/api/v1`);
+  logger.log(`Swagger UI at http://${config.apiHost}:${config.port}/api/docs`);
 }
 
 function setupSwagger(app: INestApplication): void {

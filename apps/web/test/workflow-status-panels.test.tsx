@@ -73,6 +73,40 @@ describe('WorkflowStatusPanels V2 insights', () => {
     fireEvent.click(screen.getByRole('button', { name: '更新受影响产物' }));
     expect(onRegenerate).toHaveBeenCalledOnce();
   });
+
+  it('offers recovery when a running Graph lease has expired', () => {
+    const onStart = vi.fn();
+    render(
+      <WorkflowStatusPanels
+        actionError={null}
+        busy={false}
+        failureMessage={null}
+        onRegenerate={vi.fn()}
+        onStart={onStart}
+        status={{
+          ...status,
+          status: 'active',
+          current_stage: 'risk_analysis',
+          graph_run: {
+            id: '550e8400-e29b-41d4-a716-446655440000',
+            status: 'running',
+            current_node: 'risk_analysis',
+            current_stage: 'risk_analysis',
+            checkpoint_version: 2,
+            waiting_for: null,
+            recovery_available: true,
+            tool_call_count: 0,
+            retrieval_summary: null,
+            interrupt_reason: null,
+            tool_steps: [],
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '恢复执行' }));
+    expect(onStart).toHaveBeenCalledOnce();
+  });
 });
 
 const status: WorkflowStatusResponse = {

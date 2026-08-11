@@ -90,9 +90,10 @@ export interface ModelExecutionLogResponse {
 }
 
 export interface ModelExecutionLogDetailResponse extends ModelExecutionLogResponse {
-  prompt_text: string;
-  response_text: string | null;
-  structured_output: Record<string, unknown> | null;
+  prompt_hash: string;
+  prompt_length: number;
+  response_length: number | null;
+  response_summary: string | null;
 }
 
 export interface ModelExecutionLogListResponse {

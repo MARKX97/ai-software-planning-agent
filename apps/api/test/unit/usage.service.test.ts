@@ -16,9 +16,10 @@ function log(overrides: Record<string, unknown> = {}) {
     status: 'success',
     attempt_number: 1,
     prompt_version_id: null,
-    prompt_text: 'prompt',
-    response_text: 'response',
-    structured_output: null,
+    prompt_hash: 'a'.repeat(64),
+    prompt_length: 6,
+    response_length: 8,
+    response_summary: '模型调用成功，响应内容已按隐私策略省略。',
     input_tokens: 10,
     output_tokens: 5,
     cached_tokens: 2,
@@ -148,5 +149,20 @@ describe('UsageService', () => {
         'code' in (error as object) &&
         (error as { code: string }).code === ErrorCode.EXECUTION_NOT_FOUND,
     );
+  });
+
+  it('returns only minimized content metadata for a model log detail', async () => {
+    const service = new UsageService(
+      { client: { modelExecutionLog: { findUnique: async () => log() } } } as never,
+      {} as never,
+      { findOrFail: async () => ({}) } as never,
+    );
+
+    const detail = await service.getLog('project-1', 'log-1');
+
+    assert.equal(detail.prompt_hash, 'a'.repeat(64));
+    assert.equal(detail.prompt_length, 6);
+    assert.equal('prompt_text' in detail, false);
+    assert.equal('response_text' in detail, false);
   });
 });

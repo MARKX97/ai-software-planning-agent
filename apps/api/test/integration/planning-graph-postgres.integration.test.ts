@@ -74,6 +74,7 @@ function initialState(graphRunId: string) {
   const stage = WorkflowStage.REQUIREMENT_ANALYSIS;
   return {
     graphRunId,
+    logicalAttempt: 1,
     context: workflowContext('execution-1'),
     stage,
     nextStage: stage,

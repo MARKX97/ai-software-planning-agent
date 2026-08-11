@@ -83,7 +83,9 @@ describe('AppConfigService', () => {
     process.env = {
       ...originalEnv,
       API_PORT: '4100',
+      API_HOST: '0.0.0.0',
       API_KEY: 'api-test-key',
+      CORS_ALLOWED_ORIGINS: 'https://app.example.com,http://localhost:3000/',
       COST_MAX_COST_PER_PROJECT: '9.5',
       WORKFLOW_RATE_LIMIT_PER_MINUTE: '0',
       DOWNLOAD_TOKEN_SECRET: '',
@@ -95,6 +97,8 @@ describe('AppConfigService', () => {
     assert.deepEqual(
       {
         port: config.port,
+        host: config.apiHost,
+        origins: config.corsAllowedOrigins,
         cost: config.costLimitPerProject,
         rate: config.workflowRateLimitPerMinute,
         secret: config.downloadTokenSecret,
@@ -104,6 +108,8 @@ describe('AppConfigService', () => {
       },
       {
         port: 4100,
+        host: '0.0.0.0',
+        origins: ['https://app.example.com', 'http://localhost:3000'],
         cost: 9.5,
         rate: 0,
         secret: 'api-test-key',
@@ -118,6 +124,7 @@ describe('AppConfigService', () => {
     process.env = {
       ...originalEnv,
       API_PORT: 'invalid',
+      API_HOST: '127.0.0.1',
       API_KEY: '',
       COST_MAX_COST_PER_PROJECT: 'invalid',
       WORKFLOW_RATE_LIMIT_PER_MINUTE: '-1',
@@ -128,6 +135,25 @@ describe('AppConfigService', () => {
     assert.equal(config.costLimitPerProject, 5);
     assert.equal(config.workflowRateLimitPerMinute, 10);
     assert.match(config.downloadTokenSecret, /^[a-f0-9]{64}$/);
+  });
+
+  it('rejects unauthenticated non-loopback binding', () => {
+    process.env = {
+      ...originalEnv,
+      API_HOST: '0.0.0.0',
+      API_KEY: '   ',
+    };
+    assert.throws(() => new AppConfigService(), /API_KEY is required/);
+  });
+
+  it('rejects malformed or path-scoped CORS origins', () => {
+    process.env = {
+      ...originalEnv,
+      API_HOST: '127.0.0.1',
+      API_KEY: '',
+      CORS_ALLOWED_ORIGINS: 'https://app.example.com/path',
+    };
+    assert.throws(() => new AppConfigService(), /Invalid CORS origin/);
   });
 
   it('rejects an unknown Embedding provider instead of silently using Mock', () => {

@@ -32,9 +32,13 @@ V3 不支持私有仓库凭据、任意 URL 抓取、网页搜索、OCR、跨项
 | 文件上传 | `.md`, `.txt`, `.pdf`                     | 单文件 20 MiB；拒绝空文件和不匹配的 MIME                           |
 | 公开仓库 | `https://github.com/<owner>/<repository>` | 仅 HTTPS 和 `github.com`；最多 2,000 个文本文件、50 MiB 可索引文本 |
 
-仓库索引必须忽略二进制文件、符号链接逃逸、`.git`、依赖目录、构建产物、锁文件和高置信度密钥文件。服务端不得接受仓库 Token，也不得跟随到非允许域名，防止 SSRF。
+仓库索引必须忽略二进制文件、符号链接逃逸、`.git`、依赖目录、构建产物、锁文件和完整文件任意位置命中模式的高置信度密钥文件。服务端不得接受仓库 Token，也不得跟随到非允许域名，防止 SSRF。
 
 PDF 仅提取内嵌文本，不执行 OCR；每页独立成为可切分文档，引用 locator 使用 `文件名:page-N`。仓库只通过 GitHub REST API 读取 canonical repository、默认分支和 immutable commit；每个请求禁用自动重定向，并在响应前校验 HTTPS、允许主机和路径。代码文档必须保留仓库相对路径、行范围和固定 commit，locator 使用 `path:Lx-Ly@<sha>`。
+
+单个知识源最多 200 个 PDF 页面、2,000,000 个规范化提取字符和 2,000 个 chunks；
+超限在 Embedding 和数据库写入前拒绝。单个 API 进程最多同时处理 2 个知识索引写请求，
+上传、GitHub 导入和 reindex 均进入调用方/项目限流；队列仅在真实负载需要时引入。
 
 所有来源使用规范化文本的 SHA-256 内容 hash。P0 将规范化上传文本保存在来源记录中以支持确定性重建，软删除时清除原文但保留 hash 和引用快照。相同项目、来源和索引配置的重复请求必须复用已有 active revision，不得产生重复 Chunk；Embedding 模型、维度或 indexer version 变化时必须创建新 revision。
 
@@ -50,7 +54,9 @@ any non-processing state -> deleted
 
 - 单文档解析失败时保留其他成功文档并标记 `ready_with_warnings`。
 - 来源完全不可读、Embedding 全部失败或事务提交失败时标记 `failed`。
-- 重建索引先写入新 revision；完整成功后原子切换 active revision，失败时继续使用旧 revision。
+- 重建索引先写入新 revision；完整成功后原子切换 active revision。失败时新 revision 标为
+  `failed`；若旧 active revision 存在，source 保持 `ready_with_warnings` 并继续检索旧 revision，
+  仅在没有可用 active revision 时把 source 标为 `failed`。
 - P1 在上传、仓库导入或重建请求内同步完成索引和事务提交，不引入内存任务队列；后续需要长任务时再设计持久化 worker。
 - `processing` 状态不参与检索。
 

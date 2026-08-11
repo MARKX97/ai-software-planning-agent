@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { ArtifactType } from '@ai-planning/database';
 import { deriveRegenerationImpact } from '../../src/modules/workflow/artifact-generation/artifact-impact.js';
+import {
+  mergeRegenerationImpacts,
+  retainFailedRegenerationTargets,
+} from '../../src/modules/workflow/artifact-generation/artifact-regeneration-state.js';
 
 const old = new Date('2026-08-01T00:00:00.000Z');
 const current = new Date('2026-08-02T00:00:00.000Z');
@@ -50,6 +54,40 @@ describe('artifact regeneration impact', () => {
       ),
       null,
     );
+  });
+
+  it('keeps failed incremental targets after successful targets change the derived impact', async () => {
+    assert.deepEqual(
+      mergeRegenerationImpacts(null, {
+        affected_artifacts: ['backend_spec'],
+        source_ids: ['source-1'],
+      }),
+      { affected_artifacts: ['backend_spec'], source_ids: ['source-1'] },
+    );
+    let saved: Record<string, unknown> | undefined;
+    const db = {
+      client: {
+        workflowState: {
+          findUnique: async () => ({
+            data_json: {
+              quality_report: { status: 'warning' },
+              _regeneration: { affected_artifacts: ['prd'], source_ids: ['source-1'] },
+            },
+          }),
+          update: async (input: { data: { data_json: Record<string, unknown> } }) => {
+            saved = input.data.data_json;
+          },
+        },
+      },
+    };
+
+    await retainFailedRegenerationTargets(db as never, 'project-1', ['backend_spec']);
+
+    assert.deepEqual(saved?.['_regeneration'], {
+      affected_artifacts: ['backend_spec'],
+      source_ids: ['source-1'],
+    });
+    assert.deepEqual(saved?.['quality_report'], { status: 'warning' });
   });
 });
 

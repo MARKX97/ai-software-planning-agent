@@ -4,6 +4,7 @@ import {
   KnowledgeParser,
   type UploadedKnowledgeFile,
 } from '../../src/modules/knowledge/knowledge-parser.js';
+import { MAX_EXTRACTED_CHARACTERS } from '../../src/modules/knowledge/knowledge-limits.js';
 
 function upload(name: string, mime: string, content: string): UploadedKnowledgeFile {
   const buffer = Buffer.from(content, 'utf8');
@@ -92,6 +93,9 @@ describe('KnowledgeParser', () => {
         size: 2,
         buffer: Buffer.from([0xc3, 0x28]),
       }),
+    );
+    await assert.rejects(() =>
+      parser.parse(upload('huge.txt', 'text/plain', 'x'.repeat(MAX_EXTRACTED_CHARACTERS + 1))),
     );
   });
 });

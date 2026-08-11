@@ -44,13 +44,17 @@ function response(provider: string, structuredOutput: unknown): LLMResponse {
 }
 
 function db(logs: unknown[]) {
+  const transactionClient = {
+    modelExecutionLog: {
+      create: async (entry: unknown) => logs.push(entry),
+      aggregate: async () => ({ _avg: { latency_ms: 1 } }),
+    },
+    tokenUsage: { upsert: async () => undefined },
+  };
   return {
     client: {
-      modelExecutionLog: {
-        create: async (entry: unknown) => logs.push(entry),
-        aggregate: async () => ({ _avg: { latency_ms: 1 } }),
-      },
-      tokenUsage: { upsert: async () => undefined },
+      ...transactionClient,
+      $transaction: (run: (tx: typeof transactionClient) => unknown) => run(transactionClient),
       promptVersion: { findFirst: async () => ({ id: 'prompt-v1' }) },
     },
   };

@@ -6,6 +6,7 @@ export interface ToolStepResponse {
   stage: string;
   tool: string;
   call_number: number;
+  logical_attempt: number;
   status: 'running' | 'success' | 'failed' | 'rejected';
   result_count: number;
   duration_ms: number | null;
@@ -35,6 +36,9 @@ export function toGraphRunResponse(run?: GraphRunWithTools | null): GraphRunResp
   const steps = run.tool_steps ?? [];
   const toolCallCount = steps.filter((step) => step.status !== 'rejected').length;
   const resultCount = steps.reduce((sum, step) => sum + step.result_count, 0);
+  const expiredLease =
+    run.status === 'running' &&
+    Boolean(run.lease_expires_at && run.lease_expires_at.getTime() <= Date.now());
   return {
     id: run.id,
     status: run.status,
@@ -43,7 +47,7 @@ export function toGraphRunResponse(run?: GraphRunWithTools | null): GraphRunResp
     checkpoint_version: run.checkpoint_version,
     waiting_for:
       run.waiting_for === 'reply' || run.waiting_for === 'review' ? run.waiting_for : null,
-    recovery_available: run.status === 'interrupted',
+    recovery_available: run.status === 'interrupted' || run.status === 'failed' || expiredLease,
     tool_call_count: toolCallCount,
     retrieval_summary:
       toolCallCount > 0 ? `${toolCallCount} 次 Tool · ${resultCount} 条结果` : null,
@@ -60,6 +64,7 @@ function toToolStepResponse(step: ToolStep): ToolStepResponse {
     stage: step.stage,
     tool: step.tool,
     call_number: step.call_number,
+    logical_attempt: step.logical_attempt,
     status: toolStatus(step.status),
     result_count: step.result_count,
     duration_ms: step.duration_ms,
