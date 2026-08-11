@@ -20,3 +20,4 @@
 ## Maintenance
 
 - [`docker-cache-code-shape-debt.md`](./docker-cache-code-shape-debt.md)：Docker 依赖缓存优化与现有 Harness 代码形态债务清理。
+- [`audit-remediation.md`](./audit-remediation.md)：AUD-01–15 按顺序修复，并通过 PostgreSQL HTTP、Playwright、P1/V2 fallback 与 Docker 运行时门禁。

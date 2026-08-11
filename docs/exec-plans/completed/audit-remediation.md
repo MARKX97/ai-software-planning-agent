@@ -1,6 +1,6 @@
 # Audit Remediation Plan
 
-> Status: Active — implementation complete, awaiting CI runtime gates  
+> Status: Completed  
 > Started: 2026-08-11  
 > Source: [`2026-08-11-project-audit.md`](../../reviews/2026-08-11-project-audit.md)
 
@@ -53,6 +53,6 @@ Docker 和真实模型 smoke 不属于逐项反馈循环；仅在全部代码完
 - AUD-01 追加验证：模型日志与 Token 汇总同事务；clarification/review checkpoint 消息幂等，review 会话与首条消息同事务；Graph replay 聚焦用例 8/8 通过。
 - AUD-03 追加真实 HTTP+PostgreSQL 回归：同项目处于初次失败恢复产生的 `failed/failed` 持久状态时，重新 `/run` 必须进入 active clarification；用例已纳入环境型集成套件。
 - 复用本机已有 Docker 镜像、且不映射宿主端口执行 PostgreSQL 门禁：6 个新增 migration 实际 deploy 成功；Graph 重启恢复、并发启动 claim、resume 事务回滚共 3/3 通过。
-- P1/V2 HTTP 回退与 Playwright E2E 已纳入 CI；本机无现成 API/Web 进程，按端口约束未在本轮启动，CI 通过后再归档本计划。
-- CI 运行时门禁发现 P2 增量重生成在缺失 `planning_generation` 状态行时返回 500；修复标准是待重生影响使用 upsert 持久化，并补缺行回归。
-- `docker compose config --quiet`：通过；未执行 Docker build，也未下载依赖。
+- CI 运行时门禁发现并修复 P2 增量重生成在缺失 `planning_generation` 状态行时返回 500；待重生影响改为 upsert 持久化，并补缺行回归。
+- [CI run 31478817902](https://github.com/MARKX97/ai-software-planning-agent/actions/runs/31478817902)：`pnpm verify`、真实 PostgreSQL HTTP integration、Playwright E2E、P1 Graph fallback、V2 runner fallback 全部通过。
+- 同一 CI run 的 Docker smoke 通过：Compose config、缓存构建、API/Web health 与 volumes cleanup 全部成功。
