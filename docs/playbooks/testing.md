@@ -27,6 +27,8 @@ pnpm --filter @ai-planning/web test:e2e # Web 端到端测试
 每次代码或产品变更都必须执行 Web E2E。测试需要 PostgreSQL、完成迁移的数据库以及运行在 `3001`/`3000` 端口的 API/Web；CI 会自动准备这些条件。
 
 HTTP integration 由 CI 在 PostgreSQL 和运行中 API 上显式启用。
+CI 的干净环境在执行 migration、`pnpm verify` 或任何 database build 前，必须先运行
+`pnpm --filter @ai-planning/database db:generate`；Prisma generated client 不提交到仓库。
 
 ## V2 Coverage Contract
 

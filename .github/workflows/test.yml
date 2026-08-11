@@ -45,6 +45,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ai-planning/database db:generate
       - run: pnpm --filter @ai-planning/database exec prisma migrate deploy
       - run: pnpm verify
 
