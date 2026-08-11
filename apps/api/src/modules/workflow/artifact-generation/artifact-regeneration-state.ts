@@ -3,6 +3,7 @@ import { WorkflowStage } from '@ai-planning/shared';
 import type { PrismaService } from '../../../database/database.module.js';
 import { ARTIFACT_TYPES } from '../stages/model-routing.js';
 import type { RegenerationImpact } from './artifact-impact.js';
+import { stageDisplayName } from '../workflow-response.dto.js';
 
 export async function retainFailedRegenerationTargets(
   db: PrismaService,
@@ -34,11 +35,27 @@ export async function retainRegenerationImpact(
 ): Promise<void> {
   const state = await findPlanningState(db, projectId);
   const current = record(state?.data_json);
-  await db.client.workflowState.update({
+  const now = new Date();
+  const dataJson = { ...current, _regeneration: impact } as never;
+  await db.client.workflowState.upsert({
     where: { project_id_stage: planningStateKey(projectId) },
-    data: {
-      data_json: { ...current, _regeneration: impact } as never,
-      updated_at: new Date(),
+    create: {
+      project_id: projectId,
+      stage: WorkflowStage.PLANNING_GENERATION,
+      status: 'completed',
+      display_name: stageDisplayName(WorkflowStage.PLANNING_GENERATION),
+      progress: {
+        completed_stages: 9,
+        total_stages: 9,
+        percentage: 100,
+      },
+      data_json: dataJson,
+      completed_at: now,
+      updated_at: now,
+    },
+    update: {
+      data_json: dataJson,
+      updated_at: now,
     },
   });
 }

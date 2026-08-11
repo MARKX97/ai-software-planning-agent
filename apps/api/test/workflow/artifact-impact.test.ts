@@ -5,6 +5,7 @@ import { deriveRegenerationImpact } from '../../src/modules/workflow/artifact-ge
 import {
   mergeRegenerationImpacts,
   retainFailedRegenerationTargets,
+  retainRegenerationImpact,
 } from '../../src/modules/workflow/artifact-generation/artifact-regeneration-state.js';
 
 const old = new Date('2026-08-01T00:00:00.000Z');
@@ -88,6 +89,32 @@ describe('artifact regeneration impact', () => {
       source_ids: ['source-1'],
     });
     assert.deepEqual(saved?.['quality_report'], { status: 'warning' });
+  });
+
+  it('creates the planning state when regeneration impact has no existing row', async () => {
+    let saved: Record<string, unknown> | undefined;
+    const db = {
+      client: {
+        workflowState: {
+          findUnique: async () => null,
+          upsert: async (input: { create: Record<string, unknown> }) => {
+            saved = input.create;
+          },
+        },
+      },
+    };
+
+    await retainRegenerationImpact(db as never, 'project-1', {
+      affected_artifacts: ['prd'],
+      source_ids: ['source-1'],
+    });
+
+    assert.equal(saved?.['stage'], 'planning_generation');
+    assert.equal(saved?.['status'], 'completed');
+    assert.deepEqual((saved?.['data_json'] as Record<string, unknown>)['_regeneration'], {
+      affected_artifacts: ['prd'],
+      source_ids: ['source-1'],
+    });
   });
 });
 

@@ -54,4 +54,5 @@ Docker 和真实模型 smoke 不属于逐项反馈循环；仅在全部代码完
 - AUD-03 追加真实 HTTP+PostgreSQL 回归：同项目处于初次失败恢复产生的 `failed/failed` 持久状态时，重新 `/run` 必须进入 active clarification；用例已纳入环境型集成套件。
 - 复用本机已有 Docker 镜像、且不映射宿主端口执行 PostgreSQL 门禁：6 个新增 migration 实际 deploy 成功；Graph 重启恢复、并发启动 claim、resume 事务回滚共 3/3 通过。
 - P1/V2 HTTP 回退与 Playwright E2E 已纳入 CI；本机无现成 API/Web 进程，按端口约束未在本轮启动，CI 通过后再归档本计划。
+- CI 运行时门禁发现 P2 增量重生成在缺失 `planning_generation` 状态行时返回 500；修复标准是待重生影响使用 upsert 持久化，并补缺行回归。
 - `docker compose config --quiet`：通过；未执行 Docker build，也未下载依赖。
