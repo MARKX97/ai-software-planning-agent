@@ -119,19 +119,19 @@ docker compose up --build
 # API: http://localhost:3001/api/v1/health
 ```
 
-Compose 默认使用 Mock Embedding，并在未配置 `BAISHAN_API_KEY` 时使用 Mock Chat Provider。默认启用知识检索、Graph runner 和受控 Tool；真实模型密钥只传给 API 容器，不会进入 Web 镜像。
+Compose 默认使用 Mock Embedding，并在三个 `BAISHAN_API_KEY_*` 都未配置时使用 Mock Chat Provider。真实 Chat 模式要求三把 Key 全部配置；真实模型密钥只传给 API 容器，不会进入 Web 镜像。
 
 ### 运行模式
 
 主要开关位于 `.env`：
 
-| 配置                    | 默认值  | 作用                                          |
-| ----------------------- | ------- | --------------------------------------------- |
-| `RAG_ENABLED`           | `true`  | 启用项目知识检索；关闭后沿用无证据工作流      |
-| `WORKFLOW_RUNNER`       | `graph` | 使用可恢复的 LangGraph runner                 |
-| `AGENT_ACTIONS_ENABLED` | `true`  | 启用受控只读 Tool；关闭后保留固定知识检索     |
-| `EMBEDDING_PROVIDER`    | `mock`  | 默认使用确定性 Mock；可配置独立兼容服务       |
-| `BAISHAN_API_KEY`       | 空      | 为空时使用 Mock Chat Provider，配置后调用白山 |
+| 配置                    | 默认值   | 作用                                             |
+| ----------------------- | -------- | ------------------------------------------------ |
+| `RAG_ENABLED`           | `true`   | 启用项目知识检索；关闭后沿用无证据工作流         |
+| `WORKFLOW_RUNNER`       | `graph`  | 使用可恢复的 LangGraph runner                    |
+| `AGENT_ACTIONS_ENABLED` | `true`   | 启用受控只读 Tool；关闭后保留固定知识检索        |
+| `EMBEDDING_PROVIDER`    | `mock`   | 默认使用确定性 Mock；可配置独立兼容服务          |
+| `BAISHAN_API_KEY_*`     | 全部为空 | 三把 Key 全部为空时使用 Mock；真实模式需全部配置 |
 
 ## Tech Stack
 
@@ -147,7 +147,7 @@ Compose 默认使用 Mock Embedding，并在未配置 `BAISHAN_API_KEY` 时使�
 | 测试       | node:test、Vitest、Playwright              |
 | 语言       | TypeScript 5.5+                            |
 
-用户可见的模型回复由 NestJS API 通过 SSE 代理到浏览器。`BAISHAN_BASE_URL` 与 `BAISHAN_API_KEY` 只配置在 API Server 的 `.env`，不会下发到前端；内部分析与产物生成仍使用结构化非流式调用。
+用户可见的模型回复由 NestJS API 通过 SSE 代理到浏览器。`BAISHAN_BASE_URL` 与三个 `BAISHAN_API_KEY_*` 只配置在 API Server 的 `.env`，不会下发到前端；内部分析与产物生成仍使用结构化非流式调用。
 
 用户可见对话支持 `GLM -> MiniMax -> DeepSeek` 的首字前降级：只有当前模型尚未输出内容时才会切换，避免重复文本。模型工作流操作同时执行 Bearer 认证、单实例限流和持久化项目成本准入；成本达到上限后不再启动新模型调用。
 
@@ -215,15 +215,15 @@ pnpm --filter @ai-planning/web exec playwright install
 
 ### Baishan API Key（可选）
 
-单元测试和集成测试都用 `MockLLMProvider`，**不需要真实 API Key**。只有本地手动跑一遍端到端真实工作流时，才需要在 `.env` 里填 `BAISHAN_BASE_URL` 和 `BAISHAN_API_KEY`。
+单元测试和集成测试都用 `MockLLMProvider`，**不需要真实 API Key**。只有本地手动跑一遍端到端真实工作流时，才需要在 `.env` 里填 `BAISHAN_BASE_URL`、`BAISHAN_API_KEY_DEEPSEEK`、`BAISHAN_API_KEY_GLM` 与 `BAISHAN_API_KEY_MINIMAX`。
 
-验证真实 Baishan SSE 时，先在 `.env` 配置上述两项，再显式运行付费测试。该测试默认跳过，不进入 CI：
+验证真实 Baishan SSE 时，先在 `.env` 配置上述四项，再显式运行付费测试。该测试默认跳过，不进入 CI：
 
 ```bash
 RUN_REAL_BAISHAN_STREAM=1 pnpm exec dotenv -e .env -- pnpm --filter @ai-planning/llm-core test
 ```
 
-本地体验完整流程时，将 `BAISHAN_API_KEY` 留空。系统会使用一套连贯且固定分片输出的演示数据：先通过多轮需求澄清收集信息，再依次停在需求范围、需求取舍、MVP 范围和技术方案四个检查点。每个检查点都可继续与 Agent 实时讨论；点击“确认，继续下一环节”后才会进入后续分析，最终生成 11 类产物和用量日志。
+本地体验完整流程时，将三个 `BAISHAN_API_KEY_*` 都留空。系统会使用一套连贯且固定分片输出的演示数据：先通过多轮需求澄清收集信息，再依次停在需求范围、需求取舍、MVP 范围和技术方案四个检查点。每个检查点都可继续与 Agent 实时讨论；点击“确认，继续下一环节”后才会进入后续分析，最终生成 11 类产物和用量日志。
 
 ## Project Structure
 

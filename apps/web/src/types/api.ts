@@ -80,12 +80,15 @@ export interface ModelExecutionLogResponse {
   prompt_version_id: string | null;
   input_tokens: number;
   output_tokens: number;
+  cached_tokens: number;
   cost_input: number;
   cost_output: number;
+  cost_cached: number;
   cost_total: number;
   latency_ms: number | null;
   error_code: string | null;
   error_message: string | null;
+  response_summary: string | null;
   created_at: string;
 }
 
@@ -93,7 +96,6 @@ export interface ModelExecutionLogDetailResponse extends ModelExecutionLogRespon
   prompt_hash: string;
   prompt_length: number;
   response_length: number | null;
-  response_summary: string | null;
 }
 
 export interface ModelExecutionLogListResponse {

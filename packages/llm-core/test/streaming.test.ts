@@ -91,12 +91,12 @@ describe('OpenAICompatibleAdapter.stream', () => {
     const adapter = new OpenAICompatibleAdapter({
       name: 'baishan',
       baseUrl: process.env['BAISHAN_BASE_URL'] ?? '',
-      apiKey: process.env['BAISHAN_API_KEY'] ?? '',
+      apiKey: process.env['BAISHAN_API_KEY_GLM'] ?? '',
     });
     const deltas: string[] = [];
     const result = await adapter.stream(
       {
-        model: process.env['BAISHAN_MODEL_GLM'] ?? 'GLM-4.5',
+        model: process.env['BAISHAN_MODEL_GLM'] ?? 'GLM-5.2',
         messages: [{ role: 'user', content: '只回复“流式测试通过”。' }],
       },
       60_000,

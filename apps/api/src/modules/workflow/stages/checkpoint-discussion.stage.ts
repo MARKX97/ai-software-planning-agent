@@ -21,6 +21,7 @@ export class CheckpointDiscussionStage {
       stage: checkpoint,
       prompt,
       promptName: 'checkpoint_discussion',
+      responseSummary: `围绕${stageDisplayName(checkpoint)}结论与用户继续讨论。`,
     });
     return response.content;
   }

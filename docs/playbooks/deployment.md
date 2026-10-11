@@ -30,7 +30,7 @@ docker compose up --build
 - Docker 镜像必须在目标 Linux 环境内执行 `prisma generate`，不得复用宿主机生成的 Prisma Engine；基础镜像必须提供 Prisma 运行时所需的 OpenSSL。
 - Web: `http://localhost:3000`；API health: `http://localhost:3001/api/v1/health`。
 - Compose 内 API 使用 `0.0.0.0` 供 Web 容器访问，并配置固定的本地演示 API Key；Web 构建使用同一公开演示 key。宿主机端口仅绑定 `127.0.0.1`，该配置不得作为生产凭据复用。
-- `BAISHAN_API_KEY` 为空时使用确定性 Mock；配置真实密钥时只注入 API 容器。
+- 三个 `BAISHAN_API_KEY_*` 都为空时使用确定性 Mock；真实模式要求三者同时配置，并且只注入 API 容器。
 - `EMBEDDING_PROVIDER` 默认是固定向量 `mock`；真实服务使用 `openai-compatible`，并单独配置 `EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY`、`EMBEDDING_MODEL` 和 `EMBEDDING_DIMENSIONS`。
 - `RAG_ENABLED` 默认 `true`；设为 `false` 时跳过知识检索与查询 Embedding，工作流沿用无证据路径。
 - `WORKFLOW_RUNNER` 默认 `graph`；设为 `v2` 时使用旧的确定性 runner。Graph checkpoint 与业务库使用同一 `DATABASE_URL`。
@@ -48,7 +48,7 @@ docker compose up --build
 
 - `.env.example` 只提供空密钥和公开示例值。
 - `.env`、`.env.local`、`.claude/settings.local.json` 不得提交。
-- `BAISHAN_API_KEY`、`BAISHAN_BASE_URL`、Embedding 地址/密钥和下载密钥只存在 API Server 环境。
+- `BAISHAN_API_KEY_DEEPSEEK`、`BAISHAN_API_KEY_GLM`、`BAISHAN_API_KEY_MINIMAX`、`BAISHAN_BASE_URL`、Embedding 地址/密钥和下载密钥只存在 API Server 环境。
 - Web 只能读取 `NEXT_PUBLIC_API_BASE_URL` 和可选的 `NEXT_PUBLIC_API_KEY`。
 - 浏览器中的 `NEXT_PUBLIC_API_KEY` 不是秘密；生产环境不能仅依赖该共享 key，仍须用网络边界、精确 CORS 和正式身份认证限制访问。
 - 日志、诊断输出和测试 artifact 不得包含密钥、完整 Prompt 或完整模型响应。

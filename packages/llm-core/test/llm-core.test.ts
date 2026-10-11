@@ -134,6 +134,19 @@ describe('OpenAICompatibleAdapter', () => {
       LLMNetworkError,
     );
   });
+  it('rejects empty message content from a successful response', async () => {
+    const fetch = async () => new Response('{"choices":[{"message":{"content":" "}}]}');
+    const adapter = new OpenAICompatibleAdapter({
+      name: 'test',
+      baseUrl: 'https://x',
+      apiKey: 'k',
+      fetchImpl: fetch as unknown as typeof globalThis.fetch,
+    });
+    await assert.rejects(
+      () => adapter.complete({ model: 'm', messages: [{ role: 'user', content: 'hi' }] }, 1000),
+      LLMNetworkError,
+    );
+  });
 });
 
 describe('MockLLMProvider', () => {

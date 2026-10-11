@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import { Badge, statusVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { stageName, statusName } from '@/components/project/project-status';
+import { stageDescription, stageName, statusName } from '@/components/project/project-status';
 import { getUserErrorMessage } from '@/lib/api-client';
 import { formatCurrency, formatDateTime, formatNumber } from '@/lib/format';
 import type {
@@ -31,7 +31,7 @@ export function UsageLogsContent(props: UsageLogsContentProps) {
   if (!props.logs?.items.length) return null;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+      <table className="w-full min-w-[920px] border-collapse text-left text-sm">
         <LogTableHeader />
         <tbody>
           {props.logs.items.map((log) => (
@@ -47,7 +47,7 @@ function LogTableHeader() {
   return (
     <thead>
       <tr className="border-b border-slate-200 text-xs text-slate-500">
-        {['参与者', '在做什么', '结果', '用量', '花费', '时间', '细节'].map((label) => (
+        {['模型', '本次工作', '结果', '用量', '花费', '时间', '审计'].map((label) => (
           <th className="py-3 pr-4" key={label}>
             {label}
           </th>
@@ -65,7 +65,10 @@ function LogRows({ log, props }: { log: ModelExecutionLogResponse; props: UsageL
         <td className="py-3 pr-4 text-slate-900">
           <ProviderAttempt log={log} />
         </td>
-        <td className="py-3 pr-4 text-slate-700">{stageName(log.stage)}</td>
+        <td className="max-w-72 py-3 pr-4 text-slate-700">
+          <p className="font-medium text-slate-800">{stageName(log.stage)}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{callDescription(log)}</p>
+        </td>
         <td className="py-3 pr-4">
           <Badge variant={statusVariant(log.status)}>{statusName(log.status)}</Badge>
         </td>
@@ -80,7 +83,7 @@ function LogRows({ log, props }: { log: ModelExecutionLogResponse; props: UsageL
             onClick={() => props.onSelect(selected ? null : log.id)}
             variant="quiet"
           >
-            {selected ? '收起' : '看看细节'}
+            {selected ? '收起' : '查看调用审计'}
           </Button>
         </td>
       </tr>
@@ -98,8 +101,10 @@ function LogRows({ log, props }: { log: ModelExecutionLogResponse; props: UsageL
 function ProviderAttempt({ log }: { log: ModelExecutionLogResponse }) {
   return (
     <>
-      <span className="font-semibold">{log.provider_name}</span>
-      <span className="ml-2 text-xs text-slate-500">第 {log.attempt_number} 次</span>
+      <span className="font-semibold">{log.model_id}</span>
+      <span className="ml-2 text-xs text-slate-500">
+        {log.provider_name} · 第 {log.attempt_number} 次
+      </span>
       {log.attempt_number > 1 && log.status === 'success' ? (
         <Badge className="ml-2" variant="active">
           接手
@@ -113,31 +118,78 @@ function LogDetail({ props }: { props: UsageLogsContentProps }) {
   if (props.detailLoading) return <p className="text-sm text-slate-500">正在打开这次记录...</p>;
   if (props.detailError)
     return <InlineError error={props.detailError} onRetry={props.onRetryDetail} />;
+  const detail = props.detail;
   return (
     <div className="grid gap-4">
-      <h3 className="text-sm font-bold text-slate-950">调用审计元数据</h3>
-      <LogText label="Prompt SHA-256" value={props.detail?.prompt_hash ?? ''} />
-      <p className="text-sm text-slate-700">
-        Prompt {props.detail?.prompt_length ?? 0} 字符 · 响应 {props.detail?.response_length ?? 0}{' '}
-        字符
-      </p>
-      <p className="text-sm text-slate-700">
-        {props.detail?.response_summary ?? '本次调用没有响应内容。'}
-      </p>
-      <p className="text-xs text-slate-500">出于隐私与密钥安全考虑，不保存调用原文。</p>
+      <div>
+        <h3 className="text-sm font-bold text-slate-950">调用审计</h3>
+        <p className="mt-1 text-sm leading-6 text-slate-600">
+          用于核对本次调用的成本、耗时和处理状态。
+        </p>
+      </div>
+      <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <AuditMetric label="使用模型" value={detail?.model_id ?? '未记录'} />
+        <AuditMetric label="耗时" value={formatLatency(detail?.latency_ms)} />
+        <AuditMetric
+          label="Token 用量"
+          value={`输入 ${formatNumber(detail?.input_tokens ?? 0)} · 输出 ${formatNumber(detail?.output_tokens ?? 0)}`}
+        />
+        <AuditMetric label="缓存命中" value={`${formatNumber(detail?.cached_tokens ?? 0)} Token`} />
+        <AuditMetric label="预估花费" value={formatCurrency(detail?.cost_total ?? 0)} />
+        <AuditMetric label="调用阶段" value={stageName(detail?.stage ?? '')} />
+        <AuditMetric label="本次工作" value={detail ? callDescription(detail) : '未记录'} />
+      </dl>
+      {detail?.error_code ? (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-800">
+          {detail.error_code}：{detail.error_message ?? '本次调用未完成。'}
+        </p>
+      ) : (
+        <p className="text-sm leading-6 text-slate-700">模型调用成功，响应内容已按隐私策略省略。</p>
+      )}
+      <details className="rounded-md border border-slate-200 bg-white px-3 py-2">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-700">调试标识</summary>
+        <dl className="mt-3 grid gap-3 text-sm">
+          <AuditMetric label="提示词版本记录" value={detail?.prompt_version_id ?? '未记录'} />
+          <AuditMetric label="Prompt SHA-256" value={detail?.prompt_hash ?? ''} mono />
+        </dl>
+      </details>
+      <p className="text-xs text-slate-500">为保护个人资料和项目资料，不保存调用原文。</p>
     </div>
   );
 }
 
-function LogText({ label, value }: { label: string; value: string }) {
+function AuditMetric({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
   return (
-    <section>
-      <h4 className="mb-2 text-sm font-semibold text-slate-800">{label}</h4>
-      <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-white p-3 font-mono text-sm leading-6 text-slate-700">
+    <div>
+      <dt className="text-xs font-semibold text-slate-500">{label}</dt>
+      <dd className={`mt-1 break-all text-sm text-slate-800 ${mono ? 'font-mono' : ''}`}>
         {value}
-      </pre>
-    </section>
+      </dd>
+    </div>
   );
+}
+
+function formatLatency(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '未记录';
+  if (value < 1_000) return `${value} 毫秒`;
+  return `${Math.round((value / 1_000) * 10) / 10} 秒`;
+}
+
+function callDescription(
+  log: Pick<ModelExecutionLogResponse, 'stage' | 'response_summary'>,
+): string {
+  const summary = log.response_summary?.trim();
+  return summary && summary !== '模型调用成功，响应内容已按隐私策略省略。'
+    ? summary
+    : stageDescription(log.stage);
 }
 
 function InlineError({ error, onRetry }: { error: Error; onRetry: () => void }) {

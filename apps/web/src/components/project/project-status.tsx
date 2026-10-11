@@ -26,6 +26,18 @@ const stageLabels: Record<string, string> = {
   failed: '需要回看',
 };
 
+const stageDescriptions: Record<string, string> = {
+  requirement_analysis: '从初始想法中梳理用户、问题、范围和待确认事项。',
+  requirement_clarification: '围绕尚未确定的事项发起需求澄清对话。',
+  multi_model_analysis: '让三个模型从不同角度检查需求的共识、分歧和未知项。',
+  requirement_synthesis: '合并分析结果和已确认信息，形成统一需求结论。',
+  feasibility_analysis: '评估技术可行性、依赖、团队投入和交付周期。',
+  risk_analysis: '识别技术、成本、安全与合规风险，并给出应对措施。',
+  mvp_compression: '划定首版必须做与延后做的范围。',
+  platform_recommendation: '比较实现平台和技术栈，说明推荐理由与取舍。',
+  planning_generation: '根据已确认的结论生成一份开工所需文档。',
+};
+
 export function ProjectStatus({ status }: { status: string }) {
   return <Badge variant={statusVariant(status)}>{statusLabels[status] ?? status}</Badge>;
 }
@@ -36,6 +48,10 @@ export function StageName({ stage }: { stage: string }) {
 
 export function stageName(stage: string): string {
   return stageLabels[stage] ?? stage;
+}
+
+export function stageDescription(stage: string): string {
+  return stageDescriptions[stage] ?? `执行“${stageName(stage)}”阶段的模型任务。`;
 }
 
 export function statusName(status: string): string {

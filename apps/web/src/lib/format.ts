@@ -13,7 +13,7 @@ export function formatDateTime(value: string | null | undefined): string {
 export function formatCurrency(value: number): string {
   return new Intl.NumberFormat('zh-CN', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'CNY',
     maximumFractionDigits: 4,
   }).format(value);
 }

@@ -82,6 +82,7 @@ export class AgentActionService {
         response,
         attemptNumber: attempt,
         promptName: 'agent_action',
+        responseSummary: '根据当前阶段与可用资料，选择最多三个只读查询动作。',
       });
       const parsed = agentActionPlanSchema.safeParse(response.structuredOutput);
       if (parsed.success) return parsed.data;

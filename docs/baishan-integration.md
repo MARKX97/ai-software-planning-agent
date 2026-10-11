@@ -8,8 +8,9 @@
 
 - Base URL：`https://api.edgefn.net/v1`
 - Chat 端点：`POST /chat/completions`
-- 认证：`Authorization: Bearer <BAISHAN_API_KEY>`
+- 认证：每个 Provider 使用独立的 `Authorization: Bearer <BAISHAN_API_KEY_*>`。
 - API Key 只存在于 NestJS API Server 环境，浏览器代码不直接调用白山。
+- `BAISHAN_API_KEY_DEEPSEEK`、`BAISHAN_API_KEY_GLM` 和 `BAISHAN_API_KEY_MINIMAX` 必须同时配置才启用真实 Chat；三者都为空时使用确定性 Mock，部分配置会在启动时失败。
 - 模型 ID 区分大小写，通过 `BAISHAN_MODEL_*` 配置。
 - `.env.example` 是提交到仓库的配置样例基准。当其中的 Base URL 或模型 ID 与 API 默认值、CI 覆盖值不一致时，`pnpm harness:check` 会失败。
 

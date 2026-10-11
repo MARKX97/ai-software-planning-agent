@@ -229,7 +229,7 @@ describe('CostController', () => {
   it('is wired through createLlmOrchestrator config', async () => {
     const svc = createLlmOrchestrator({
       baseUrl: '',
-      apiKey: '',
+      apiKeys: { deepseek: '', glm: '', minimax: '' },
       modelIds: { deepseek: 'd', glm: 'g', minimax: 'm' },
       costLimitPerProject: 0,
     });
@@ -238,15 +238,62 @@ describe('CostController', () => {
 });
 
 describe('createLlmOrchestrator factory', () => {
-  it('registers mock providers when apiKey is empty', async () => {
+  it('registers mock providers when all API keys are empty', async () => {
     const svc = createLlmOrchestrator({
       baseUrl: '',
-      apiKey: '',
+      apiKeys: { deepseek: '', glm: '', minimax: '' },
       modelIds: { deepseek: 'd', glm: 'g', minimax: 'm' },
     });
     const health = await svc.healthCheck();
     assert.deepEqual(Object.keys(health).sort(), ['deepseek', 'glm', 'minimax']);
     assert.equal(Object.values(health).every(Boolean), true);
+  });
+
+  it('rejects partial real API key configuration', () => {
+    assert.throws(
+      () =>
+        createLlmOrchestrator({
+          baseUrl: 'https://api.edgefn.net/v1',
+          apiKeys: { deepseek: 'key-d', glm: '', minimax: 'key-m' },
+          modelIds: { deepseek: 'd', glm: 'g', minimax: 'm' },
+        }),
+      /All Baishan model API keys are required/,
+    );
+  });
+
+  it('uses the configured key for each real provider', async () => {
+    const originalFetch = globalThis.fetch;
+    const authorizations = new Map<string, string | null>();
+    globalThis.fetch = (async (_url, init) => {
+      const body = JSON.parse(String(init?.body)) as { model: string };
+      authorizations.set(body.model, new Headers(init?.headers).get('authorization'));
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: 'ok' } }],
+          usage: { prompt_tokens: 1, completion_tokens: 1 },
+        }),
+        { status: 200 },
+      );
+    }) as typeof globalThis.fetch;
+    try {
+      const svc = createLlmOrchestrator({
+        baseUrl: 'https://api.edgefn.net/v1',
+        apiKeys: { deepseek: 'key-d', glm: 'key-g', minimax: 'key-m' },
+        modelIds: { deepseek: 'd', glm: 'g', minimax: 'm' },
+      });
+      await Promise.all([
+        svc.callSingle('deepseek', 'hi'),
+        svc.callSingle('glm', 'hi'),
+        svc.callSingle('minimax', 'hi'),
+      ]);
+      assert.deepEqual(Object.fromEntries(authorizations), {
+        d: 'Bearer key-d',
+        g: 'Bearer key-g',
+        m: 'Bearer key-m',
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 

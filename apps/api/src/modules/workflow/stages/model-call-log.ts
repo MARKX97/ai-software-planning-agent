@@ -28,6 +28,7 @@ export interface ModelCallLogEntry {
   readonly modelId?: string;
   readonly attemptNumber?: number;
   readonly promptName?: string;
+  readonly responseSummary?: string;
 }
 
 interface ModelCallContext {
@@ -102,7 +103,9 @@ async function createModelExecutionLog(
       prompt_hash: createHash('sha256').update(entry.promptText).digest('hex'),
       prompt_length: entry.promptText.length,
       response_length: entry.response?.content.length ?? null,
-      response_summary: entry.response ? '模型调用成功，响应内容已按隐私策略省略。' : null,
+      response_summary: entry.response
+        ? (entry.responseSummary ?? '模型调用成功，响应内容已按隐私策略省略。')
+        : null,
       input_tokens: usage?.inputTokens ?? 0,
       output_tokens: usage?.outputTokens ?? 0,
       cached_tokens: usage?.cachedTokens ?? 0,

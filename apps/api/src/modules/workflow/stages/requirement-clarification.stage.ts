@@ -41,6 +41,7 @@ export class RequirementClarificationStage implements StageProcessor {
       stage: this.stage,
       prompt,
       promptName: 'requirement_clarification',
+      responseSummary: '围绕尚未确定的事项发起需求澄清对话。',
     });
     const needsMore = questions.length > 0 && ctx.clarificationRound < MAX_CLARIFICATION_ROUNDS;
     return {

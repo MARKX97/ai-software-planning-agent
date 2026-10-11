@@ -20,7 +20,7 @@ import { LLM_ORCHESTRATOR } from './llm.constants.js';
       useFactory: (config: AppConfigService): LlmOrchestratorService =>
         createLlmOrchestrator({
           baseUrl: config.baishanBaseUrl,
-          apiKey: config.baishanApiKey,
+          apiKeys: config.baishanApiKeys,
           modelIds: {
             deepseek: config.modelDeepseek,
             glm: config.modelGlm,

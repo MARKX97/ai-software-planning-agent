@@ -6,6 +6,7 @@ import { AppException } from '../../src/common/exception/app-exception.js';
 import { ErrorCode } from '../../src/common/exception/error-code.js';
 import { runPipeline } from '../../src/modules/workflow/workflow-pipeline-runner.js';
 import { markFailed } from '../../src/modules/workflow/workflow-store.js';
+import { loadPersistedStageResults } from '../../src/modules/workflow/workflow-results.js';
 import { RequirementClarificationStage } from '../../src/modules/workflow/stages/requirement-clarification.stage.js';
 import { MultiModelAnalysisStage } from '../../src/modules/workflow/stages/multi-model-analysis.stage.js';
 
@@ -200,5 +201,26 @@ describe('workflow stage processors', () => {
       error: new Error('fetch failed'),
     });
     assert.deepEqual(messages, ['工作流执行失败，请稍后重试。', '工作流执行失败，请稍后重试。']);
+  });
+
+  it('does not resume a stage from a free-text fallback record', async () => {
+    const results = await loadPersistedStageResults(
+      {
+        client: {
+          analysisResult: {
+            findMany: async () => [
+              {
+                stage: WorkflowStage.REQUIREMENT_ANALYSIS,
+                result_type: 'free_text',
+                content_json: { content: '' },
+                content_text: '',
+              },
+            ],
+          },
+        },
+      } as never,
+      'project-1',
+    );
+    assert.equal(results[WorkflowStage.REQUIREMENT_ANALYSIS]?.structuredOutput, null);
   });
 });

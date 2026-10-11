@@ -91,6 +91,7 @@ describe('Graph durable side-effect idempotency', () => {
       provider: 'deepseek',
       promptText: 'stable prompt',
       response: llmResponse(),
+      responseSummary: '生成 PRD 产品需求文档',
     };
     await logModelCall(db as never, entry);
     await logModelCall(db as never, { ...entry, executionId: 'execution-2' });
@@ -101,6 +102,7 @@ describe('Graph durable side-effect idempotency', () => {
     assert.equal('prompt_text' in (stored ?? {}), false);
     assert.equal('response_text' in (stored ?? {}), false);
     assert.equal('structured_output' in (stored ?? {}), false);
+    assert.equal(stored?.['response_summary'], '生成 PRD 产品需求文档');
   });
 
   it('rolls back the model log when Token usage persistence fails', async () => {

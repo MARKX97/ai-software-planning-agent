@@ -27,6 +27,7 @@ export abstract class BaseProvider implements ILLMProvider {
   abstract readonly modelId: string;
   abstract readonly pricing: ModelPricing;
   protected abstract readonly httpClient: ILLMHttpClient;
+  protected readonly defaultMaxTokens: number = 4096;
 
   async chat(prompt: string, options?: LLMCallOptions): Promise<LLMResponse> {
     const start = Date.now();
@@ -50,7 +51,7 @@ export abstract class BaseProvider implements ILLMProvider {
       model: this.modelId,
       messages: [{ role: 'user', content: prompt }],
       temperature: options?.temperature ?? 1,
-      maxTokens: options?.maxTokens ?? 4096,
+      maxTokens: options?.maxTokens ?? this.defaultMaxTokens,
     };
   }
 

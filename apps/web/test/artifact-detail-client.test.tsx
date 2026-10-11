@@ -17,7 +17,7 @@ describe('ArtifactDetailClient', () => {
       type_display_name: 'PRD',
       title: 'PRD',
       stage: 'planning_generation',
-      content: '# PRD [S1]',
+      content: '# PRD [S1]\n\n## 核心目标\n\n让用户清楚地看到计划。',
       file_path: null,
       size_bytes: 12,
       format: 'markdown',
@@ -50,5 +50,17 @@ describe('ArtifactDetailClient', () => {
     expect(screen.getByText('context.md:L1-L3')).toBeVisible();
     expect(screen.getByText('首版必须支持证据引用。')).toBeVisible();
     expect(screen.getByText('生成时保存的证据快照')).toBeVisible();
+  });
+
+  it('renders Markdown as a document instead of source text', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <ArtifactDetailClient artifactId="artifact-1" projectId="project-1" />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByRole('heading', { name: 'PRD [S1]' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: '核心目标' })).toBeVisible();
+    expect(screen.queryByText('# PRD [S1]')).not.toBeInTheDocument();
   });
 });

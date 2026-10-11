@@ -14,7 +14,7 @@ export async function loadPersistedStageResults(
     if (results[row.stage]) continue;
     results[row.stage] = {
       stage: row.stage,
-      structuredOutput: row.content_json,
+      structuredOutput: row.result_type === 'free_text' ? null : row.content_json,
       content: row.content_text ?? JSON.stringify(row.content_json),
     };
   }

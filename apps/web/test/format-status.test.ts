@@ -14,7 +14,7 @@ describe('display formatters', () => {
       formatBytes(1024 * 1024),
     ]).toEqual(['0 B', '1023 B', '1 KB', '1 MB']);
     expect(formatNumber(1234)).toContain('1');
-    expect(formatCurrency(1.25)).toContain('1.25');
+    expect(formatCurrency(1.25)).toContain('¥1.25');
   });
 
   it('maps known statuses and safely falls back for unknown values', () => {

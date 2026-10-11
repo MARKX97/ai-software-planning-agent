@@ -13,7 +13,7 @@ export interface ProviderConfigInput {
 
 /**
  * Static catalog of provider metadata. Pricing comes from
- * specs/model-routing.spec.md §3 and is fixed per model.
+ * specs/model-routing.spec.md §3 and is fixed per configured context tier.
  */
 export const PROVIDER_CONFIG_FACTORY = {
   /** Build all three provider configs from a single model-id map. */
@@ -22,29 +22,29 @@ export const PROVIDER_CONFIG_FACTORY = {
       {
         name: 'deepseek',
         modelId: input.modelIds.deepseek,
-        displayName: 'DeepSeek R1 0528',
-        pricing: { inputPer1k: 0.004, outputPer1k: 0.016, cachedInputPer1k: 0.0008 },
+        displayName: 'DeepSeek V4 Flash 0731',
+        pricing: { inputPer1k: 0.003, outputPer1k: 0.009, cachedInputPer1k: 0.0001 },
         maxTokens: 8192,
         capabilities: ['chat', 'streaming'],
-        description: '白山文档列出的通用推理模型',
+        description: '白山模型市场中的稀疏混合专家模型',
       },
       {
         name: 'glm',
         modelId: input.modelIds.glm,
-        displayName: 'GLM 4.5',
-        pricing: { inputPer1k: 0.002, outputPer1k: 0.006, cachedInputPer1k: 0.0004 },
+        displayName: 'GLM 5.2',
+        pricing: { inputPer1k: 0.008, outputPer1k: 0.028, cachedInputPer1k: 0.002 },
         maxTokens: 4096,
         capabilities: ['chat', 'streaming'],
-        description: '白山文档列出的通用大语言模型',
+        description: '白山模型市场中的旗舰大模型',
       },
       {
         name: 'minimax',
         modelId: input.modelIds.minimax,
-        displayName: 'MiniMax M2.5',
-        pricing: { inputPer1k: 0.0021, outputPer1k: 0.0084 },
+        displayName: 'MiniMax M3',
+        pricing: { inputPer1k: 0.0021, outputPer1k: 0.0084, cachedInputPer1k: 0.00042 },
         maxTokens: 4096,
         capabilities: ['chat', 'streaming'],
-        description: '白山公开活动说明中列出的通用模型',
+        description: '白山模型市场中的多模态基础模型（0–512K 上下文档）',
       },
     ];
   },

@@ -128,7 +128,8 @@ test('user can create a project, finish workflow, inspect and download artifacts
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/artifacts/[0-9a-f-]+$`));
     const artifactUrl = page.url();
     await expect(page.getByRole('button', { name: '下载这份内容' })).toBeVisible();
-    await expect(page.locator('pre')).toContainText('本地演示模式生成');
+    await expect(page.getByText('本地演示模式生成')).toBeVisible();
+    await expect(page.locator('pre')).toHaveCount(0);
     const citation = page.getByText(/^\[S1\] /).first();
     await expect(citation).toBeVisible();
     await citation.click();

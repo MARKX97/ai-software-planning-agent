@@ -126,7 +126,7 @@
 - `workflow/status.decision_snapshots` 返回已确认检查点的结构化结论；`quality_report` 在规划生成完成后返回确定性质量检查结果，生成前为 `null`。
 - `workflow/status.graph_run` 返回当前节点、checkpoint 版本和可恢复状态；`continue` 与 `advance` 必须回传 `graph_run_id`、`checkpoint_version`，过期恢复返回 409。
 - `workflow/status.graph_run` 同时返回脱敏 Tool 轨迹、调用次数、检索摘要和 interrupt 原因；不得返回完整 Tool 参数、来源内容或 Prompt。
-- 模型日志详情只返回 Prompt SHA-256、Prompt/响应长度和无内容状态摘要；不得返回 Prompt、响应或 structured output 原文。
+- 模型日志列表和详情可以返回固定、脱敏的调用说明；规划生成说明必须包含实际产物类型。详情还返回 Prompt SHA-256、Prompt/响应长度和状态摘要；不得返回 Prompt、响应或 structured output 原文。
 - `workflow/status.regeneration` 由服务端根据 active revision、引用快照和产物依赖计算；为空表示无需重生成。
 - `workflow/regenerate` 无请求体，只在项目已完成且存在影响时执行服务端计算的产物集合；并发调用返回 409，未受影响产物保持不变。
 - `workflow/continue` 只用于需求澄清回复；其他检查点讨论使用 `workflow/discuss`，确认后使用 `workflow/advance`。
@@ -134,7 +134,7 @@
 - SSE 响应必须使用 `Content-Type: text/event-stream`、`Cache-Control: no-cache, no-transform` 和 `X-Accel-Buffering: no`，避免中间代理缓存或缓冲。
 - 流开始前的校验/权限/阶段错误返回标准 JSON HTTP Error；流开始后的模型错误通过 SSE `error` 返回。
 - `done` 携带已持久化的 `assistant_message` 和最新 `status`。浏览器不得接触 Baishan Base URL 或 API Key。
-- Usage 与调用日志响应包含白山返回的 `cached_tokens` / `total_cached_tokens` 和 `cost_cached`；这些字段用于解释本地成本估算，不替代白山控制台账单。
+- Usage 与调用日志响应包含白山返回的 `cached_tokens` / `total_cached_tokens` 和 `cost_cached`；成本字段单位为人民币元，用于解释本地成本估算，不替代白山控制台账单。
 - `artifacts` 列表接口不返回完整 `content`，详情接口才返回。
 - 导出接口创建任务后，前端轮询 `export/{export_id}`。
 

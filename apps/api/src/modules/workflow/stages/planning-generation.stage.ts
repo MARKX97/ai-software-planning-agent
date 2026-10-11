@@ -14,7 +14,7 @@ import { ArtifactFileStore } from '../artifact-generation/artifact-file-store.js
 import type { StageDeps } from './stage-deps.js';
 import type { StageProcessor } from './stage-processor.js';
 import { logModelCall } from './model-call-log.js';
-import { ARTIFACT_TYPES } from './model-routing.js';
+import { ARTIFACT_DISPLAY_NAME, ARTIFACT_TYPES } from './model-routing.js';
 import { retainFailedRegenerationTargets } from '../artifact-generation/artifact-regeneration-state.js';
 
 export class PlanningGenerationStage implements StageProcessor {
@@ -28,10 +28,10 @@ export class PlanningGenerationStage implements StageProcessor {
     const targets = regenerationTargets(ctx);
     const result = await generator.generateAll(ctx, await this.loadEvidence(ctx), targets);
     for (const item of result.successes) {
-      for (const call of item.calls) await this.logCall(ctx, item.provider, call);
+      for (const call of item.calls) await this.logCall(ctx, item, call);
     }
     for (const item of result.failures) {
-      for (const call of item.calls) await this.logCall(ctx, item.provider, call);
+      for (const call of item.calls) await this.logCall(ctx, item, call);
     }
     if (ctx.regenerationTargets && result.failures.length > 0) {
       await retainFailedRegenerationTargets(
@@ -62,7 +62,7 @@ export class PlanningGenerationStage implements StageProcessor {
 
   private async logCall(
     ctx: WorkflowContext,
-    provider: string,
+    artifact: { readonly type: string; readonly provider: string },
     call: {
       readonly prompt: string;
       readonly response: import('@ai-planning/shared').LLMResponse | null;
@@ -74,11 +74,12 @@ export class PlanningGenerationStage implements StageProcessor {
       projectId: ctx.projectId,
       executionId: ctx.executionId,
       stage: this.stage,
-      provider,
+      provider: artifact.provider,
       promptText: call.prompt,
       response: call.response,
       error: call.error,
       attemptNumber: call.attemptNumber,
+      responseSummary: `生成${ARTIFACT_DISPLAY_NAME[artifact.type] ?? artifact.type}`,
     });
   }
 }

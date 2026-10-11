@@ -65,6 +65,7 @@ export interface ModelExecutionLogResponse {
   latency_ms: number | null;
   error_code: string | null;
   error_message: string | null;
+  response_summary: string | null;
   created_at: string;
 }
 
@@ -152,6 +153,7 @@ export function toModelExecutionLogResponse(log: ModelExecutionLog): ModelExecut
     latency_ms: log.latency_ms,
     error_code: log.error_code,
     error_message: log.error_message,
+    response_summary: log.response_summary,
     created_at: log.created_at.toISOString(),
   };
 }
@@ -163,7 +165,6 @@ export function toModelExecutionLogDetail(log: ModelExecutionLog): ModelExecutio
     prompt_hash: log.prompt_hash,
     prompt_length: log.prompt_length,
     response_length: log.response_length,
-    response_summary: log.response_summary,
   };
 }
 

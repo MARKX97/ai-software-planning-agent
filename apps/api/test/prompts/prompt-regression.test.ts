@@ -61,6 +61,7 @@ describe('prompt regression', () => {
     for (const [template, vars] of cases) {
       const rendered = renderPrompt(template, vars);
       assert.doesNotMatch(rendered, /\{\{\w+\}\}/);
+      assert.match(rendered, /Simplified Chinese/);
       if (
         template !== PLANNING_GENERATION_PROMPT &&
         template !== CLARIFICATION_PROMPT &&

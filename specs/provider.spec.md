@@ -33,36 +33,43 @@ chat() 流程:
      - 校验失败: structuredOutput = null (不抛异常，降级)
 ```
 
+HTTP 200 但 `choices[0].message.content` 为空或全空白，视为无效模型响应并按可重试网络错误处理；
+不得将空响应持久化为成功的阶段结果。
+
 `chatStream()` 复用同一响应归一化流程，但通过 `ILLMHttpClient.stream()` 实时触发 `onDelta`，流结束后仍返回聚合后的标准 `LLMResponse`，用于日志、Token 和成本记录。
 
 ## 3. 当前 Provider 实现
 
 ### 3.1 DeepSeekProvider
 
-| 属性           | 值                 |
-| -------------- | ------------------ |
-| name           | `deepseek`         |
-| modelId        | `DeepSeek-R1-0528` |
-| pricing.input  | ¥0.004 / 1K tokens |
-| pricing.output | ¥0.016 / 1K tokens |
+| 属性           | 值                       |
+| -------------- | ------------------------ |
+| name           | `deepseek`               |
+| modelId        | `DeepSeek-V4-Flash-0731` |
+| pricing.input  | ¥0.003 / 1K tokens       |
+| pricing.output | ¥0.009 / 1K tokens       |
+| pricing.cached | ¥0.0001 / 1K tokens      |
+| 默认 maxTokens | 8192                     |
 
 ### 3.2 GLMProvider
 
 | 属性           | 值                 |
 | -------------- | ------------------ |
 | name           | `glm`              |
-| modelId        | `GLM-4.5`          |
-| pricing.input  | ¥0.002 / 1K tokens |
-| pricing.output | ¥0.006 / 1K tokens |
+| modelId        | `GLM-5.2`          |
+| pricing.input  | ¥0.008 / 1K tokens |
+| pricing.output | ¥0.028 / 1K tokens |
+| pricing.cached | ¥0.002 / 1K tokens |
 
 ### 3.3 MiniMaxProvider
 
-| 属性           | 值                  |
-| -------------- | ------------------- |
-| name           | `minimax`           |
-| modelId        | `MiniMax-M2.5`      |
-| pricing.input  | ¥0.0021 / 1K tokens |
-| pricing.output | ¥0.0084 / 1K tokens |
+| 属性           | 值                   |
+| -------------- | -------------------- |
+| name           | `minimax`            |
+| modelId        | `MiniMax-M3`         |
+| pricing.input  | ¥0.0021 / 1K tokens  |
+| pricing.output | ¥0.0084 / 1K tokens  |
+| pricing.cached | ¥0.00042 / 1K tokens |
 
 ## 4. ProviderRegistry
 
@@ -80,13 +87,15 @@ healthCheckAll(): Promise<Record<string, boolean>>
 
 ```bash
 BAISHAN_BASE_URL=https://api.edgefn.net/v1
-BAISHAN_API_KEY=sk-xxx
-BAISHAN_MODEL_DEEPSEEK=DeepSeek-R1-0528
-BAISHAN_MODEL_GLM=GLM-4.5
-BAISHAN_MODEL_MINIMAX=MiniMax-M2.5
+BAISHAN_API_KEY_DEEPSEEK=sk-xxx
+BAISHAN_API_KEY_GLM=sk-xxx
+BAISHAN_API_KEY_MINIMAX=sk-xxx
+BAISHAN_MODEL_DEEPSEEK=DeepSeek-V4-Flash-0731
+BAISHAN_MODEL_GLM=GLM-5.2
+BAISHAN_MODEL_MINIMAX=MiniMax-M3
 ```
 
-模型 ID 区分大小写。默认值只选择白山公开文档可验证的模型；上线前必须在控制台确认账号可用模型和实时价格。API Key 仅保存在 API Server 环境变量中，并通过 `Authorization: Bearer` 发送。
+模型 ID 区分大小写。默认值与价格以白山模型市场为准；上线前必须在控制台确认账号可用模型和实时价格。三个 Key 分别绑定对应 Provider，并通过各自独立 Adapter 的 `Authorization: Bearer` 发送。三个 Key 都为空时使用确定性 Mock；只配置部分 Key 是无效配置，应用必须启动失败，禁止混用真实和 Mock Provider。
 
 ## 6. LLMResponse 类型
 
@@ -104,12 +113,12 @@ BAISHAN_MODEL_MINIMAX=MiniMax-M2.5
 
 ## 7. LLMCallOptions
 
-| 字段           | 类型      | 默认值 | 说明                 |
-| -------------- | --------- | ------ | -------------------- |
-| `outputSchema` | ZodSchema | —      | 结构化输出约束       |
-| `temperature`  | number    | 1      | 温度（白山范围 0-2） |
-| `maxTokens`    | number    | 4096   | 最大输出 token       |
-| `timeout`      | number    | 60000  | 超时 (ms)            |
+| 字段           | 类型      | 默认值                        | 说明                 |
+| -------------- | --------- | ----------------------------- | -------------------- |
+| `outputSchema` | ZodSchema | —                             | 结构化输出约束       |
+| `temperature`  | number    | 1                             | 温度（白山范围 0-2） |
+| `maxTokens`    | number    | DeepSeek 为 8192，其余为 4096 | 最大输出 token       |
+| `timeout`      | number    | 60000                         | 超时 (ms)            |
 
 `LLMStreamOptions` 在以上字段基础上增加必填 `onDelta(content)` 和可选 `signal: AbortSignal`。
 

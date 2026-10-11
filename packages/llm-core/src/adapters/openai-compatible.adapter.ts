@@ -143,7 +143,7 @@ export class OpenAICompatibleAdapter implements ILLMHttpClient {
       usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; cached_tokens?: unknown };
     };
     const content = body.choices?.[0]?.message?.content;
-    if (typeof content !== 'string') {
+    if (typeof content !== 'string' || !content.trim()) {
       throw new LLMNetworkError('Gateway response missing choices[0].message.content');
     }
     const inputTokens = Number(body.usage?.prompt_tokens ?? 0);

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
+import type { LLMProviderName } from '@ai-planning/shared';
 
 /**
  * Reads app-level configuration from environment variables.
@@ -27,8 +28,8 @@ export class AppConfigService {
   readonly databaseUrl: string;
   /** Baishan OpenAI-compatible base URL. */
   readonly baishanBaseUrl: string;
-  /** Baishan API key. */
-  readonly baishanApiKey: string;
+  /** Baishan API keys, one per logical provider. */
+  readonly baishanApiKeys: Record<LLMProviderName, string>;
   /** Baishan model IDs for the three providers. */
   readonly modelDeepseek: string;
   readonly modelGlm: string;
@@ -63,10 +64,14 @@ export class AppConfigService {
     this.logLevel = process.env['LOG_LEVEL'] ?? 'DEBUG';
     this.databaseUrl = process.env['DATABASE_URL'] ?? '';
     this.baishanBaseUrl = process.env['BAISHAN_BASE_URL'] ?? 'https://api.edgefn.net/v1';
-    this.baishanApiKey = process.env['BAISHAN_API_KEY'] ?? '';
-    this.modelDeepseek = process.env['BAISHAN_MODEL_DEEPSEEK'] ?? 'DeepSeek-R1-0528';
-    this.modelGlm = process.env['BAISHAN_MODEL_GLM'] ?? 'GLM-4.5';
-    this.modelMinimax = process.env['BAISHAN_MODEL_MINIMAX'] ?? 'MiniMax-M2.5';
+    this.baishanApiKeys = {
+      deepseek: process.env['BAISHAN_API_KEY_DEEPSEEK']?.trim() ?? '',
+      glm: process.env['BAISHAN_API_KEY_GLM']?.trim() ?? '',
+      minimax: process.env['BAISHAN_API_KEY_MINIMAX']?.trim() ?? '',
+    };
+    this.modelDeepseek = process.env['BAISHAN_MODEL_DEEPSEEK'] ?? 'DeepSeek-V4-Flash-0731';
+    this.modelGlm = process.env['BAISHAN_MODEL_GLM'] ?? 'GLM-5.2';
+    this.modelMinimax = process.env['BAISHAN_MODEL_MINIMAX'] ?? 'MiniMax-M3';
     this.embeddingProvider = this.parseEmbeddingProvider(process.env['EMBEDDING_PROVIDER']);
     this.embeddingBaseUrl = process.env['EMBEDDING_BASE_URL'] ?? '';
     this.embeddingApiKey = process.env['EMBEDDING_API_KEY'] ?? '';

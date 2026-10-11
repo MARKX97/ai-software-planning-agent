@@ -207,7 +207,11 @@ function checkSecrets() {
   for (const absolute of walk('apps/web/src', (file) => /\.(ts|tsx)$/.test(file))) {
     const file = repoPath(absolute);
     const source = read(file);
-    if (/\b(BAISHAN_API_KEY|BAISHAN_BASE_URL|DATABASE_URL|DOWNLOAD_TOKEN_SECRET)\b/.test(source)) {
+    if (
+      /\b(BAISHAN_API_KEY(?:_[A-Z]+)?|BAISHAN_BASE_URL|DATABASE_URL|DOWNLOAD_TOKEN_SECRET)\b/.test(
+        source,
+      )
+    ) {
       issues.push(
         issue(
           'HE-SEC-004',

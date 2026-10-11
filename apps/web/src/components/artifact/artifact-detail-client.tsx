@@ -6,6 +6,7 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardBody } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/feedback';
+import { MarkdownDocument } from '@/components/ui/markdown-document';
 import { ListSkeleton } from '@/components/ui/skeleton';
 import { downloadArtifact, getArtifact } from '@/features/artifacts/api';
 import { formatBytes, formatDateTime } from '@/lib/format';
@@ -93,9 +94,7 @@ function ArtifactBody({ artifact }: { artifact: ArtifactResponse }) {
     <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
       <Card>
         <CardBody>
-          <pre className="max-w-none whitespace-pre-wrap break-words font-mono text-sm leading-7 text-slate-800">
-            {artifact.content ?? '这份内容暂时还是空的。'}
-          </pre>
+          <MarkdownDocument content={artifact.content ?? '这份内容暂时还是空的。'} />
         </CardBody>
       </Card>
       <aside className="grid h-fit gap-3">

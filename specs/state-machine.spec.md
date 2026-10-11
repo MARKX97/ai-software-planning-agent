@@ -94,6 +94,10 @@ FAILED                      → { }
 | `on_exit_synthesis` | 更新 `project.requirement_text`                    |
 | `on_exit_planning`  | 保存所有产物到 `artifacts` 表 + 文件系统           |
 
+恢复阶段结果时，`analysis_results.result_type=free_text` 仅作为审计快照，不能还原为
+`structuredOutput`。它不满足阶段恢复条件，下一次运行必须从该阶段重新执行；不得把
+`{ content: '' }` 等兜底 JSON 误判为已验证的结构化结果。
+
 ## 8. 流式交互状态
 
 - SSE 连接存续期间，项目保持在当前检查点；只有完整回复成功后才更新可见消息与状态响应。
